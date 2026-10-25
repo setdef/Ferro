@@ -200,6 +200,15 @@ module Ferro
       # On Windows and Linux this raises an Error subclass if the clipboard
       # cannot be cleared. Clearing an empty clipboard succeeds.
       #
+      # On X11, arboard clears by giving up the selection, and the X server
+      # answers with a SelectionClear event that arboard's server thread
+      # handles later by dropping whatever the process holds for that
+      # selection (<tt>src/platform/linux/x11.rs:233-242</tt>,
+      # <tt>:835-856</tt>). Text set right after a clear, from any clipboard
+      # in the process, can be dropped by that late event: the process still
+      # owns the selection but has nothing to offer, so reads raise
+      # Error::ContentNotAvailable.
+      #
       # Mirrors arboard's <tt>Clipboard::clear</tt>
       # (<tt>src/lib.rs:150-158</tt>).
       #

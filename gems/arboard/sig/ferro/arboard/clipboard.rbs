@@ -29,6 +29,7 @@ module Ferro
       def native_set_html: (String html, String? alt_text, native_set_options options) -> void
       def native_set_image: (Integer width, Integer height, String bytes, native_set_options options) -> void
       def native_set_file_list: (Array[String] paths, native_set_options options) -> void
+      def native_gvl_releases: () -> Integer
     end
   end
 end

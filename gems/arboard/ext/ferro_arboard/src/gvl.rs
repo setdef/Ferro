@@ -34,6 +34,7 @@
 use std::ffi::c_void;
 use std::panic::{self, AssertUnwindSafe};
 use std::ptr;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use magnus::{Error, Ruby};
 
@@ -45,6 +46,16 @@ pub enum Gvl {
     Released,
     Held,
 }
+
+/// How many times work has run with the GVL released in this process.
+///
+/// The tests read it (`Clipboard#native_gvl_releases`) to tell which path a
+/// call took. Whether another Ruby thread actually runs meanwhile is up to
+/// Ruby's scheduler: from Ruby 4.0.6 on, a thread returning from a short
+/// blocking region takes the GVL straight back when the thread it woke has
+/// not started yet (`thread_pthread.c:846-867` and `:1055-1066` at
+/// v4.0.9), so a fast read can release the lock without anyone using it.
+pub static RELEASES: AtomicUsize = AtomicUsize::new(0);
 
 /// How many times `drive` lets Ruby skip the work for a pending interrupt
 /// before running it with the GVL held.
@@ -82,6 +93,7 @@ pub extern "C" fn run<F: FnOnce(Gvl) -> T, T>(data: *mut c_void) -> *mut c_void 
     // reference meanwhile.
     #[allow(unsafe_code)]
     let call = unsafe { &mut *data.cast::<Call<F, T>>() };
+    RELEASES.fetch_add(1, Ordering::Relaxed);
     call.run(Gvl::Released);
     ptr::null_mut()
 }
@@ -159,10 +171,11 @@ pub fn without_gvl<F: FnOnce(Gvl) -> T, T>(
 
 #[cfg(test)]
 mod tests {
-    use super::{drive, run, Call, Gvl, TRIES};
+    use super::{drive, run, Call, Gvl, RELEASES, TRIES};
     use std::cell::Cell;
     use std::ffi::c_void;
     use std::ptr;
+    use std::sync::atomic::Ordering;
 
     fn call_run<F: FnOnce(Gvl) -> T, T>(call: &mut Call<F, T>) {
         run::<F, T>(ptr::from_mut(call).cast::<c_void>());
@@ -180,6 +193,16 @@ mod tests {
         assert!(matches!(call.outcome, Some(Ok(Gvl::Released))));
         drop(call);
         assert_eq!(runs, 1);
+    }
+
+    // Other tests run `run` on other threads at the same time, so this
+    // looks only for its own increment.
+    #[test]
+    fn running_unlocked_counts_a_release() {
+        let before = RELEASES.load(Ordering::Relaxed);
+        let mut call = Call::new(|gvl| gvl);
+        call_run(&mut call);
+        assert!(RELEASES.load(Ordering::Relaxed) > before);
     }
 
     #[test]

@@ -10,47 +10,49 @@ require "test_helper"
 # Calls that can block release Ruby's global VM lock; short calls keep it,
 # since releasing and retaking it costs a time slice per competing thread
 # (plan 001, decision 14). On Linux every read can block on the owning
-# program; on macOS and Windows none does. test_linux.rb covers the waits.
+# program, and so can a write that waits; on macOS and Windows none does.
+#
+# These tests count the releases (gvl.rs RELEASES) rather than time a
+# spinning thread. A released lock does not promise another thread runs:
+# from Ruby 4.0.6 on, a thread back from a short blocking region takes the
+# lock straight back when the thread it woke has not started yet
+# (thread_pthread.c:846-867 and :1055-1066 at v4.0.9), and a spinner test
+# failed that way in a few runs in ten. test_linux.rb shows a released lock
+# at work: another thread replaces the text while a write waits.
 class TestGvl < Minitest::Test
   include ClipboardSuite
 
-  # A thread spins on a counter while this one reads the clipboard three
-  # times, and returns how far the counter moved during each read.
-  private def spinner_progress
-    clipboard.set_text("spin")
-    count = 0
-    stop = false
-    spinner = Thread.new { count += 1 until stop }
-    Thread.pass until count.positive?
-
-    Array.new(3) do
-      before = count
-      clipboard.get_text
-      count - before
+  # How many more calls released the lock while the block ran. The block's
+  # result does not matter here, only its path: on X11 a read can find
+  # nothing when another test's clear lands late (Clipboard#clear), and it
+  # takes the same path either way.
+  private def releases
+    before = clipboard.__send__(:native_gvl_releases)
+    begin
+      yield
+    rescue Ferro::Arboard::Error::ContentNotAvailable
+      nil
     end
-  ensure
-    stop = true
-    spinner&.join
+    clipboard.__send__(:native_gvl_releases) - before
   end
 
-  # A released lock lets the spinner run during each read. Holding it, the
-  # counter could move only if Ruby switched threads in the instant before
-  # the read, three times over.
-  def test_linux_reads_let_other_threads_run
+  def test_linux_reads_and_waiting_writes_release_the_lock
     skip_unless_platform(:linux)
+    clipboard.set_text("read me")
+    past = Process.clock_gettime(Process::CLOCK_MONOTONIC) - 1
 
-    progress = spinner_progress
-
-    assert progress.all?(&:positive?), "the spinner stalled during a read: #{progress}"
+    assert_equal 1, releases { clipboard.get_text }
+    assert_equal 1, releases { clipboard.set.wait_until(past).text("waited") }
   end
 
-  # The reverse: a read that keeps the lock leaves the spinner still. One
-  # switch in the instant before a read is allowed for.
-  def test_short_reads_keep_the_lock_off_linux
-    skip "Linux reads release the lock; see test_linux_reads_let_other_threads_run" if PLATFORM == :linux
+  def test_reads_keep_the_lock_off_linux
+    skip "Linux reads release the lock; see test_linux_reads_and_waiting_writes_release_the_lock" if PLATFORM == :linux
+    clipboard.set_text("read me")
 
-    progress = spinner_progress
+    assert_equal 0, releases { clipboard.get_text }
+  end
 
-    assert_operator progress.count(&:zero?), :>=, 2, "a short read released the lock: #{progress}"
+  def test_writes_that_do_not_wait_keep_the_lock
+    assert_equal 0, releases { clipboard.set_text("short") }
   end
 end

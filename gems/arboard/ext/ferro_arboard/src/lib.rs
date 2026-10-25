@@ -685,6 +685,12 @@ impl Clipboard {
     }
 }
 
+/// How many calls have run with the GVL released (`gvl::RELEASES`), for
+/// the tests that check which calls release it.
+fn native_gvl_releases(_clipboard: &Clipboard) -> usize {
+    gvl::RELEASES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 #[magnus::init]
 fn init(ruby: &Ruby) -> Result<(), Error> {
     // SAFETY: Ruby asks a Ractor-safe extension to share no unshareable
@@ -735,6 +741,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         "native_set_file_list",
         method!(Clipboard::native_set_file_list, 2),
     )?;
+    class.define_private_method("native_gvl_releases", method!(native_gvl_releases, 0))?;
     Ok(())
 }
 
