@@ -149,7 +149,12 @@ Three things differ from calling arboard from Rust:
   thread. That happens when the garbage collector frees the clipboard, so a
   GC sweep can pause for it.
 * The extension is Ractor-safe, and a frozen Clipboard may be shared with
-  other Ractors.
+  other Ractors. On Windows, Ruby 4.0.9 can hang when a Ractor starts a
+  garbage collection while the main Ractor has another thread asleep and
+  its main thread waits in Ractor#value; the bug is Ruby's, needs no
+  clipboard, and Ruby 4.1 replaces the Windows scheduler involved. Keep
+  the main Ractor's other threads busy or absent while it waits on a
+  Ractor there.
 
 ferro-arboard 0.1.0.pre.1 binds arboard 3.7.0. The gem's version follows its
 own API; its +arboard_version+ metadata names the arboard release.

@@ -6,62 +6,82 @@
 #++
 
 require "test_helper"
+require "open3"
+require "rbconfig"
+require "tmpdir"
 
 # arboard's Clipboard is Send and Sync (src/lib.rs:510-516), so the
 # extension is marked Ractor-safe and a frozen clipboard may be shared
 # (plan 001, decision 13). Without rb_ext_ractor_safe, every call from a
 # non-main Ractor raises Ractor::UnsafeError.
+#
+# Each test is a script whose last value is what it checks. On Windows the
+# script runs in a child process, because of a Ruby 4.0 bug there: a VM
+# barrier (a GC inside a Ractor starts one) waits forever while the main
+# Ractor has a thread asleep and its main thread waits in Ractor#value.
+# Ruby's Windows barrier counts a Ractor as stopped only when all its
+# threads are in blocking regions, which a sleeping thread is not
+# (thread_win32.c:932-963, ractor.c:781-790, thread.c:170-178 and :1535 at
+# v4.0.9), and Minitest and the test watchdog always keep threads asleep
+# here. A child process has only its main thread. Elsewhere the script runs
+# in this process. Plan 001 has the evidence.
 class TestRactor < Minitest::Test
   include ClipboardSuite
 
-  # With FERRO_TEST_TRACE set, as CI sets it, each Ractor reports each step
-  # to stderr as it takes it. Windows CI hung once in Ractor#value with no
-  # sign of where the Ractor stopped: in a clipboard call, or after its
-  # block returned. The last step printed says which.
-  TRACE = !ENV.fetch("FERRO_TEST_TRACE", "").empty?
+  # The child: reads a script on stdin and writes its value, marshaled.
+  CHILD = <<~RUBY
+    require "ferro/arboard"
+    Warning[:experimental] = false
+    $stdout.binmode.write(Marshal.dump(eval($stdin.read, TOPLEVEL_BINDING)))
+  RUBY
 
-  private def quietly
+  # The value of +script+, run as the comment above says.
+  private def run_script(script)
+    return in_child(script) if PLATFORM == :windows
+
     experimental = Warning[:experimental]
     Warning[:experimental] = false
-    yield
+    eval(script, TOPLEVEL_BINDING)
   ensure
-    Warning[:experimental] = experimental
+    Warning[:experimental] = experimental unless PLATFORM == :windows
+  end
+
+  private def in_child(script)
+    Dir.mktmpdir("ferro-ractor") do |dir|
+      child = File.join(dir, "child.rb")
+      File.write(child, CHILD)
+      output, errors, status = Open3.capture3(RbConfig.ruby, "-I", File.expand_path("../lib", __dir__), child,
+        stdin_data: script, binmode: true)
+      raise "the child Ruby failed: #{errors}" unless status.success?
+
+      Marshal.load(output)
+    end
   end
 
   def test_another_ractor_round_trips_text_through_a_shared_clipboard
-    shared = Ractor.make_shareable(Ferro::Arboard::Clipboard.new)
-
-    read = quietly do
-      Ractor.new(TRACE, shared) do |trace, clipboard|
-        step = -> (name) { warn("ractor: #{name}") if trace }
-        step.call("setting text through the shared clipboard")
+    read, read_here = run_script(<<~RUBY)
+      shared = Ractor.make_shareable(Ferro::Arboard::Clipboard.new)
+      read = Ractor.new(shared) do |clipboard|
         clipboard.set_text("from a Ractor")
-        step.call("reading it back")
-        text = clipboard.get_text
-        step.call("returning")
-        text
+        clipboard.get_text
       end.value
-    end
+      [read, Ferro::Arboard::Clipboard.new.get_text]
+    RUBY
 
     assert_equal "from a Ractor", read
-    assert_equal "from a Ractor", clipboard.get_text
+    assert_equal "from a Ractor", read_here
   end
 
   def test_another_ractor_opens_its_own_clipboard_and_rescues_arboards_errors
-    raised = quietly do
-      Ractor.new(TRACE) do |trace|
-        step = -> (name) { warn("ractor: #{name}") if trace }
-        step.call("opening a clipboard")
+    raised = run_script(<<~RUBY)
+      Ractor.new do
         clipboard = Ferro::Arboard::Clipboard.new
-        step.call("clearing it")
         clipboard.clear
-        step.call("reading the empty clipboard")
         clipboard.get_text
       rescue Ferro::Arboard::Error::ContentNotAvailable => e
-        step.call("rescued #{e.class}; returning")
         e.message
       end.value
-    end
+    RUBY
 
     assert_equal NOT_AVAILABLE, raised
   end

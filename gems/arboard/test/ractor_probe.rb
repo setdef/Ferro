@@ -76,6 +76,34 @@ STEPS = <<~'RUBY'
       shared = Ractor.make_shareable(Object.new)
       Ractor.new(shared) { |object| $stderr.puts("    ractor: returning"); object.frozen? }.value
     end,
+    # Another thread in the main Ractor, asleep, as Minitest's and the
+    # watchdog's are during the tests.
+    "sleeper" => lambda do
+      sleeper = Thread.new { sleep }
+      Thread.pass until sleeper.status == "sleep"
+      :sleeping
+    end,
+    # A GC inside a Ractor, which needs a VM barrier, while the main thread
+    # waits in Ractor#value. No gem involved.
+    "ractor_gc" => lambda do
+      Ractor.new { sleep 0.1; $stderr.puts("    ractor: GC.start"); GC.start; :gc_done }.value
+    end,
+    # The same GC, but the main thread waits by polling, so it stays runnable.
+    "ractor_gc_polled" => lambda do
+      ractor = Ractor.new { sleep 0.1; $stderr.puts("    ractor: GC.start"); GC.start; :gc_done }
+      Thread.pass until ractor.inspect.include?("terminated")
+      ractor.value
+    end,
+    # The shared-clipboard test with a GC inside its Ractor.
+    "shared_gc" => lambda do
+      shared = Ractor.make_shareable(Ferro::Arboard::Clipboard.new)
+      Ractor.new(shared) do |clipboard|
+        clipboard.set_text("from a Ractor")
+        sleep 0.1
+        $stderr.puts("    ractor: GC.start"); GC.start
+        clipboard.get_text
+      end.value
+    end,
     # The main thread's own read, as the shared test ends.
     "main_read" => -> { Ferro::Arboard::Clipboard.new.get_text },
   }.freeze
@@ -93,13 +121,18 @@ STEPS = <<~'RUBY'
 RUBY
 
 SCENARIOS = {
-  "shared, own (the failing order)" => %w[shared main_read own],
-  "own, shared (the passing order)" => %w[own shared main_read],
-  "shared, own_no_raise" => %w[shared main_read own_no_raise],
-  "shared, ruby_raise" => %w[shared main_read ruby_raise],
-  "plain, own" => %w[plain own],
-  "shared_plain, own" => %w[shared_plain own],
-  "own, own" => %w[own own],
+  # The CI hangs: the tests' two orders, each process holding only its main
+  # thread, never stopped in 140 runs.
+  "shared, own" => %w[shared main_read own],
+  "own, shared" => %w[own shared main_read],
+  # The suspected Ruby bug, without the gem: a Ractor's GC while another
+  # main-Ractor thread sleeps. Expected to stop on Windows only.
+  "ruby: sleeper, ractor_gc" => %w[sleeper ractor_gc],
+  "ruby: ractor_gc" => %w[ractor_gc],
+  "ruby: sleeper, ractor_gc_polled" => %w[sleeper ractor_gc_polled],
+  # The same trigger through the gem's shared-clipboard test.
+  "gem: sleeper, shared_gc" => %w[sleeper shared_gc],
+  "gem: shared_gc" => %w[shared_gc],
 }.freeze
 
 runs = Integer(ARGV.fetch(0, "20"))

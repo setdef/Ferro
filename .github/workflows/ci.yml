@@ -33,9 +33,6 @@ jobs:
         # ships, and remove one only when it reaches end of life.
         ruby:
           - "4.0"
-    # The Ractor tests report each step when this is set (test_ractor.rb).
-    env:
-      FERRO_TEST_TRACE: "1"
     defaults:
       run:
         shell: bash
