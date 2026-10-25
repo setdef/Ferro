@@ -14,6 +14,12 @@ require "test_helper"
 class TestRactor < Minitest::Test
   include ClipboardSuite
 
+  # With FERRO_TEST_TRACE set, as CI sets it, each Ractor reports each step
+  # to stderr as it takes it. Windows CI hung once in Ractor#value with no
+  # sign of where the Ractor stopped: in a clipboard call, or after its
+  # block returned. The last step printed says which.
+  TRACE = !ENV.fetch("FERRO_TEST_TRACE", "").empty?
+
   private def quietly
     experimental = Warning[:experimental]
     Warning[:experimental] = false
@@ -26,9 +32,14 @@ class TestRactor < Minitest::Test
     shared = Ractor.make_shareable(Ferro::Arboard::Clipboard.new)
 
     read = quietly do
-      Ractor.new(shared) do |clipboard|
+      Ractor.new(TRACE, shared) do |trace, clipboard|
+        step = -> (name) { warn("ractor: #{name}") if trace }
+        step.call("setting text through the shared clipboard")
         clipboard.set_text("from a Ractor")
-        clipboard.get_text
+        step.call("reading it back")
+        text = clipboard.get_text
+        step.call("returning")
+        text
       end.value
     end
 
@@ -38,11 +49,16 @@ class TestRactor < Minitest::Test
 
   def test_another_ractor_opens_its_own_clipboard_and_rescues_arboards_errors
     raised = quietly do
-      Ractor.new do
+      Ractor.new(TRACE) do |trace|
+        step = -> (name) { warn("ractor: #{name}") if trace }
+        step.call("opening a clipboard")
         clipboard = Ferro::Arboard::Clipboard.new
+        step.call("clearing it")
         clipboard.clear
+        step.call("reading the empty clipboard")
         clipboard.get_text
       rescue Ferro::Arboard::Error::ContentNotAvailable => e
+        step.call("rescued #{e.class}; returning")
         e.message
       end.value
     end

@@ -24,7 +24,8 @@ loop do
   test, started = current
   next unless test && Time.now - started > limit
 
-  warn "❌ #{test} did not finish within #{limit.round} s, and holds Ruby's VM lock; killing the test process"
+  warn "❌ #{test} did not finish within #{limit.round} s (it has run #{format('%.1f', Time.now - started)} s), " \
+    "and holds Ruby's VM lock; killing the test process"
   Process.kill(:KILL, parent)
   exit 1
 end

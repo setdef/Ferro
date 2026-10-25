@@ -80,6 +80,18 @@ class TestBump < Minitest::Test
     assert_includes read("gems/demo/CHANGELOG.md"), "## [Unreleased]\n\n## [0.1.0.pre.2] - 2026-10-25\n\n### Added\n\n- A thing.\n"
     assert_equal 1, @gate_runs
     assert_equal ["chore(demo): release 0.1.0.pre.2", "init"], log
+    assert_equal <<~MESSAGE, IO.popen(["git", "log", "-1", "--format=%B", chdir: @root], &:read).chomp
+      chore(demo): release 0.1.0.pre.2
+
+      Release ferro-demo 0.1.0.pre.2. The entries that were under Unreleased
+      in its CHANGELOG are now the 0.1.0.pre.2 section, dated 2026-10-25, and
+      version.rb, the crate's Cargo.toml, its Cargo.lock, and the root
+      Gemfile.lock name 0.1.0.pre.2. Tag it with rake release:demo:tag.
+
+      Generated with Claude Code (https://claude.com/claude-code)
+
+      Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+    MESSAGE
     assert_empty IO.popen(["git", "status", "--porcelain", chdir: @root], &:read)
   end
 

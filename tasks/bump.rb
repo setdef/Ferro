@@ -31,6 +31,13 @@ class Bump
   # Raised when the bump must not proceed; the message says why.
   class Failure < StandardError; end
 
+  # The footer AGENTS.md asks every commit to end with.
+  FOOTER = <<~FOOTER.chomp
+    Generated with Claude Code (https://claude.com/claude-code)
+
+    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+  FOOTER
+
   # Where version.rb writes the version.
   VERSION = /(?<=VERSION = ")[^"]+(?=")/
 
@@ -61,10 +68,24 @@ class Bump
     raise Failure, "the gate failed; #{target}'s changes are left uncommitted for you to inspect" unless @gate.call
 
     git("add", "--", *files)
-    git("commit", "--quiet", "--message", "chore(#{@gem.short_name}): release #{target}")
+    git("commit", "--quiet", "--message", commit_message(target))
     target
   rescue Changelog::Failure, ArgumentError => e
     raise Failure, e.message
+  end
+
+  # The release commit's message: a scoped Conventional Commit subject, a
+  # short prose body, and the footer AGENTS.md asks for.
+  def commit_message(target)
+    <<~MESSAGE
+      chore(#{@gem.short_name}): release #{target}
+
+      #{wrap("Release #{@gem.name} #{target}. The entries that were under Unreleased in its CHANGELOG are now the " \
+        "#{target} section, dated #{@date.iso8601}, and version.rb, the crate's Cargo.toml, its Cargo.lock, and the " \
+        "root Gemfile.lock name #{target}. Tag it with rake release:#{@gem.short_name}:tag.")}
+
+      #{FOOTER}
+    MESSAGE
   end
 
   # Rewrites every file, or none: the tree was clean, so a failure part way
@@ -75,6 +96,11 @@ class Bump
   rescue Failure, Changelog::Failure
     git("checkout", "--", *files)
     raise
+  end
+
+  # +text+ wrapped at 72 columns, as commit bodies are.
+  private def wrap(text)
+    text.gsub(/(.{1,72})(?:\s+|\z)/, "\\1\n").chomp
   end
 
   private def preflight!

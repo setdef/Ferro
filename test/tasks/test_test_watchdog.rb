@@ -24,13 +24,18 @@ class TestTestWatchdog < Minitest::Test
 
     refute_predicate status, :success?
     assert_includes output, "TestFixture#test_hangs did not finish within 1 s"
+    assert_operator Float(output[/it has run (\d+\.\d) s/, 1]), :>=, 1.0
     assert_match(/in 'Kernel#sleep'/, output)
   end
 
-  def test_tests_within_the_limit_pass
-    output, status = run_suite("def test_quick; sleep 0.2; assert true; end; def test_also; assert true; end")
+  # Each test gets the whole limit from its own start, however long the
+  # tests before it took together.
+  def test_the_limit_is_per_test_and_never_ends_one_early
+    tests = Array.new(3) { |n| "def test_#{n}; sleep 0.7; assert true; end" }.join("; ")
+
+    output, status = run_suite(tests)
 
     assert_predicate status, :success?, output
-    assert_includes output, "2 runs, 2 assertions, 0 failures"
+    assert_includes output, "3 runs, 3 assertions, 0 failures"
   end
 end

@@ -71,15 +71,16 @@ module TestWatchdog
       loop do
         sleep 0.5
         test, started = @lock.synchronize { @current }
-        next unless test && monotonic - started > LIMIT
+        next unless test && (elapsed = monotonic - started) > LIMIT
 
-        report(test)
+        report(test, elapsed)
         exit!(1)
       end
     end
 
-    private def report(test)
-      warn "\n❌ #{test} did not finish within #{LIMIT.round} s. Ruby's threads:"
+    private def report(test, elapsed)
+      warn "\n❌ #{test} did not finish within #{LIMIT.round} s (it has run #{format('%.1f', elapsed)} s). " \
+        "Ruby's threads:"
       Thread.list.each do |thread|
         warn "#{thread.inspect}\n  #{(thread.backtrace || ['(no backtrace)']).join("\n  ")}"
       end
