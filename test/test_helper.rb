@@ -9,3 +9,16 @@
 # each gem's tests live in gems/<name>/test.
 require "minitest/autorun"
 require "stringio"
+
+# The tests make throwaway git repositories and delete them in teardown.
+# After a commit, git starts `git maintenance run --auto` in the background
+# (maintenance.autoDetach, on by default since git 2.47), which creates and
+# removes .git/objects/maintenance.lock while teardown deletes the
+# directory, so the removal can fail on a file that vanished (seen on
+# macOS CI). Every git the tests run, directly or through the tasks they
+# test, skips that work.
+ENV["GIT_CONFIG_COUNT"] = "2"
+ENV["GIT_CONFIG_KEY_0"] = "maintenance.auto"
+ENV["GIT_CONFIG_VALUE_0"] = "false"
+ENV["GIT_CONFIG_KEY_1"] = "gc.auto"
+ENV["GIT_CONFIG_VALUE_1"] = "0"

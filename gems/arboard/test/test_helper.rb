@@ -42,6 +42,13 @@ module ClipboardSuite
     skip "#{platform} only; this extension was built for #{PLATFORM}" unless PLATFORM == platform
   end
 
+  # +path+ as arboard returns it from a file list. On Windows that is the
+  # path Windows resolves, with backslashes (src/platform/windows.rs:923-952),
+  # where Ruby writes forward slashes.
+  private def native_path(path)
+    (PLATFORM == :windows) ? path.tr("/", "\\") : path
+  end
+
   # Reading an empty clipboard either raises ContentNotAvailable or reads
   # back empty text, depending on the platform (arboard src/lib.rs:323-327).
   private def assert_no_text

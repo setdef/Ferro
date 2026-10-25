@@ -18,7 +18,12 @@ namespace :test do
   desc "Run every gem's Ruby tests"
   task ruby: FERRO_GEMS.map { |gem| "test:ruby:#{gem.short_name}" }
 
+  # Every test process loads the watchdog, which ends a hanging test with
+  # its name instead of letting the run sit silent (tasks/test_watchdog.rb).
+  watchdog = %(require "tasks/test_watchdog")
+
   Minitest::TestTask.create(:tooling) do |t|
+    t.test_prelude = watchdog
     t.libs = %w[test .]
     t.test_globs = ["test/**/test_*.rb"]
     t.warning = true
@@ -35,6 +40,7 @@ namespace :test do
     end
 
     Minitest::TestTask.create("ruby:#{gem.short_name}") do |t|
+      t.test_prelude = watchdog
       t.libs = [File.join(gem.dir, "lib"), File.join(gem.dir, "test"), "."]
       t.test_globs = [File.join(gem.dir, "test/**/test_*.rb")]
       t.warning = true

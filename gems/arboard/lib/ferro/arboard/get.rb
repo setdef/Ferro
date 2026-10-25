@@ -99,7 +99,11 @@ module Ferro
         @clipboard.__send__(:native_get_html, @selection)
       end
 
-      # Reads a list of file paths, as Strings.
+      # Reads a list of file paths, as Strings. On Windows they come back as
+      # Windows writes them, with backslashes (<tt>D:\a\report.pdf</tt>),
+      # not with the forward slashes File.realpath gives: arboard resolves
+      # each path it sets with <tt>GetFinalPathNameByHandleW</tt>
+      # (<tt>src/platform/windows.rs:923-952</tt>).
       #
       # Mirrors arboard's <tt>Get::file_list</tt>
       # (<tt>src/lib.rs:209-212</tt>).

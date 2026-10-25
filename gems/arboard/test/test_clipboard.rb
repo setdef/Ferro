@@ -92,7 +92,7 @@ class TestClipboard < Minitest::Test
 
     clipboard.set.file_list(paths)
 
-    assert_equal paths, clipboard.get.file_list
+    assert_equal paths.map { |path| native_path(path) }, clipboard.get.file_list
   end
 
   def test_each_format_overwrites_the_other

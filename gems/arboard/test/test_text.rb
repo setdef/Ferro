@@ -43,7 +43,7 @@ class TestText < Minitest::Test
 
     clipboard.set.file_list([Pathname(readme)])
 
-    assert_equal [readme], clipboard.get.file_list
+    assert_equal [native_path(readme)], clipboard.get.file_list
   end
 
   def test_file_list_skips_missing_files
@@ -51,7 +51,7 @@ class TestText < Minitest::Test
 
     clipboard.set.file_list([readme, "/nonexistent/ferro-arboard"])
 
-    assert_equal [readme], clipboard.get.file_list
+    assert_equal [native_path(readme)], clipboard.get.file_list
   end
 
   def test_a_file_list_of_only_missing_files_raises_conversion_failure
