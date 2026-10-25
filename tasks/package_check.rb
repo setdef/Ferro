@@ -18,7 +18,7 @@ require "tmpdir"
 # loads from the working tree, and a crate that leans on the repository's
 # Cargo workspace still compiles there. Both broke installed gems before,
 # in Tokra, the project Ferro spun out of (Tokra's commit 1c098a3,
-# https://git.sr.ht/~kerrick/tokra/commit/1c098a3). This check builds each
+# https://github.com/setdef/Tokra/commit/3f6d791). This check builds each
 # gem with gem build, then proves the package on its own: its files, its
 # Cargo workspace and lockfile, and a smoke script that loads it in a fresh
 # process that sees only the gem and the gems it declares.
@@ -27,7 +27,7 @@ require "tmpdir"
 # native extension the repository already compiled. Full mode installs the
 # gems into an empty GEM_HOME, so RubyGems compiles every extension from the
 # packaged sources (Tokra's plan 017,
-# https://git.sr.ht/~kerrick/tokra/tree/trunk/item/doc/contributors/plan/017.md).
+# https://github.com/setdef/Tokra/blob/trunk/doc/contributors/plan/017.md).
 #
 # Files a gem reads without require (templates, assets) are checked only by
 # what its smoke script exercises; the require-all script covers the rest.

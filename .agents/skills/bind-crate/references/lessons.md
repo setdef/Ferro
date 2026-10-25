@@ -37,7 +37,7 @@ clipboard plugin carried the first arboard binding.
 - **Rust panics end the VM.** magnus raises `fatal` for a panic in a bound
   method. Catch it, and refuse known panicking inputs with the crate's own
   error (Tokra's plan 016, item 6:
-  https://git.sr.ht/~kerrick/tokra/tree/trunk/item/doc/contributors/plan/016.md).
+  https://github.com/setdef/Tokra/blob/trunk/doc/contributors/plan/016.md).
 - **Validate in the language's words.** A wrong Ruby type raises
   `TypeError` worded as Ruby words it, not a message you invent.
 
@@ -47,7 +47,7 @@ clipboard plugin carried the first arboard binding.
   still loads from the repository, and a crate that inherits from a
   workspace the gem lacks still compiles there. `package:check` builds and
   loads each gem from its package (Tokra's plan 017:
-  https://git.sr.ht/~kerrick/tokra/tree/trunk/item/doc/contributors/plan/017.md).
+  https://github.com/setdef/Tokra/blob/trunk/doc/contributors/plan/017.md).
 - **An installed gem builds alone.** Each gem is its own Cargo workspace
   with a committed `Cargo.lock`, built `--locked`; no `workspace = true`
   inheritance.

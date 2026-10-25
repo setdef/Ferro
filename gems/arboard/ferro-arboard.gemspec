@@ -16,20 +16,20 @@ Gem::Specification.new do |spec|
   spec.summary = "The system clipboard for Ruby: arboard, bound one to one"
   spec.description = File.read(File.expand_path("README.rdoc", __dir__)).gsub(/^--\n.*?^\+\+\n/m, "")
   spec.licenses = ["MIT", "Apache-2.0"]
-  spec.homepage = "https://git.sr.ht/~kerrick/ferro/tree/trunk/item/gems/arboard"
+  spec.homepage = "https://github.com/setdef/Ferro/tree/trunk/gems/arboard"
   spec.required_ruby_version = ">= 4.0"
   spec.required_rubygems_version = ">= 3.3.11"
 
   spec.metadata["allowed_push_host"] = "https://rubygems.org"
-  spec.metadata["source_code_uri"] = "https://git.sr.ht/~kerrick/ferro/tree/trunk/item/gems/arboard"
-  spec.metadata["changelog_uri"] = "https://git.sr.ht/~kerrick/ferro/tree/trunk/item/gems/arboard/CHANGELOG.md"
+  spec.metadata["source_code_uri"] = "https://github.com/setdef/Ferro/tree/trunk/gems/arboard"
+  spec.metadata["changelog_uri"] = "https://github.com/setdef/Ferro/blob/trunk/gems/arboard/CHANGELOG.md"
   spec.metadata["rubygems_mfa_required"] = "true"
   spec.metadata["arboard_version"] = "3.7.0"
 
   # Ship what an installed app loads, what compiles the native extension
   # against its pinned dependencies, and the license texts. Anything else
   # in the directory stays out, as Tokra's plan 017 does for its gems:
-  # https://git.sr.ht/~kerrick/tokra/tree/trunk/item/doc/contributors/plan/017.md
+  # https://github.com/setdef/Tokra/blob/trunk/doc/contributors/plan/017.md
   packaged = %w[lib sig ext Cargo.toml Cargo.lock Cargo.lock.license README.rdoc CHANGELOG.md LICENSES]
   spec.files = IO.popen(["git", "ls-files", "-z", "--", *packaged], chdir: __dir__, err: IO::NULL) do |ls|
     ls.readlines("\x0", chomp: true)

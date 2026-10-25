@@ -18,7 +18,7 @@ and the crate's.
 Each Ferro gem binds one crate and mirrors it: the crate's names, errors,
 and behavior, translated only where Rust has no Ruby meaning. The crate's
 own documentation stays your guide. Ferro spun out of
-[Tokra](https://git.sr.ht/~kerrick/tokra), whose plugins build on these gems.
+[Tokra](https://github.com/setdef/Tokra), whose plugins build on these gems.
 
 ## Gems
 
