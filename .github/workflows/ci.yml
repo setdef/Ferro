@@ -169,6 +169,19 @@ jobs:
           [ -n "$socket" ] || { cat "$RUNNER_TEMP/sway.log"; echo "::error::sway did not start"; exit 1; }
           env -u DISPLAY WAYLAND_DISPLAY="$(basename "$socket")" bundle exec rake test:ruby
 
+      # Diagnostic, to be removed once the cause is found: on Windows the
+      # Ractor test that opens its own clipboard hung twice, each time right
+      # after the shared-clipboard test. This runs both orders, and variants
+      # that separate the suspects, in fresh processes with a deadline, and
+      # prints where a stopped one was (gems/arboard/test/ractor_probe.rb).
+      - name: Probe the Ractor tests on Windows
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        timeout-minutes: 20
+        run: |
+          bundle exec rake compile
+          bundle exec ruby -Igems/arboard/lib gems/arboard/test/ractor_probe.rb 20
+
       - name: Run the gate
         if: runner.os != 'Linux'
         timeout-minutes: 30
