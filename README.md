@@ -59,7 +59,7 @@ gate uses.
 -->
 ```sh
 mise install
-mise x -- pip install reuse
+mise x -- pip install reuse==6.2.0
 bundle install
 bundle exec rake            # the gate: every check, across every gem
 bundle exec rake gate:arboard   # one gem's checks, while you work on it

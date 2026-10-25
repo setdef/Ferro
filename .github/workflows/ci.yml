@@ -88,7 +88,7 @@ jobs:
         with:
           python-version: ${{ steps.pins.outputs.python }}
       - name: Install the REUSE tool
-        run: python -m pip install reuse
+        run: python -m pip install reuse==6.2.0
 
       - uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1.335.0
         with:
@@ -97,8 +97,10 @@ jobs:
 
       # bindgen parses Ruby's MinGW headers, so clang must target MinGW and
       # find the MSYS2 tree setup-ruby installs beside Ruby, as
-      # oxidize-rb/actions' setup-ruby-and-rust configures it. libclang
-      # comes from the LLVM the runner image ships.
+      # oxidize-rb/actions' setup-ruby-and-rust configures it, including its
+      # two AVX-512 defines, which keep clang from parsing intrinsics headers
+      # bindgen cannot handle (rust-bindgen #2500). libclang comes from the
+      # LLVM the runner image ships.
       - name: Point bindgen at Ruby's MSYS2 headers
         if: runner.os == 'Windows'
         run: |
@@ -106,7 +108,7 @@ jobs:
           libclang="C:/Program Files/LLVM/bin"
           test -d "$sysroot/include" || { echo "::error::no MSYS2 headers at $sysroot"; exit 1; }
           test -f "$libclang/libclang.dll" || { echo "::error::no libclang.dll in $libclang"; exit 1; }
-          echo "BINDGEN_EXTRA_CLANG_ARGS=--target=x86_64-pc-windows-gnu --sysroot=$sysroot" >> "$GITHUB_ENV"
+          echo "BINDGEN_EXTRA_CLANG_ARGS=--target=x86_64-pc-windows-gnu --sysroot=$sysroot -D__AVX512VLFP16INTRIN_H -D__AVX512FP16INTRIN_H" >> "$GITHUB_ENV"
           echo "LIBCLANG_PATH=$libclang" >> "$GITHUB_ENV"
 
       # arboard speaks X11 and Wayland through pure-Rust clients (x11rb,

@@ -31,7 +31,7 @@ namespace :test do
   FERRO_GEMS.each do |gem|
     desc "Run #{gem.name}'s Rust unit tests"
     task "rust:#{gem.short_name}" do
-      cargo!("test", "--locked", "--quiet", chdir: gem.dir)
+      cargo!("test", "--locked", chdir: gem.dir)
     end
 
     Minitest::TestTask.create("ruby:#{gem.short_name}") do |t|

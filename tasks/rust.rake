@@ -22,7 +22,7 @@ namespace :rust do
     namespace :clippy do
       desc "Run Clippy, warnings as errors, on #{gem.name}"
       task gem.short_name do
-        cargo!("clippy", "--locked", "--all-targets", "--quiet", "--", "-D", "warnings", chdir: gem.dir)
+        cargo!("clippy", "--locked", "--all-targets", "--", "-D", "warnings", chdir: gem.dir)
       end
     end
 

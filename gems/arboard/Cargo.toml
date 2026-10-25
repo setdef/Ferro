@@ -9,10 +9,12 @@
 members = ["ext/ferro_arboard"]
 resolver = "2"
 
-# Keep symbols and debug info in released builds, as RatatuiRuby does, so a
-# crash or panic backtrace from an installed gem names Ferro's and arboard's
-# functions. Profiles take effect only at the workspace root, so this lives
+# Keep symbols in released builds, as RatatuiRuby does, so a crash or panic
+# backtrace from an installed gem names Ferro's and arboard's functions. Debug
+# info stays off: Tokra measured it growing its Linux extension from 6 MB to
+# 29 MB (line tables only) or 94 MB (full), and the symbols alone already name
+# each frame. Profiles take effect only at the workspace root, so this lives
 # here, beside the lockfile the gem ships.
 [profile.release]
-debug = true
+debug = false
 strip = false

@@ -13,7 +13,7 @@ namespace :package do
   # machine's. Fetching them from the gem's own lockfile is a no-op once
   # they are there.
   task :fetch do
-    FERRO_GEMS.each { |gem| cargo!("fetch", "--locked", "--quiet", chdir: gem.dir) }
+    FERRO_GEMS.each { |gem| cargo!("fetch", "--locked", chdir: gem.dir) }
   end
 
   desc "Build each gem and load it from its package, with the compiled extensions (fast)"
