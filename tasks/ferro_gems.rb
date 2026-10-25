@@ -35,6 +35,23 @@ class FerroGem < Data.define(:short_name, :name, :crate, :extension, :packaged, 
     File.join("gems", short_name)
   end
 
+  # The file that defines the gem's VERSION, relative to the gem:
+  # <tt>lib/ferro/arboard/version.rb</tt> for ferro-arboard.
+  def version_file
+    File.join("lib", name.tr("-", "/"), "version.rb")
+  end
+
+  # The gem's changelog, relative to the gem.
+  def changelog
+    "CHANGELOG.md"
+  end
+
+  # What comes before the version in the gem's release tags:
+  # <tt>ferro-arboard/v</tt> (ADR 001, section 5).
+  def tag_prefix
+    "#{name}/v"
+  end
+
   # The gemspec's path, relative to the repository.
   def gemspec_path
     File.join(dir, "#{name}.gemspec")

@@ -50,7 +50,8 @@ The authority is the crate's source at the version the gem's `Cargo.lock` pins. 
 
 ## Committing
 
-- One commit per working session, on `trunk`, after the gate passes. Never push, tag, or release; `rake release:<name>` is for the maintainer alone.
+- One commit per working session, on `trunk`, after the gate passes. Never push a branch, and never push or tag in any other repository.
+- Releases are scripted rake tasks, never hand-run git. `rake bump:<name>:patch` (or `:minor`, `:major`, `:exact[0.1.0.pre.2]`; a label such as `patch[pre]` makes a prerelease) sets the gem's version everywhere, releases its CHANGELOG's Unreleased entries, runs the gate, and commits `chore(<name>): release X.Y.Z`. `rake release:<name>:tag` tags that commit `ferro-<name>/vX.Y.Z` and pushes only the tag; it refuses unless trunk is clean and matches origin's, the tag is absent, and the CHANGELOG has the version's section. In Ferro, agents may run the tag task without asking once the gate and CI pass for that commit. `rake release:<name>` also pushes the gem to RubyGems.org: only the maintainer runs it, and Ferro publishes nothing there yet; Tokra takes Ferro gems from their tags as git sources.
 - Include any plan or ADR the session produced. Never commit session transcripts.
 - Scoped Conventional Commits, plain text, wrapped at 72: `feat(arboard): ...` for one gem, no scope for repository-wide work, so `git log -- gems/<name>` reads as that gem's history. The body explains why this approach over alternatives, in prose (no lists, no markdown, no file inventories). Types: gem code feat/fix/refactor/perf; `tasks/`, the Rakefile, and CI chore; `doc/` and READMEs docs; tests test. End with the AI footer, after a blank line:
 

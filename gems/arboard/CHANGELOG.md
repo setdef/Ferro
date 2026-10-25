@@ -22,3 +22,5 @@ own API. Releases are tagged `ferro-arboard/vX.Y.Z`.
 - macOS only: `SetExtApple#exclude_from_history`. Windows only: `SetExtWindows` (`exclude_from_monitoring`, `exclude_from_cloud`, `exclude_from_history`).
 - Images arboard would panic on (a zero width or height, or a byte count other than `width * height * 4`) raise `Error::ConversionFailure` instead; any panic inside arboard raises `Error` instead of ending the process.
 - Calls that can block (Linux reads and waiting writes) release Ruby's global VM lock, so other threads run meanwhile; the extension is Ractor-safe, and a frozen `Clipboard` is shareable.
+
+[Unreleased]: https://github.com/setdef/Ferro/commits/trunk/gems/arboard

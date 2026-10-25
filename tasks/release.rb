@@ -7,6 +7,7 @@
 
 require "fileutils"
 require "open3"
+require_relative "changelog"
 
 # Tags and publishes one gem.
 #
@@ -16,7 +17,13 @@ require "open3"
 # (ADR 001, section 5), and otherwise does what Bundler's does: build the
 # gem, tag the commit, push the branch and the tag, and push the gem.
 #
-# Releasing is a human step. Agents never run it.
+# A release can also stop at the tag (#tag!). Ferro publishes nothing to
+# RubyGems.org yet, but a pushed tag is enough for Bundler's git sources,
+# which is how Tokra uses a Ferro gem. The tag goes on the commit the bump
+# made (Bump), so it names exactly the release the CHANGELOG describes.
+#
+# Publishing with #run! is the maintainer's step alone; agents may run
+# #tag! once the gate and CI pass for that commit (AGENTS.md).
 class Release
   # The branch releases come from.
   BRANCH = "trunk"
@@ -28,14 +35,21 @@ class Release
   # [name] The gem's name, such as <tt>ferro-arboard</tt>.
   # [dir] The gem's directory, relative to +root+.
   # [version] The version to release, from the gemspec.
+  # [scope] The gem's commit scope, such as <tt>arboard</tt>.
   # [runner] Runs one command (an Array) in a directory; returns whether
   #   it succeeded. Tests pass a recorder.
-  def initialize(root:, name:, dir:, version:, runner: -> (command, chdir:) { system(*command, chdir:) })
+  def initialize(root:, name:, dir:, version:, scope:, runner: -> (command, chdir:) { system(*command, chdir:) })
     @root = root
     @name = name
     @dir = dir
     @version = version
+    @scope = scope
     @runner = runner
+  end
+
+  # The subject of the commit that released this version.
+  def release_subject
+    "chore(#{@scope}): release #{@version}"
   end
 
   # The release's git tag.
@@ -56,9 +70,27 @@ class Release
     raise Failure, "commit or stash your changes first" unless git("status", "--porcelain").empty?
     raise Failure, "#{tag} already exists" if tagged?
 
-    changelog = File.join(@root, @dir, "CHANGELOG.md")
-    section = /^## \[#{Regexp.escape(@version)}\]/
-    raise Failure, "#{@dir}/CHANGELOG.md has no section for #{@version}" unless File.read(changelog).match?(section)
+    changelog = Changelog.new(File.join(@root, @dir, "CHANGELOG.md"), tag_prefix: "#{@name}/v")
+    raise Failure, "#{@dir}/CHANGELOG.md has no section for #{@version}" unless changelog.released?(@version)
+  end
+
+  # Tags the commit that released this version and pushes only the tag.
+  # Raises Failure, before running anything, unless #preflight! passes,
+  # trunk matches origin's, origin has no such tag either, and trunk holds
+  # the commit #release_subject names.
+  def tag!
+    preflight!
+    git("fetch", "--quiet", "origin", "refs/heads/#{BRANCH}")
+    unless git("rev-parse", "HEAD") == git("rev-parse", "FETCH_HEAD")
+      raise Failure, "#{BRANCH} differs from origin's; pull or push it first"
+    end
+    raise Failure, "origin already has #{tag}" unless git("ls-remote", "--tags", "origin", "refs/tags/#{tag}").empty?
+
+    commit = release_commit or raise Failure, "#{BRANCH} has no commit \"#{release_subject}\"; run rake bump:#{@scope}:... first"
+    [
+      ["git", "tag", "--annotate", tag, commit, "--message", "#{@name} #{@version}"],
+      ["git", "push", "origin", "refs/tags/#{tag}"],
+    ].each { |command| raise Failure, "#{command.join(' ')} failed" unless @runner.call(command, chdir: @root) }
   end
 
   # The commands a release runs, each with the directory it runs in.
@@ -79,6 +111,13 @@ class Release
     commands.each do |command, chdir|
       raise Failure, "#{command.join(' ')} failed" unless @runner.call(command, chdir:)
     end
+  end
+
+  # The newest commit on trunk's first-parent history with the release
+  # subject, or nil.
+  private def release_commit
+    git("log", "--first-parent", "--format=%H %s", BRANCH).lines.map { |line| line.chomp.split(" ", 2) }
+      .find { |_, subject| subject == release_subject }&.first
   end
 
   private def tagged?
