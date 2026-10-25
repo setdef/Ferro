@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Arboard
+    class Error < StandardError
+      class ContentNotAvailable < Error
+        def initialize: (?String? message) -> void
+      end
+
+      class ClipboardNotSupported < Error
+        def initialize: (?String? message) -> void
+      end
+
+      class ClipboardOccupied < Error
+        def initialize: (?String? message) -> void
+      end
+
+      class ConversionFailure < Error
+        def initialize: (?String? message) -> void
+      end
+
+      class Unknown < Error
+        attr_reader description: String
+
+        def initialize: (?String description) -> void
+      end
+    end
+  end
+end

@@ -1,0 +1,161 @@
+--
+SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: CC-BY-SA-4.0
+++
+
+= ferro-arboard
+
+{rdoc-image:https://justin.searls.co/img/shovelware.svg}[https://justin.searls.co/shovelware/]
+
+The system clipboard for Ruby, through arboard 3.7.0.
+
+Command-line tools, editors, and desktop apps all want to copy and paste.
+Each operating system's clipboard speaks its own protocol: NSPasteboard on
+macOS, X11 selections or Wayland's data-control protocol on Linux, the Win32
+clipboard on Windows. Binding them yourself means native code three times
+over, and the edge cases (an empty clipboard, a busy one, an image in a
+format you cannot decode) come with it.
+
+ferro-arboard binds arboard (https://github.com/1Password/arboard), the
+clipboard crate 1Password maintains, one to one. It keeps arboard's names,
+errors, and behavior, and adds nothing of its own. Use it to copy a result
+for the user, read what they copied, or clear a password once it is pasted.
+
+== Install
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  bundle add ferro-arboard
+
+--
+SPDX-SnippetEnd
+++
+
+The gem compiles a Rust extension when it installs, so the machine that
+installs it needs Rust and Cargo: Rust 1.88 or newer (the highest
++rust-version+ among the locked dependencies), and 1.99 or newer on
+macOS 27, where earlier toolchains strip the extension in a way the new
+loader rejects. The build runs <tt>cargo --locked</tt>, so it compiles
+exactly the dependency versions this gem was tested with. To build against
+newer ones anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will do);
+it replaces <tt>--locked</tt>.
+
+== Use
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  require "ferro/arboard"
+
+  clipboard = Ferro::Arboard::Clipboard.new
+  clipboard.set_text("Hello, world!")
+  clipboard.get_text # => "Hello, world!"
+
+  clipboard.set_html("<b>Hello</b>, world!", "Hello, world!")
+  clipboard.get.html
+
+  # Four bytes per pixel: red, green, blue, alpha.
+  pixel = [255, 0, 0, 255].pack("C*")
+  clipboard.set_image(Ferro::Arboard::ImageData.new(width: 1, height: 1, bytes: pixel))
+  clipboard.get_image # => #<data Ferro::Arboard::ImageData width=1, height=1, bytes="...">
+
+  clipboard.set.file_list(["README.rdoc"])
+  clipboard.get.file_list # => ["/full/path/to/README.rdoc"]
+
+  begin
+    clipboard.clear
+    clipboard.get_text
+  rescue Ferro::Arboard::Error::ContentNotAvailable => e
+    puts e.message
+  end
+
+--
+SPDX-SnippetEnd
+++
+
+Clipboard#get, Clipboard#set, and Clipboard#clear_with return builders that
+take arboard's platform options before you finish them. Each option exists
+only on the platform that has it, so <tt>respond_to?</tt> tells you what
+you can use:
+
+[Linux] LinuxClipboardKind picks a selection (GetExtLinux, SetExtLinux,
+        ClearExtLinux). SetExtLinux#wait, #wait_until, and #wait_once keep
+        serving what you set until another program takes it, and
+        #exclude_from_history keeps it out of clipboard managers.
+[macOS] SetExtApple#exclude_from_history.
+[Windows] SetExtWindows#exclude_from_monitoring, #exclude_from_cloud, and
+          #exclude_from_history.
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  set = clipboard.set
+  set = set.exclude_from_history if set.respond_to?(:exclude_from_history)
+  set.text(one_time_code)
+
+--
+SPDX-SnippetEnd
+++
+
+== How it maps arboard
+
+The API is arboard's, translated where Rust has no Ruby meaning:
+
+* <tt>Result<T, Error></tt> returns +T+ or raises an Error subclass, one per
+  arboard variant, with arboard's message. <tt>Option<T></tt> is +T+ or
+  +nil+.
+* Strings are Strings; byte buffers are binary Strings; paths are Strings
+  (Set#file_list also takes anything with +to_path+).
+* Builders hold their clipboard, so <tt>clipboard.get().text()</tt> becomes
+  <tt>clipboard.get.text</tt>. A builder keeps its options and may be
+  finished more than once.
+* An +Instant+ is a Float on Ruby's monotonic clock, as
+  <tt>Process.clock_gettime(Process::CLOCK_MONOTONIC)</tt> returns it.
+* Every arboard feature is built in: images, and Wayland's data-control
+  protocol on Linux.
+
+Three things differ from calling arboard from Rust:
+
+* An ImageData with a zero width or height, or a byte count other than
+  <tt>width * height * 4</tt>, raises Error::ConversionFailure before it
+  reaches arboard, on every platform. arboard would panic on some of them.
+* A panic inside arboard raises Ferro::Arboard::Error with the message
+  <tt>arboard panicked: ...</tt> instead of ending the Ruby process. Rust
+  still prints its usual <tt>thread ... panicked at ...</tt> message to
+  stderr first; ferro-arboard leaves the process-wide panic hook alone.
+* Calls that can block release Ruby's global VM lock while arboard works,
+  so other Ruby threads run meanwhile: on Linux, every read (arboard polls
+  the owning program for up to four seconds) and every write with
+  SetExtLinux#wait, #wait_until, or #wait_once. Every other call keeps the
+  lock, because giving it up and taking it back costs up to a time slice
+  for each other thread that wants it, far longer than a short clipboard
+  call. arboard cannot cancel a call in progress, so Ctrl-C,
+  <tt>Thread#kill</tt>, and <tt>Thread#raise</tt> take effect when it
+  returns, and the process does not exit until a thread stuck in such a
+  call is done; SetExtLinux#wait returns only once another program takes
+  the clipboard.
+* On Linux, dropping the last clipboard hands its contents to the desktop's
+  clipboard manager, waiting up to 100 ms, and stops arboard's X11 server
+  thread. That happens when the garbage collector frees the clipboard, so a
+  GC sweep can pause for it.
+* The extension is Ractor-safe, and a frozen Clipboard may be shared with
+  other Ractors.
+
+ferro-arboard 0.1.0.pre.1 binds arboard 3.7.0. The gem's version follows its
+own API; its +arboard_version+ metadata names the arboard release.
+
+== License
+
+ferro-arboard's code is MIT OR Apache-2.0, as arboard's is. This README is
+CC-BY-SA-4.0, and its code examples are MIT-0, so paste them freely. The
+lockfile is CC0-1.0. The license texts are in LICENSES/.

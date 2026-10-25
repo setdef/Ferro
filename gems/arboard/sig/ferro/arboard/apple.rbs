@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Arboard
+    module SetExtApple
+      @exclude_from_history: bool
+
+      def exclude_from_history: () -> self
+    end
+
+    class Set
+      include SetExtApple
+    end
+  end
+end

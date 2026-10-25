@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Arboard
+    class Get
+      @clipboard: Clipboard
+      @selection: Symbol?
+
+      private def self.new: (Clipboard clipboard) -> instance
+
+      def initialize: (Clipboard clipboard) -> void
+      def text: () -> String
+      def image: () -> ImageData
+      def html: () -> String
+      def file_list: () -> Array[String]
+    end
+  end
+end

@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Arboard
+    class LinuxClipboardKind
+      Clipboard: LinuxClipboardKind
+      Primary: LinuxClipboardKind
+      Secondary: LinuxClipboardKind
+
+      @name: Symbol
+
+      private def self.new: (Symbol name) -> instance
+      private def self.variant: (Object selection) -> Symbol
+
+      def initialize: (Symbol name) -> void
+      def inspect: () -> String
+    end
+
+    module GetExtLinux
+      @selection: Symbol?
+
+      def clipboard: (LinuxClipboardKind selection) -> self
+    end
+
+    module SetExtLinux
+      @selection: Symbol?
+      @wait: (:forever | :once | Float)?
+      @exclude_from_history: bool
+
+      def wait: () -> self
+      def wait_until: (Numeric deadline) -> self
+      def wait_once: () -> self
+      def clipboard: (LinuxClipboardKind selection) -> self
+      def exclude_from_history: () -> self
+    end
+
+    module ClearExtLinux
+      @clipboard: Clipboard
+
+      def clipboard: (LinuxClipboardKind selection) -> void
+    end
+
+    class Get
+      include GetExtLinux
+    end
+
+    class Set
+      include SetExtLinux
+    end
+
+    class Clear
+      include ClearExtLinux
+    end
+  end
+end

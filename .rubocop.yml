@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+inherit_from:
+  - ./vendor/goodcop/base.yml
+
+# Merge Include with RuboCop's defaults rather than replace them, so the
+# hidden .agents directory (agent skill scripts) is linted too.
+inherit_mode:
+  merge:
+    - Include
+
+AllCops:
+  TargetRubyVersion: "4.0"
+  NewCops: disable
+  SuggestExtensions: false
+  Include:
+    - ".agents/**/*.rb"
+  Exclude:
+    - "tmp/**/*"
+    - "target/**/*"
+    - "gems/*/tmp/**/*"
+    - "vendor/bundle/**/*"
+
+# RDoc mis-parses endless methods: the methods after one lose their comments
+# and visibility (doc/contributors/documentation_style.md, section 5). Every
+# file RDoc reads uses def ... end.
+Style/EndlessMethod:
+  Enabled: true
+  EnforcedStyle: disallow
+  Include:
+    - "gems/*/lib/**/*.rb"

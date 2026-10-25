@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Arboard
+    class Clear
+      @clipboard: Clipboard
+
+      private def self.new: (Clipboard clipboard) -> instance
+
+      def initialize: (Clipboard clipboard) -> void
+      def default: () -> void
+    end
+  end
+end

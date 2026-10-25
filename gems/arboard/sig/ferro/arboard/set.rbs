@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Arboard
+    class Set
+      @clipboard: Clipboard
+      @selection: Symbol?
+      @wait: (:forever | :once | Float)?
+      @exclude_from_history: bool
+      @exclude_from_monitoring: bool
+      @exclude_from_cloud: bool
+
+      private def self.new: (Clipboard clipboard) -> instance
+
+      def initialize: (Clipboard clipboard) -> void
+      def text: (String text) -> void
+      def html: (String html, String? alt_text) -> void
+      def image: (ImageData image) -> void
+      def file_list: (Array[String | _ToPath] paths) -> void
+
+      private
+
+      def options: () -> native_set_options
+    end
+  end
+end

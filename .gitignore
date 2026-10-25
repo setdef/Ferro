@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Build output: the shared Cargo target directory (ADR 001, section 3),
+# rake-compiler's staging, and compiled extensions.
+/target/
+/gems/*/target/
+/tmp/
+/gems/*/tmp/
+*.bundle
+*.so
+*.dll
+*.dylib
+
+# Packages
+/pkg/
+/gems/*/pkg/
+*.gem
+
+# Tool state
+/.bundle/
+/vendor/bundle/
+/coverage/
+/.idea/
+.DS_Store

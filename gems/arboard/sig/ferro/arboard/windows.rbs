@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Arboard
+    module SetExtWindows
+      @exclude_from_history: bool
+      @exclude_from_monitoring: bool
+      @exclude_from_cloud: bool
+
+      def exclude_from_monitoring: () -> self
+      def exclude_from_cloud: () -> self
+      def exclude_from_history: () -> self
+    end
+
+    class Set
+      include SetExtWindows
+    end
+  end
+end

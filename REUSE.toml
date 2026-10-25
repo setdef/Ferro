@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+version = 1
+
+# Lockfiles are machine-written lists of versions. Each gem's Cargo.lock
+# carries a .license file instead, so a packaged gem is REUSE-compliant
+# without this file.
+[[annotations]]
+path = 'Gemfile.lock'
+SPDX-FileCopyrightText = "2026 Kerrick Long <me@kerricklong.com>"
+SPDX-License-Identifier = "CC0-1.0"

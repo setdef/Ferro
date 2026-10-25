@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Arboard
+    type native_set_options = [Symbol?, (Symbol | Float)?, bool, bool, bool]
+
+    class Clipboard
+      def self.new: () -> instance
+
+      def get_text: () -> String
+      def set_text: (String text) -> void
+      def set_html: (String html, String? alt_text) -> void
+      def get_image: () -> ImageData
+      def set_image: (ImageData image) -> void
+      def clear: () -> void
+      def clear_with: () -> Clear
+      def get: () -> Get
+      def set: () -> Set
+
+      private
+
+      def native_get_text: (Symbol? selection) -> String
+      def native_get_html: (Symbol? selection) -> String
+      def native_get_image: (Symbol? selection) -> [Integer, Integer, String]
+      def native_get_file_list: (Symbol? selection) -> Array[String]
+      def native_clear: (Symbol? selection) -> void
+      def native_set_text: (String text, native_set_options options) -> void
+      def native_set_html: (String html, String? alt_text, native_set_options options) -> void
+      def native_set_image: (Integer width, Integer height, String bytes, native_set_options options) -> void
+      def native_set_file_list: (Array[String] paths, native_set_options options) -> void
+    end
+  end
+end

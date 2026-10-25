@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Arboard
+    class ImageData < Data
+      attr_reader width: Integer
+      attr_reader height: Integer
+      attr_reader bytes: String
+
+      def self.new: (Integer width, Integer height, String bytes) -> instance
+                  | (width: Integer, height: Integer, bytes: String) -> instance
+    end
+  end
+end
