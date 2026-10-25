@@ -20,17 +20,26 @@ require "test_helper"
 class TestClipboard < Minitest::Test
   include ClipboardSuite
 
+  # arboard's test drops its only clipboard and waits 300 ms for a
+  # clipboard manager. On X11 that tests the manager, not arboard: when the
+  # last clipboard drops, arboard asks the manager to save the contents,
+  # waits at most 100 ms, and then destroys the window that served them
+  # (src/platform/linux/x11.rs:788-801, :1106-1135). A busy manager misses
+  # that limit; CI saw xfce4-clipman take the CLIPBOARD selection with
+  # nothing in it. What arboard guarantees on X11 is that the contents
+  # outlive one clipboard while another in the process stays open, since
+  # they share one X11 server thread, so the test keeps one open there.
+  # Elsewhere the system or arboard's Wayland thread holds the contents, and
+  # the test drops every clipboard as arboard's does.
   def test_text_round_trips_and_outlives_its_clipboard
+    keeper = Ferro::Arboard::Clipboard.new if PLATFORM == :linux && !ENV["WAYLAND_DISPLAY"]
     clipboard.set_text("some string")
     assert_equal "some string", clipboard.get_text
 
-    # The content must persist after the clipboard is dropped, which matters
-    # most on X11. Give any clipboard manager time to take it over.
     @clipboard = nil
     GC.start
-    sleep 0.3
 
-    assert_equal "some string", Ferro::Arboard::Clipboard.new.get_text
+    assert_equal "some string", (keeper || Ferro::Arboard::Clipboard.new).get_text
   end
 
   def test_utf8_text_round_trips

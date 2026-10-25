@@ -66,7 +66,12 @@ module Ferro
     # On Linux, under both X11 and Wayland, the clipboard's contents live
     # inside the program that last set them. When that program's last
     # clipboard is dropped, the contents may vanish for other programs.
-    # See SetExtLinux#wait.
+    # See SetExtLinux#wait. On X11, arboard then offers them to the desktop's
+    # clipboard manager but waits at most 100 ms for it
+    # (<tt>src/platform/linux/x11.rs:788-801</tt>), so a busy manager can
+    # end up with nothing. Keep a clipboard open for as long as the
+    # contents should stay; while any clipboard in the process is open, the
+    # others' contents stay too.
     #
     # On Windows, the clipboard is a global object that only one thread
     # may open at a time, so arboard opens it only for the length of each

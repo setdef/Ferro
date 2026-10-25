@@ -120,17 +120,16 @@ jobs:
       # wayland-client), so Linux needs only display servers, no client
       # libraries: Xvfb for X11, and sway's headless backend for Wayland.
       # weston would not do: it lacks the data-control protocols arboard's
-      # Wayland clipboard needs. On X11, text outlives the last clipboard
-      # only once a clipboard manager takes it over (arboard
-      # src/platform/linux/x11.rs:1106-1135), as on a desktop, so the X11
-      # run has one: xfce4-clipman, which speaks the ClipboardManager
-      # protocol, on its own D-Bus session, with stalonetray to hold its
-      # icon (.github/ci/with-clipboard-manager says why).
-      - name: Install display servers and a clipboard manager
+      # Wayland clipboard needs. There is no clipboard manager: arboard only
+      # offers one the contents, within 100 ms, when the last clipboard
+      # drops (src/platform/linux/x11.rs:788-801), so no test can rely on it,
+      # and xfce4-clipman, tried here, refilled the clipboard after tests
+      # cleared it.
+      - name: Install display servers
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends xvfb xauth sway xfce4-clipman stalonetray python3-xlib dbus libclang-dev
+          sudo apt-get install --yes --no-install-recommends xvfb xauth sway libclang-dev
 
       # Minitest prints each test's name and time (A is Minitest::TestTask's
       # argument variable), and tasks/test_watchdog.rb ends a test that hangs
@@ -140,7 +139,7 @@ jobs:
         timeout-minutes: 30
         env:
           A: --verbose
-        run: xvfb-run --auto-servernum dbus-run-session -- .github/ci/with-clipboard-manager bundle exec rake
+        run: xvfb-run --auto-servernum bundle exec rake
 
       # The gate ran each gem's tests against X11. This runs them again on
       # Wayland. DISPLAY stays unset so arboard cannot fall back to X11
