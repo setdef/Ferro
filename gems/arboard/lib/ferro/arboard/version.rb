@@ -11,6 +11,6 @@ module Ferro
     #
     # It follows this gem's own API, not arboard's. The gemspec's
     # <tt>arboard_version</tt> metadata names the arboard release it binds.
-    VERSION = "0.1.0.pre.1"
+    VERSION = "0.1.0.pre.2"
   end
 end

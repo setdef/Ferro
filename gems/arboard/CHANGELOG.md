@@ -12,6 +12,8 @@ own API. Releases are tagged `ferro-arboard/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0.pre.2] - 2026-10-25
+
 ### Added
 
 - `Ferro::Arboard::Clipboard` binding arboard 3.7.0: `new`, `get_text`, `set_text`, `set_html`, `get_image`, `set_image`, `clear`, `clear_with`, `get`, and `set`.
@@ -23,4 +25,5 @@ own API. Releases are tagged `ferro-arboard/vX.Y.Z`.
 - Images arboard would panic on (a zero width or height, or a byte count other than `width * height * 4`) raise `Error::ConversionFailure` instead; any panic inside arboard raises `Error` instead of ending the process.
 - Calls that can block (Linux reads and waiting writes) release Ruby's global VM lock, so other threads run meanwhile; the extension is Ractor-safe, and a frozen `Clipboard` is shareable.
 
-[Unreleased]: https://github.com/setdef/Ferro/commits/trunk/gems/arboard
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-arboard/v0.1.0.pre.2...HEAD
+[0.1.0.pre.2]: https://github.com/setdef/Ferro/releases/tag/ferro-arboard/v0.1.0.pre.2
