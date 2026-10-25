@@ -894,8 +894,18 @@ mod tests {
         let too_big = "cannot convert float seconds to Duration: value is either too big or NaN";
         assert_eq!(deadline(now, f64::NAN), Err(too_big.to_owned()));
         assert_eq!(deadline(now, f64::INFINITY), Err(too_big.to_owned()));
+        // How far an Instant reaches is the platform's: Unix keeps signed
+        // seconds, so 1e19 overflows there, while Windows keeps a Duration,
+        // which holds it. Either way the deadline is what Instant itself
+        // gives, with std's own overflow message.
+        let huge = 1.0e19;
+        let expected = now
+            .checked_add(Duration::from_secs_f64(huge))
+            .ok_or_else(|| "overflow when adding duration to instant".to_owned());
+        assert_eq!(deadline(now, huge), expected);
+        #[cfg(unix)]
         assert_eq!(
-            deadline(now, 1.0e19),
+            deadline(now, huge),
             Err("overflow when adding duration to instant".to_owned())
         );
     }
