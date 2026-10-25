@@ -53,10 +53,19 @@ class TestClipboard < Minitest::Test
     assert_no_text
   end
 
-  def test_html_without_alt_text_leaves_no_plain_text
-    clipboard.set_html("<b>hello</b> <i>world</i>!", nil)
+  # arboard's test expects no text, which holds everywhere but Wayland.
+  # There a text read takes any text type the clipboard offers, text/html
+  # included (wl-clipboard-rs 0.9.4 src/paste.rs:441-443 and
+  # src/utils.rs:33-39), so the HTML reads back as the text.
+  def test_html_without_alt_text_leaves_no_plain_text_except_on_wayland
+    html = "<b>hello</b> <i>world</i>!"
+    clipboard.set_html(html, nil)
 
-    assert_no_text
+    if PLATFORM == :linux && ENV["WAYLAND_DISPLAY"]
+      assert_equal html, clipboard.get_text
+    else
+      assert_no_text
+    end
   end
 
   def test_html_alt_text_is_the_plain_text

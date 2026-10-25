@@ -1,0 +1,157 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# The gate contributors run, bundle exec rake, on each operating system a
+# gem binds and on every Ruby release that still gets fixes (ADR 001,
+# section 8). Every gem runs on every change: the gate is one command across
+# all of them, and with few gems a selective run would save little.
+
+name: CI
+
+on:
+  push:
+    branches: [trunk]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: ${{ matrix.os }}, Ruby ${{ matrix.ruby }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Each supported Ruby release, one per line. Add a release when it
+        # ships, and remove one only when it reaches end of life.
+        ruby:
+          - "4.0"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Git for Windows writes symlinks as plain files by default, and
+      # CLAUDE.md and .claude/skills/ are symlinks the skill tests and REUSE
+      # check. Line endings stay converted, as on a contributor's machine:
+      # RuboCop's Layout/EndOfLine is native, so it expects CRLF there.
+      - name: Check out symlinks as symlinks
+        if: runner.os == 'Windows'
+        run: git config --global core.symlinks true
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # mise.toml pins the toolchains contributors use; CI reads the same
+      # pins rather than repeating them. RubyInstaller's Ruby is a MinGW
+      # build, and rb-sys refuses to build it with Rust's MSVC target
+      # (rb-sys-build rb_config.rs, validate_target_compatibility), so
+      # Windows takes the GNU host toolchain.
+      - name: Read the toolchain pins
+        id: pins
+        run: |
+          rust=$(sed -n 's/^rust = "\(.*\)"$/\1/p' mise.toml)
+          python=$(sed -n 's/^python = "\(.*\)"$/\1/p' mise.toml)
+          if [ "$RUNNER_OS" = Windows ]; then rust="$rust-x86_64-pc-windows-gnu"; fi
+          {
+            echo "rust=$rust"
+            echo "python=$python"
+            # Each gem is its own Cargo workspace, compiling into the shared
+            # target directory (ADR 001, section 3).
+            echo "workspaces<<EOF"
+            for gem in gems/*/; do echo "${gem%/} -> ../../target"; done
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: ${{ steps.pins.outputs.rust }}
+          components: clippy, rustfmt
+
+      # The extension links Ruby's headers through bindgen, so the compiled
+      # dependencies differ by Ruby release as well as by OS.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: ruby-${{ matrix.ruby }}
+          workspaces: ${{ steps.pins.outputs.workspaces }}
+
+      # The REUSE tool checks licensing, for the repository and for each
+      # unpacked gem.
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ steps.pins.outputs.python }}
+      - name: Install the REUSE tool
+        run: python -m pip install reuse
+
+      - uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1.335.0
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+
+      # bindgen parses Ruby's MinGW headers, so clang must target MinGW and
+      # find the MSYS2 tree setup-ruby installs beside Ruby, as
+      # oxidize-rb/actions' setup-ruby-and-rust configures it. libclang
+      # comes from the LLVM the runner image ships.
+      - name: Point bindgen at Ruby's MSYS2 headers
+        if: runner.os == 'Windows'
+        run: |
+          sysroot=$(ruby -e 'print File.join(RbConfig::TOPDIR, "msys64", RbConfig::CONFIG["host_os"].include?("ucrt") ? "ucrt64" : "mingw64")')
+          libclang="C:/Program Files/LLVM/bin"
+          test -d "$sysroot/include" || { echo "::error::no MSYS2 headers at $sysroot"; exit 1; }
+          test -f "$libclang/libclang.dll" || { echo "::error::no libclang.dll in $libclang"; exit 1; }
+          echo "BINDGEN_EXTRA_CLANG_ARGS=--target=x86_64-pc-windows-gnu --sysroot=$sysroot" >> "$GITHUB_ENV"
+          echo "LIBCLANG_PATH=$libclang" >> "$GITHUB_ENV"
+
+      # arboard speaks X11 and Wayland through pure-Rust clients (x11rb,
+      # wayland-client), so Linux needs only display servers, no client
+      # libraries: Xvfb for X11, and sway's headless backend for Wayland.
+      # weston would not do: it lacks the data-control protocols arboard's
+      # Wayland clipboard needs. On X11, text outlives the last clipboard
+      # only once a clipboard manager takes it over (arboard
+      # src/platform/linux/x11.rs:1106-1135), as on a desktop, so the X11
+      # run has one: xfce4-clipman, which speaks the ClipboardManager
+      # protocol, on its own D-Bus session.
+      - name: Install display servers and a clipboard manager
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends xvfb xauth sway xfce4-clipman dbus libclang-dev
+
+      # The gem tests start well after the manager does: compiling and the
+      # tooling tests come first.
+      - name: Run the gate under X11
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum dbus-run-session -- sh -c 'xfce4-clipman & exec bundle exec rake'
+
+      # The gate ran each gem's tests against X11. This runs them again on
+      # Wayland. DISPLAY stays unset so arboard cannot fall back to X11
+      # (src/platform/linux/mod.rs:133-150): a failed Wayland connection
+      # fails the tests instead of passing on X11.
+      - name: Run the gems' tests under Wayland
+        if: runner.os == 'Linux'
+        run: |
+          export XDG_RUNTIME_DIR="$RUNNER_TEMP/xdg"
+          mkdir -m 700 "$XDG_RUNTIME_DIR"
+          echo "xwayland disable" > "$RUNNER_TEMP/sway.conf"
+          WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1 \
+            sway --config "$RUNNER_TEMP/sway.conf" > "$RUNNER_TEMP/sway.log" 2>&1 &
+          sway=$!
+          trap 'kill "$sway" || true' EXIT
+          for _ in $(seq 50); do
+            socket=$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -name 'wayland-*' -type s -print -quit)
+            [ -n "$socket" ] && break
+            sleep 0.2
+          done
+          [ -n "$socket" ] || { cat "$RUNNER_TEMP/sway.log"; echo "::error::sway did not start"; exit 1; }
+          env -u DISPLAY WAYLAND_DISPLAY="$(basename "$socket")" bundle exec rake test:ruby
+
+      - name: Run the gate
+        if: runner.os != 'Linux'
+        run: bundle exec rake

@@ -13,11 +13,20 @@ desc "Run every test: the tooling's, then each gem's Rust and Ruby tests"
 task test: ["test:tooling", *FERRO_GEMS.map { |gem| "test:#{gem.short_name}" }]
 
 namespace :test do
+  # CI runs these again under a second display server (Wayland, after the
+  # gate's X11), so they have a task of their own.
+  desc "Run every gem's Ruby tests"
+  task ruby: FERRO_GEMS.map { |gem| "test:ruby:#{gem.short_name}" }
+
   Minitest::TestTask.create(:tooling) do |t|
     t.libs = %w[test .]
     t.test_globs = ["test/**/test_*.rb"]
     t.warning = true
   end
+  # The packaging check's tests resolve fixture crates with cargo metadata
+  # --offline, which needs every platform's dependencies in Cargo's cache;
+  # compiling downloads only this machine's.
+  task tooling: "package:fetch"
 
   FERRO_GEMS.each do |gem|
     desc "Run #{gem.name}'s Rust unit tests"

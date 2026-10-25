@@ -6,6 +6,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 # Ferro
 
 [![Certified Shovelware](https://justin.searls.co/img/shovelware.svg)](https://justin.searls.co/shovelware/)
+[![CI](https://github.com/setdef/Ferro/actions/workflows/ci.yml/badge.svg?branch=trunk)](https://github.com/setdef/Ferro/actions)
 
 Ruby gems that bind Rust crates one to one.
 

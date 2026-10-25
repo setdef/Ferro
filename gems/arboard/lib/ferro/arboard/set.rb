@@ -77,7 +77,9 @@ module Ferro
       #
       # On macOS, arboard wraps +html+ in <tt><html></tt>, <tt><head></tt>,
       # and <tt><body></tt> tags with a UTF-8 <tt>meta</tt> tag, because
-      # some programs would read it as Windows Latin 1 otherwise.
+      # some programs would read it as Windows Latin 1 otherwise. On
+      # Wayland, a text read with no +alt_text+ returns +html+ itself, since
+      # it takes any text type the clipboard offers.
       #
       # Mirrors arboard's <tt>Set::html</tt> (<tt>src/lib.rs:234-246</tt>).
       #
