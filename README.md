@@ -26,6 +26,7 @@ own documentation stays your guide. Ferro spun out of
 | Gem | Crate | Status |
 |---|---|---|
 | [ferro-arboard](gems/arboard/README.rdoc) | [arboard](https://github.com/1Password/arboard) 3.7.0, the system clipboard | 0.1.0.pre.1, unreleased |
+| [ferro-rfd](gems/rfd/README.rdoc) | [rfd](https://github.com/PolyMeilex/rfd) 0.17.2, native file and message dialogs | 0.1.0.pre.1, unreleased |
 
 ## Using a gem
 
@@ -91,7 +92,8 @@ a crate becomes a gem.
 ## License
 
 Each gem takes its crate's license: ferro-arboard is MIT OR Apache-2.0, as
-arboard is. The repository's tooling is AGPL-3.0-or-later. Documentation is
-CC-BY-SA-4.0, code snippets in it are MIT-0, and lockfiles are CC0-1.0.
-Every file says which applies; [REUSE](https://reuse.software) checks it, and
-the texts are in [LICENSES](LICENSES).
+arboard is, and ferro-rfd is MIT, as rfd is. The repository's tooling is
+AGPL-3.0-or-later. Documentation is CC-BY-SA-4.0, code snippets in it are
+MIT-0, and lockfiles are CC0-1.0. Every file says which applies;
+[REUSE](https://reuse.software) checks it, and the texts are in
+[LICENSES](LICENSES).

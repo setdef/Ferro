@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT
+
+module Ferro
+  module Rfd
+    class Future
+      type value = FileHandle | Array[FileHandle] | MessageDialogResult | MessageDialogResult::Custom | String | nil
+
+      @native: Native::Future
+      @lock: Thread::Mutex
+      @done: bool
+      @value: value
+      @error: Exception?
+
+      private def self.new: (Native::Future native) -> Future
+
+      def initialize: (Native::Future native) -> void
+      def value: () -> value
+
+      private
+
+      def settle: () -> void
+    end
+  end
+end

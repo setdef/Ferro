@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT
+
+module Ferro
+  module Rfd
+    class Error < StandardError
+    end
+  end
+end

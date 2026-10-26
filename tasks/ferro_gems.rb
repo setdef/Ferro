@@ -134,4 +134,30 @@ FERRO_GEMS = [
       end
       puts "ferro-arboard \#{Ferro::Arboard::VERSION} loads its extension (\#{clipboard.class})"
     RUBY
+  FerroGem.new(
+    short_name: "rfd",
+    name: "ferro-rfd",
+    crate: "ext/ferro_rfd",
+    extension: "lib/ferro/rfd/ferro_rfd",
+    packaged: %w[lib sig ext Cargo.toml Cargo.lock Cargo.lock.license README.rdoc CHANGELOG.md LICENSES],
+    native_namespace: "Ferro::Rfd",
+    platform_sigs: {
+      "macos" => "sig/ferro/rfd/apple.rbs",
+    },
+    platform_probe: %(require "ferro/rfd"; print Ferro::Rfd.const_get(:PLATFORM)),
+    smoke: <<~RUBY),
+      require "ferro/rfd"
+      # Every dialog waits for a person, so the smoke test shows none. It
+      # replays a builder through rfd (its Debug text), which proves the
+      # extension loads and reaches the crate, and refuses a filter rfd's
+      # portal backend would panic on.
+      dialog = Ferro::Rfd::FileDialog.new.add_filter("Text", ["txt"]).set_title("Smoke")
+      abort "rfd did not see the builder: \#{dialog.inspect}" unless dialog.inspect.include?('title: Some("Smoke")')
+      begin
+        Ferro::Rfd::FileDialog.new.add_filter("bad\\0name", ["txt"])
+        abort "a NUL byte reached rfd"
+      rescue ArgumentError
+      end
+      puts "ferro-rfd \#{Ferro::Rfd::VERSION} loads its extension (\#{dialog.class})"
+    RUBY
 ].freeze

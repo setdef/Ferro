@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT
+
+module Ferro
+  module Rfd
+    class FileDialog
+      def pick_file_or_folder: () -> String?
+      def pick_files_or_folders: () -> Array[String]?
+    end
+
+    class AsyncFileDialog
+      def pick_file_or_folder: () -> Future
+      def pick_files_or_folders: () -> Future
+    end
+  end
+end

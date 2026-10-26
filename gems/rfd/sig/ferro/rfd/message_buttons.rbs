@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT
+
+module Ferro
+  module Rfd
+    class MessageButtons
+      Ok: MessageButtons
+      OkCancel: MessageButtons
+      YesNo: MessageButtons
+      YesNoCancel: MessageButtons
+
+      @name: Symbol
+
+      private def self.new: (Symbol name) -> instance
+      private def self.variant: (Object buttons) -> Array[Symbol | String]
+
+      def self.default: () -> MessageButtons
+
+      def initialize: (Symbol name) -> void
+      def inspect: () -> String
+
+      class OkCustom < Data
+        attr_reader ok_text: String
+
+        def self.new: (String ok_text) -> instance
+                    | (ok_text: String) -> instance
+      end
+
+      class OkCancelCustom < Data
+        attr_reader ok_text: String
+        attr_reader cancel_text: String
+
+        def self.new: (String ok_text, String cancel_text) -> instance
+                    | (ok_text: String, cancel_text: String) -> instance
+      end
+
+      class YesNoCancelCustom < Data
+        attr_reader yes_text: String
+        attr_reader no_text: String
+        attr_reader cancel_text: String
+
+        def self.new: (String yes_text, String no_text, String cancel_text) -> instance
+                    | (yes_text: String, no_text: String, cancel_text: String) -> instance
+      end
+    end
+  end
+end

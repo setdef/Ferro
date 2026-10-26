@@ -9,6 +9,7 @@ source "https://rubygems.org"
 
 # Every gem in gems/, so the root bundle loads and tests each of them.
 gemspec path: "gems/arboard"
+gemspec path: "gems/rfd"
 
 gem "irb"
 gem "rake", "~> 13.0"

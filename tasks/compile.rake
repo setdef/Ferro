@@ -26,6 +26,23 @@ class FerroExtensionTask < RbSys::ExtensionTask
   def cargo_metadata
     @cargo_metadata ||= Dir.chdir(@ferro_gem.dir) { RbSys::Cargo::Metadata.new(@name).load! }
   end
+
+  # rb_sys's rb_sys:env:default task sets RB_SYS_CARGO_MANIFEST_DIR in the
+  # environment, once per rake run, with ||= (rb_sys 0.9.130
+  # extensiontask.rb:106-110). Every extension task shares that task, so
+  # with two gems the first gem's crate wins, and since each Makefile
+  # assigns the variable with ?=, the environment overrides the second
+  # gem's own and make builds the first gem's crate twice. Each Makefile
+  # already names its own crate (rb_sys mkmf.rb:77), so this task leaves
+  # the variable unset.
+  def define_env_tasks
+    super
+    Rake::Task["rb_sys:env:default"].clear_actions
+    task "rb_sys:env:default" do
+      ENV["RB_SYS_CARGO_TARGET_DIR"] ||= target_directory
+      ENV["RB_SYS_CARGO_PROFILE"] ||= "release"
+    end
+  end
 end
 
 # One extension task per gem. rake-compiler names them after the

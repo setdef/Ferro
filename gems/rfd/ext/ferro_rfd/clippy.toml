@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT
+
+# Lint parameters for this crate; lint levels live in Cargo.toml [lints].
+# Adopted from RatatuiRuby's crate: a binding hands every value it keeps to
+# Ruby's garbage collector, so nothing is ever leaked into a 'static.
+disallowed-methods = [
+    { path = "std::boxed::Box::leak", reason = "Let Ruby's garbage collector own the value (magnus::wrap) instead of leaking it." },
+    { path = "std::vec::Vec::leak", reason = "Let Ruby's garbage collector own the value instead of leaking it." },
+]

@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "ferro_rfd"
+version = "0.1.0-pre.1"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# rfd's defaults (xdg-portal and wayland) and file-handle-inner. gtk3 and
+# common-controls-v6 stay off; plan 002, decision 7 says why.
+rfd = { version = "=0.17.2", features = ["file-handle-inner"] }
+# rfd's own, to hand rfd a parent window (plan 002, decision 6).
+raw-window-handle = "0.6.2"
+magnus = { version = "0.9.3", features = ["bytes"] }
+rb-sys = "0.9.130"
+
+# rfd's own Objective-C crate, to check the thread and NSApp before rfd
+# would panic (plan 002, decision 5).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.5"
+
+# Each crate states its lints itself instead of inheriting them with
+# `workspace = true`: an installed gem ships only its own workspace.
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+all = { level = "deny", priority = -1 }
+# Every unsafe block carries a SAFETY comment (AGENTS.md).
+undocumented_unsafe_blocks = "deny"
+
+# Unsafe code is denied. An exception gets #[allow(unsafe_code)] on its
+# block, a SAFETY comment citing its source, and a test (AGENTS.md).
+[lints.rust]
+unsafe_code = "deny"

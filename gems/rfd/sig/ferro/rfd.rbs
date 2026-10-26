@@ -1,0 +1,58 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT
+
+module Ferro
+  module Rfd
+    VERSION: String
+
+    type window_handle = Win32WindowHandle | XlibWindowHandle | XcbWindowHandle
+    type display_handle = WindowsDisplayHandle | XlibDisplayHandle | XcbDisplayHandle
+    type message_buttons = MessageButtons | MessageButtons::OkCustom | MessageButtons::OkCancelCustom
+                         | MessageButtons::YesNoCancelCustom
+
+    interface _Parent
+      def window_handle: () -> window_handle?
+      def display_handle: () -> display_handle?
+    end
+
+    type native_window = [:Win32, Integer, Integer?] | [:Xlib, Integer, Integer] | [:Xcb, Integer, Integer?]
+    type native_display = [:Windows] | [:Xlib, Integer?, Integer] | [:Xcb, Integer?, Integer]
+    type native_parent = [native_window?, native_display?]
+    type native_filter = [String, Array[String]]
+    type native_file_settings = [Array[native_filter], String?, String?, String?, native_parent?, bool?]
+    type native_message_settings = [Symbol, String?, String?, Array[Symbol | String], native_parent?]
+    type native_result = Array[Symbol | String]
+    type native_outcome = [:handle, String?] | [:handles, Array[String]?] | [:result, native_result]
+                        | [:bytes, String] | [:written, nil] | [:raise, Exception]
+
+    private def self.string: (Object value) -> String
+    private def self.bytes: (Object value) -> String
+    private def self.filter: (Object name, Object extensions) -> native_filter
+    private def self.parent_pair: (_Parent parent) -> native_parent
+
+    module Native
+      def self.file_dialog_debug: (native_file_settings settings) -> String
+      def self.async_file_dialog_debug: (native_file_settings settings) -> String
+      def self.file_dialog: (:pick_file | :pick_folder | :save_file | :pick_file_or_folder call,
+                             native_file_settings settings) -> String?
+                          | (:pick_files | :pick_folders | :pick_files_or_folders call,
+                             native_file_settings settings) -> Array[String]?
+      def self.async_file_dialog: (Symbol call, native_file_settings settings) -> Native::Future
+      def self.message_dialog_debug: (native_message_settings settings) -> String
+      def self.async_message_dialog_debug: (native_message_settings settings) -> String
+      def self.message_dialog: (native_message_settings settings) -> native_result
+      def self.async_message_dialog: (native_message_settings settings) -> Native::Future
+      def self.check_parent: (native_parent pair) -> nil
+      def self.file_name: (String path) -> String
+      def self.file_handle_debug: (String path) -> String
+      def self.read: (String path) -> Native::Future
+      def self.write: (String path, String data) -> Native::Future
+
+      class Future
+        private
+
+        def native_value: () -> native_outcome
+      end
+    end
+  end
+end

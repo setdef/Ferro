@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT
+
+module Ferro
+  module Rfd
+    class MessageDialog
+      @level: MessageLevel
+      @title: String?
+      @description: String?
+      @buttons: message_buttons
+      @parent: native_parent?
+
+      def initialize: () -> void
+      def set_level: (MessageLevel level) -> self
+      def set_title: (String text) -> self
+      def set_description: (String text) -> self
+      def set_buttons: (message_buttons btn) -> self
+      def set_parent: (_Parent parent) -> self
+      def show: () -> (MessageDialogResult | MessageDialogResult::Custom)
+      def inspect: () -> String
+
+      private
+
+      def settings: () -> native_message_settings
+    end
+  end
+end

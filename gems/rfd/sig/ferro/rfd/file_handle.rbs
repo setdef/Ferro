@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT
+
+module Ferro
+  module Rfd
+    class FileHandle
+      @path: String
+
+      def initialize: (String | _ToPath path) -> void
+      def file_name: () -> String
+      def path: () -> String
+      def inner: () -> String
+      def read: () -> Future
+      def write: (String data) -> Future
+      def inspect: () -> String
+      def to_path: () -> String
+    end
+  end
+end

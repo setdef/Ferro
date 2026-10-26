@@ -117,19 +117,25 @@ jobs:
           echo "LIBCLANG_PATH=$libclang" >> "$GITHUB_ENV"
 
       # arboard speaks X11 and Wayland through pure-Rust clients (x11rb,
-      # wayland-client), so Linux needs only display servers, no client
-      # libraries: Xvfb for X11, and sway's headless backend for Wayland.
-      # weston would not do: it lacks the data-control protocols arboard's
-      # Wayland clipboard needs. There is no clipboard manager: arboard only
-      # offers one the contents, within 100 ms, when the last clipboard
-      # drops (src/platform/linux/x11.rs:788-801), so no test can rely on it,
-      # and xfce4-clipman, tried here, refilled the clipboard after tests
+      # wayland-client), so it needs only display servers: Xvfb for X11, and
+      # sway's headless backend for Wayland. weston would not do: it lacks
+      # the data-control protocols arboard's Wayland clipboard needs. There
+      # is no clipboard manager: arboard only offers one the contents,
+      # within 100 ms, when the last clipboard drops
+      # (src/platform/linux/x11.rs:788-801), so no test can rely on it, and
+      # xfce4-clipman, tried here, refilled the clipboard after tests
       # cleared it.
+      #
+      # rfd's wayland feature links the system's libwayland-client, which
+      # wayland-sys finds with pkg-config (wayland-sys 0.31.11 build.rs), so
+      # ferro-rfd needs libwayland-dev and pkg-config to build. Its dialog
+      # tests need no portal or zenity: they point D-Bus at nothing and put
+      # a fake zenity on PATH (gems/rfd/test/test_linux_dialogs.rb).
       - name: Install display servers
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends xvfb xauth sway libclang-dev
+          sudo apt-get install --yes --no-install-recommends xvfb xauth sway libclang-dev libwayland-dev pkg-config
 
       # Minitest prints each test's name and time (A is Minitest::TestTask's
       # argument variable), and tasks/test_watchdog.rb ends a test that hangs

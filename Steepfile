@@ -10,3 +10,8 @@ target :arboard do
   signature "gems/arboard/sig"
   check "gems/arboard/lib"
 end
+
+target :rfd do
+  signature "gems/rfd/sig"
+  check "gems/rfd/lib"
+end

@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT
+
+module Ferro
+  module Rfd
+    class Win32WindowHandle < Data
+      attr_reader hwnd: Integer
+      attr_reader hinstance: Integer?
+
+      def self.new: (Integer hwnd, Integer? hinstance) -> instance
+                  | (hwnd: Integer, hinstance: Integer?) -> instance
+    end
+
+    class XlibWindowHandle < Data
+      attr_reader window: Integer
+      attr_reader visual_id: Integer
+
+      def self.new: (Integer window, Integer visual_id) -> instance
+                  | (window: Integer, visual_id: Integer) -> instance
+    end
+
+    class XcbWindowHandle < Data
+      attr_reader window: Integer
+      attr_reader visual_id: Integer?
+
+      def self.new: (Integer window, Integer? visual_id) -> instance
+                  | (window: Integer, visual_id: Integer?) -> instance
+    end
+
+    class WindowsDisplayHandle < Data
+      def self.new: () -> instance
+    end
+
+    class XlibDisplayHandle < Data
+      attr_reader display: Integer?
+      attr_reader screen: Integer
+
+      def self.new: (Integer? display, Integer screen) -> instance
+                  | (display: Integer?, screen: Integer) -> instance
+    end
+
+    class XcbDisplayHandle < Data
+      attr_reader connection: Integer?
+      attr_reader screen: Integer
+
+      def self.new: (Integer? connection, Integer screen) -> instance
+                  | (connection: Integer?, screen: Integer) -> instance
+    end
+  end
+end

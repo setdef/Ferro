@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT
+
+module Ferro
+  module Rfd
+    class MessageDialogResult
+      Yes: MessageDialogResult
+      No: MessageDialogResult
+      Ok: MessageDialogResult
+      Cancel: MessageDialogResult
+
+      @name: Symbol
+
+      private def self.new: (Symbol name) -> instance
+      private def self.from_native: (native_result tuple) -> (MessageDialogResult | Custom)
+
+      def self.default: () -> MessageDialogResult
+
+      def initialize: (Symbol name) -> void
+      def inspect: () -> String
+      def to_s: () -> String
+
+      class Custom < Data
+        attr_reader custom: String
+
+        def self.new: (String custom) -> instance
+                    | (custom: String) -> instance
+
+        def to_s: () -> String
+      end
+    end
+  end
+end

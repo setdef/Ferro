@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT
+
+module Ferro
+  module Rfd
+    class FileDialog
+      @filters: Array[native_filter]
+      @directory: String?
+      @file_name: String?
+      @title: String?
+      @parent: native_parent?
+      @can_create_directories: bool?
+
+      def initialize: () -> void
+      def add_filter: (String name, Array[_ToS] extensions) -> self
+      def set_directory: (String | _ToPath path) -> self
+      def set_file_name: (String file_name) -> self
+      def set_title: (String title) -> self
+      def set_parent: (_Parent parent) -> self
+      def set_can_create_directories: (boolish can) -> self
+      def pick_file: () -> String?
+      def pick_files: () -> Array[String]?
+      def pick_folder: () -> String?
+      def pick_folders: () -> Array[String]?
+      def save_file: () -> String?
+      def inspect: () -> String
+
+      private
+
+      def settings: () -> native_file_settings
+    end
+  end
+end
