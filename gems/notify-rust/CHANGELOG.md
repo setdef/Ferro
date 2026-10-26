@@ -12,6 +12,8 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0.pre.1] - 2026-10-26
+
 ### Added
 
 - `Ferro::NotifyRust::Notification` binding notify-rust 4.18.2: `new`, `appname`, `summary`, `subtitle`, `body`, `icon`, `auto_icon`, `image_path`, `sound_name`, `timeout`, `actions` (deprecated), `action`, `id`, `finalize`, `show`, and its public fields as readers and writers; on Linux also `hint`, `hints`, `urgency`, `image_data`, `image`, `show_async`, `show_async_at_bus`, and `Notification.at_bus` (deprecated); on Windows `urgency` and `app_id`; on macOS `schedule` and `schedule_raw`.
@@ -23,4 +25,5 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 - Showing and waiting release Ruby's global VM lock; on Linux an interrupt ends a wait.
 - Built with notify-rust's `z` (zbus), `images`, and `chrono` features; `d`, `tokio`, `debug_namespace`, and `preview-macos-un` are not built.
 
-[Unreleased]: https://github.com/setdef/Ferro/commits/trunk/gems/notify-rust
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.1...HEAD
+[0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-notify-rust/v0.1.0.pre.1
