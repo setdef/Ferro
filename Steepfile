@@ -15,3 +15,8 @@ target :rfd do
   signature "gems/rfd/sig"
   check "gems/rfd/lib"
 end
+
+target :"notify-rust" do
+  signature "gems/notify-rust/sig"
+  check "gems/notify-rust/lib"
+end

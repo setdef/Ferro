@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module NotifyRust
+    class NotificationHandle
+      private def self.new: () -> NotificationHandle
+
+      def wait_for_action: () { (String action) -> void } -> nil
+      def wait_for_response: () { (NotificationResponse response) -> void } -> nil
+      def on_close: () { (CloseReason reason) -> void } -> nil
+
+      private
+
+      def release: () -> self
+      def native_wait_for_action: () -> String?
+      def native_wait_for_response: () -> response_tag?
+      def native_on_close: () -> close_reason_tag?
+    end
+  end
+end

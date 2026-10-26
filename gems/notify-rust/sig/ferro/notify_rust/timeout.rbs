@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module NotifyRust
+    module Timeout : Object
+      class Unit
+        include Timeout
+
+        @name: :Default | :Never
+
+        def initialize: (:Default | :Never name) -> void
+        def inspect: () -> String
+
+        private
+
+        def to_native: () -> (:Default | :Never)
+      end
+
+      Default: Unit
+      Never: Unit
+
+      class Milliseconds < Data
+        include Timeout
+
+        attr_reader value: Integer
+
+        def self.new: (Integer value) -> instance
+                    | (value: Integer) -> instance
+
+        private
+
+        def to_native: () -> Integer
+      end
+
+      def self.default: () -> Unit
+      def self.from: (Integer milliseconds) -> (Unit | Milliseconds)
+      def self.from_str: (String string) -> (Unit | Milliseconds)
+      private def self.from_native: (timeout_tag tag) -> (Unit | Milliseconds)
+
+      def to_i: () -> Integer
+    end
+  end
+end

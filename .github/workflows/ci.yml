@@ -131,11 +131,19 @@ jobs:
       # ferro-rfd needs libwayland-dev and pkg-config to build. Its dialog
       # tests need no portal or zenity: they point D-Bus at nothing and put
       # a fake zenity on PATH (gems/rfd/test/test_linux_dialogs.rb).
+      #
+      # ferro-notify-rust's tests show real notifications to a real server:
+      # they start dbus-daemon and dunst on a session bus of their own and
+      # drive dunst with dunstctl and dbus-send
+      # (gems/notify-rust/test/test_helper.rb). dunst draws on X11 or
+      # Wayland, so it runs under both passes below. notify-rust speaks
+      # D-Bus through zbus, pure Rust, so building it needs nothing more.
       - name: Install display servers
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends xvfb xauth sway libclang-dev libwayland-dev pkg-config
+          sudo apt-get install --yes --no-install-recommends xvfb xauth sway libclang-dev libwayland-dev pkg-config \
+            dbus dunst
 
       # Minitest prints each test's name and time (A is Minitest::TestTask's
       # argument variable), and tasks/test_watchdog.rb ends a test that hangs

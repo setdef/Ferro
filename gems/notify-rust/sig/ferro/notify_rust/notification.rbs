@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module NotifyRust
+    class Notification
+      include Builder
+
+      def initialize: () -> void
+      def inspect: () -> String
+
+      private
+
+      def initialize_copy: (Notification other) -> void
+      def native_inspect: () -> String
+    end
+  end
+end

@@ -25,8 +25,9 @@ own documentation stays your guide. Ferro spun out of
 
 | Gem | Crate | Status |
 |---|---|---|
-| [ferro-arboard](gems/arboard/README.rdoc) | [arboard](https://github.com/1Password/arboard) 3.7.0, the system clipboard | 0.1.0.pre.1, unreleased |
-| [ferro-rfd](gems/rfd/README.rdoc) | [rfd](https://github.com/PolyMeilex/rfd) 0.17.2, native file and message dialogs | 0.1.0.pre.1, unreleased |
+| [ferro-arboard](gems/arboard/README.rdoc) | [arboard](https://github.com/1Password/arboard) 3.7.0, the system clipboard | 0.1.0.pre.2 |
+| [ferro-rfd](gems/rfd/README.rdoc) | [rfd](https://github.com/PolyMeilex/rfd) 0.17.2, native file and message dialogs | 0.1.0.pre.2 |
+| [ferro-notify-rust](gems/notify-rust/README.rdoc) | [notify-rust](https://github.com/hoodie/notify-rust) 4.18.2, desktop notifications | 0.1.0.pre.1, unreleased |
 
 ## Using a gem
 
@@ -83,7 +84,9 @@ bundle exec rake gate:arboard   # one gem's checks, while you work on it
 
 Each gem releases on its own, through rake tasks: `rake bump:arboard:patch`
 commits a release, and `rake release:arboard:tag` tags it and pushes the
-tag. [AGENTS.md](AGENTS.md) says who may run which.
+tag. A new gem's first release is `rake bump:<gem>:current`, which
+releases the version it starts at instead of skipping past it.
+[AGENTS.md](AGENTS.md) says who may run which.
 
 Start with [AGENTS.md](AGENTS.md), which holds the rules for people and
 agents alike, and [ADR 001](doc/contributors/adr/001.md), which explains how
@@ -92,7 +95,8 @@ a crate becomes a gem.
 ## License
 
 Each gem takes its crate's license: ferro-arboard is MIT OR Apache-2.0, as
-arboard is, and ferro-rfd is MIT, as rfd is. The repository's tooling is
+arboard is, ferro-rfd is MIT, as rfd is, and ferro-notify-rust is MIT OR
+Apache-2.0, as notify-rust is. The repository's tooling is
 AGPL-3.0-or-later. Documentation is CC-BY-SA-4.0, code snippets in it are
 MIT-0, and lockfiles are CC0-1.0. Every file says which applies;
 [REUSE](https://reuse.software) checks it, and the texts are in

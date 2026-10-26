@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module NotifyRust
+    class Urgency
+      Low: Urgency
+      Normal: Urgency
+      Critical: Urgency
+
+      @name: urgency_tag
+
+      private def self.new: (urgency_tag name) -> instance
+      private def self.from_native: (urgency_tag name) -> Urgency
+
+      def self.try_from: (String string) -> Urgency
+      def self.from: (Integer? value) -> Urgency
+
+      def initialize: (urgency_tag name) -> void
+      def inspect: () -> String
+
+      private
+
+      def to_native: () -> urgency_tag
+    end
+  end
+end

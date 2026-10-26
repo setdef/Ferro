@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module NotifyRust
+    def self.set_application: (String bundle_ident) -> nil
+    def self.get_bundle_identifier_or_default: (String app_name) -> String
+
+    module Native
+      def self.set_application: (String bundle_ident) -> nil
+      def self.get_bundle_identifier_or_default: (String app_name) -> String
+    end
+
+    class Error
+      class MacNotificationSys < Error
+        class Application < MacNotificationSys
+          attr_reader name: String
+
+          class AlreadySet < Application
+            def initialize: (?String name) -> void
+          end
+
+          class CouldNotSet < Application
+            def initialize: (?String name) -> void
+          end
+        end
+
+        class Notification < MacNotificationSys
+          class ScheduleInThePast < Notification
+            def initialize: (?String? message) -> void
+          end
+
+          class UnableToSchedule < Notification
+            def initialize: (?String? message) -> void
+          end
+
+          class UnableToDeliver < Notification
+            def initialize: (?String? message) -> void
+          end
+        end
+      end
+    end
+
+    class Notification
+      def schedule: (Time time) -> NotificationHandle
+      def schedule_raw: (Float | Integer timestamp) -> NotificationHandle
+
+      private
+
+      def native_schedule: (Integer seconds) -> NotificationHandle
+      def native_schedule_raw: (Float | Integer timestamp) -> NotificationHandle
+    end
+
+    class NotificationHandle
+      private
+
+      def native_drop: () -> nil
+    end
+  end
+end

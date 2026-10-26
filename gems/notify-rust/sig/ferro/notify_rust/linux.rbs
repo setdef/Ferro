@@ -1,0 +1,131 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module NotifyRust
+    def self.get_capabilities: () -> Array[String]
+    def self.get_server_information: () -> ServerInformation
+    def self.handle_action: (Integer id) { (ActionResponse response) -> void } -> nil
+    def self.dbus_stack: () -> DbusStack
+
+    module Native
+      def self.get_capabilities: () -> Array[String]
+      def self.get_server_information: () -> [String, String, String, String]
+      def self.handle_action: (Integer id) -> action_response_tag?
+      def self.dbus_stack: () -> (:Dbus | :Zbus)
+    end
+
+    class Error
+      class Zbus < Error
+      end
+
+      class Image < Error
+      end
+    end
+
+    class ImageError < StandardError
+      class TooBig < ImageError
+      end
+
+      class WrongDataSize < ImageError
+      end
+
+      class CantOpen < ImageError
+      end
+
+      class CantConvert < ImageError
+      end
+    end
+
+    class Image
+      private def self.new: () -> Image
+
+      def self.from_rgb: (Integer width, Integer height, String data) -> Image
+      def self.from_rgba: (Integer width, Integer height, String data) -> Image
+      def self.open: (String | _ToPath path) -> Image
+      private def self.native_from_rgb: (Integer width, Integer height, String data) -> Image
+      private def self.native_from_rgba: (Integer width, Integer height, String data) -> Image
+      private def self.native_open: (String path) -> Image
+
+      def ==: (Object other) -> bool
+      def eql?: (Object other) -> bool
+      def hash: () -> Integer
+      def inspect: () -> String
+
+      private
+
+      def native_equal: (Object other) -> bool
+      def native_hash: () -> Integer
+      def native_inspect: () -> String
+    end
+
+    module Hint
+      class ImageData < Data
+        include Hint
+
+        attr_reader value: Image
+
+        def self.new: (Image value) -> instance
+                    | (value: Image) -> instance
+      end
+    end
+
+    class DbusStack
+      Dbus: DbusStack
+      Zbus: DbusStack
+
+      @name: :Dbus | :Zbus
+
+      private def self.new: (:Dbus | :Zbus name) -> instance
+
+      def initialize: (:Dbus | :Zbus name) -> void
+      def inspect: () -> String
+    end
+
+    class Future[T]
+      @work: ^() -> T
+      @lock: Thread::Mutex
+      @done: bool
+      @value: T?
+      @error: Error?
+
+      private def self.new: [T] () { () -> T } -> Future[T]
+
+      def initialize: () { () -> T } -> void
+      def value: () -> T
+
+      private
+
+      def settle: () -> void
+    end
+
+    module Builder
+      def hint: (Hint hint) -> self
+      def hints: () -> Set[Hint]
+      def hints=: (Enumerable[Hint] hints) -> void
+      def image_data: (Image image) -> self
+      def image: (String | _ToPath path) -> self
+      def show_async: () -> Future[NotificationHandle]
+      def show_async_at_bus: (String sub_bus) -> Future[NotificationHandle]
+    end
+
+    class Notification
+      def self.at_bus: (String sub_bus) -> Notification
+      private def self.native_at_bus: (String sub_bus) -> Notification
+    end
+
+    class NotificationHandle
+      def id: () -> Integer
+      def close: () -> nil
+      def close_async: () -> Future[nil]
+      def wait_for_action_async: () { (NotificationResponse response) -> void } -> Future[nil]
+      def update: () -> nil
+
+      private
+
+      def native_handle_id: () -> Integer
+      def native_close: () -> nil
+      def native_update: () -> nil
+    end
+  end
+end

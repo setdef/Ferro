@@ -34,7 +34,7 @@ class TestBump < Minitest::Test
   end
 
   def teardown
-    FileUtils.remove_entry(@root)
+    [@root, @origin].compact.each { |dir| FileUtils.remove_entry(dir) }
   end
 
   private def write(path, content)
@@ -60,11 +60,31 @@ class TestBump < Minitest::Test
   end
 
   private def bump(gate: true, &)
+    with_identity { bumper(gate:).run!(&) }
+  end
+
+  private def release_current
+    with_identity { bumper.release_current! }
+  end
+
+  private def bumper(gate: true)
+    Bump.new(root: @root, gem: GEM, gate: -> { @gate_runs += 1; gate }, date: Date.new(2026, 10, 25))
+  end
+
+  private def with_identity
     ENV["GIT_AUTHOR_NAME"] = ENV["GIT_COMMITTER_NAME"] = "Test"
     ENV["GIT_AUTHOR_EMAIL"] = ENV["GIT_COMMITTER_EMAIL"] = "test@example.com"
-    Bump.new(root: @root, gem: GEM, gate: -> { @gate_runs += 1; gate }, date: Date.new(2026, 10, 25)).run!(&)
+    yield
   ensure
     %w[GIT_AUTHOR_NAME GIT_COMMITTER_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_EMAIL].each { |name| ENV.delete(name) }
+  end
+
+  # A bare repository as origin, holding trunk, so the tag check can ask it.
+  private def with_origin
+    @origin = Dir.mktmpdir("bump-origin")
+    system("git", "init", "--quiet", "--bare", @origin, exception: true, out: File::NULL, err: File::NULL)
+    git("remote", "add", "origin", @origin)
+    git("push", "--quiet", "origin", "trunk")
   end
 
   def test_a_prerelease_bump_rewrites_every_version_runs_the_gate_and_commits
@@ -144,5 +164,82 @@ class TestBump < Minitest::Test
     FileUtils.rm(File.join(@root, "stray.txt"))
     git("switch", "--quiet", "--create", "topic")
     assert_equal "bump on trunk, not topic", assert_raises(Bump::Failure) { bump { |c| c.next(:patch) } }.message
+  end
+
+  def test_current_releases_the_version_a_new_gem_starts_at
+    with_origin
+
+    version = release_current
+
+    assert_equal "0.1.0.pre.1", version.to_s
+    assert_includes read("gems/demo/lib/ferro/demo/version.rb"), %(VERSION = "0.1.0.pre.1")
+    assert_includes read("gems/demo/ext/ferro_demo/Cargo.toml"), %(version = "0.1.0-pre.1")
+    assert_includes read("gems/demo/CHANGELOG.md"), "## [Unreleased]\n\n## [0.1.0.pre.1] - 2026-10-25\n\n### Added\n\n- A thing.\n"
+    assert_includes read("gems/demo/CHANGELOG.md"),
+      "[0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-demo/v0.1.0.pre.1"
+    assert_equal 1, @gate_runs
+    assert_equal ["chore(demo): release 0.1.0.pre.1", "init"], log
+    assert_empty IO.popen(["git", "status", "--porcelain", chdir: @root], &:read)
+  end
+
+  def test_current_is_refused_once_the_version_is_tagged_here
+    with_origin
+    git("tag", "ferro-demo/v0.1.0.pre.1")
+
+    error = assert_raises(Bump::Failure) { release_current }
+
+    assert_equal "ferro-demo/v0.1.0.pre.1 already exists, so 0.1.0.pre.1 is released; bump past it", error.message
+    assert_equal ["init"], log
+  end
+
+  def test_current_is_refused_once_origin_has_the_tag
+    with_origin
+    git("tag", "ferro-demo/v0.1.0.pre.1")
+    git("push", "--quiet", "origin", "refs/tags/ferro-demo/v0.1.0.pre.1")
+    git("tag", "--delete", "ferro-demo/v0.1.0.pre.1")
+
+    error = assert_raises(Bump::Failure) { release_current }
+
+    assert_equal "origin already has ferro-demo/v0.1.0.pre.1, so 0.1.0.pre.1 is released; bump past it", error.message
+    assert_equal 0, @gate_runs
+  end
+
+  def test_current_is_refused_when_the_changelog_already_has_the_version
+    with_origin
+    write("gems/demo/CHANGELOG.md", "# Changelog\n\n## [Unreleased]\n\n- Another.\n\n## [0.1.0.pre.1] - 2026-10-24\n\n- A thing.\n\n" \
+      "[Unreleased]: https://github.com/setdef/Ferro/commits/trunk/gems/demo\n")
+    commit_all("released by hand")
+
+    error = assert_raises(Bump::Failure) { release_current }
+
+    assert_equal "gems/demo/CHANGELOG.md already has a 0.1.0.pre.1 section; bump past it", error.message
+  end
+
+  def test_current_is_refused_with_nothing_unreleased
+    with_origin
+    write("gems/demo/CHANGELOG.md", "# Changelog\n\n## [Unreleased]\n\n[Unreleased]: https://github.com/setdef/Ferro/commits/trunk/gems/demo\n")
+    commit_all("empty")
+
+    error = assert_raises(Bump::Failure) { release_current }
+
+    assert_includes error.message, "nothing under Unreleased to release"
+    assert_equal 0, @gate_runs
+    assert_empty IO.popen(["git", "status", "--porcelain", chdir: @root], &:read)
+  end
+
+  def test_current_is_refused_without_an_origin_to_ask
+    error = assert_raises(Bump::Failure) { release_current }
+
+    assert_includes error.message, "git ls-remote"
+  end
+
+  def test_current_is_refused_below_a_released_version
+    with_origin
+    git("tag", "ferro-demo/v0.2.0")
+
+    error = assert_raises(Bump::Failure) { release_current }
+
+    assert_equal "0.1.0.pre.1 is below 0.2.0, which is released; bump past it", error.message
+    assert_equal 0, @gate_runs
   end
 end

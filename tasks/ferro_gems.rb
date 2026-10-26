@@ -25,7 +25,8 @@ require_relative "package_check"
 # [packaged] The paths the gemspec ships, relative to the gem.
 # [native_namespace] The module the native extension defines.
 # [platform_sigs] Signature files that describe one platform's API, by the
-#   platform name the extension reports; rbs:parity skips the others.
+#   platform name the extension reports: a path, or an Array of them, and a
+#   file may serve several platforms; rbs:parity skips the others.
 # [platform_probe] Ruby source that prints the extension's platform name.
 # [smoke] Ruby source the packaging check runs against the built gem.
 class FerroGem < Data.define(:short_name, :name, :crate, :extension, :packaged, :native_namespace,
@@ -35,10 +36,12 @@ class FerroGem < Data.define(:short_name, :name, :crate, :extension, :packaged, 
     File.join("gems", short_name)
   end
 
-  # The file that defines the gem's VERSION, relative to the gem:
-  # <tt>lib/ferro/arboard/version.rb</tt> for ferro-arboard.
+  # The file that defines the gem's VERSION, relative to the gem, beside
+  # the extension: <tt>lib/ferro/arboard/version.rb</tt> for ferro-arboard,
+  # and <tt>lib/ferro/notify_rust/version.rb</tt> for ferro-notify-rust,
+  # whose require path follows the crate's Rust name (plan 003).
   def version_file
-    File.join("lib", name.tr("-", "/"), "version.rb")
+    File.join(File.dirname(extension), "version.rb")
   end
 
   # The gem's changelog, relative to the gem.
@@ -92,9 +95,12 @@ class FerroGem < Data.define(:short_name, :name, :crate, :extension, :packaged, 
     output.strip
   end
 
-  # The signature files that belong to other platforms than +platform+.
+  # The signature files that belong to other platforms than +platform+,
+  # and not to +platform+ itself.
   def foreign_sigs(platform)
-    platform_sigs.reject { |name, _| name == platform }.values.map { |path| File.join(dir, path) }
+    own = Array(platform_sigs[platform])
+    (platform_sigs.reject { |name, _| name == platform }.values.flat_map { |paths| Array(paths) } - own).uniq
+      .map { |path| File.join(dir, path) }
   end
 end
 
@@ -159,5 +165,29 @@ FERRO_GEMS = [
       rescue ArgumentError
       end
       puts "ferro-rfd \#{Ferro::Rfd::VERSION} loads its extension (\#{dialog.class})"
+    RUBY
+  FerroGem.new(
+    short_name: "notify-rust",
+    name: "ferro-notify-rust",
+    crate: "ext/ferro_notify_rust",
+    extension: "lib/ferro/notify_rust/ferro_notify_rust",
+    packaged: %w[lib sig ext Cargo.toml Cargo.lock Cargo.lock.license README.rdoc CHANGELOG.md LICENSES],
+    native_namespace: "Ferro::NotifyRust",
+    platform_sigs: {
+      "linux" => %w[sig/ferro/notify_rust/linux.rbs sig/ferro/notify_rust/deref.rbs],
+      "macos" => "sig/ferro/notify_rust/apple.rbs",
+      "windows" => %w[sig/ferro/notify_rust/windows.rbs sig/ferro/notify_rust/deref.rbs],
+    },
+    platform_probe: %(require "ferro/notify_rust"; print Ferro::NotifyRust.const_get(:PLATFORM)),
+    smoke: <<~RUBY),
+      require "ferro/notify_rust"
+      # Showing a notification needs a desktop, so the smoke test shows
+      # none. It builds one through notify-rust and reads a field back, and
+      # converts a value through notify-rust's own rules, which proves the
+      # extension loads and reaches the crate.
+      notification = Ferro::NotifyRust::Notification.new.summary("Smoke").action("ok", "OK")
+      abort "notify-rust did not see the summary: \#{notification.inspect}" unless notification.summary == "Smoke"
+      abort "notify-rust did not parse an urgency" unless Ferro::NotifyRust::Urgency.try_from("High") == Ferro::NotifyRust::Urgency::Critical
+      puts "ferro-notify-rust \#{Ferro::NotifyRust::VERSION} loads its extension (\#{notification.class})"
     RUBY
 ].freeze

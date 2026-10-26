@@ -93,6 +93,9 @@ see `gems/arboard/lib/ferro/arboard/error.rb`.
   hand off. Then walk the plan item by item and mark each done or
   deferred with a reason.
 - Hand off with the commit-session skill.
+- A new gem starts at `0.1.0.pre.1` with its entries under Unreleased.
+  Its first release is `rake bump:<name>:current`, which releases that
+  version rather than skipping to `pre.2`; then `rake release:<name>:tag`.
 
 The mistakes that shaped these rules are in
 [references/lessons.md](references/lessons.md). Skim it before designing.

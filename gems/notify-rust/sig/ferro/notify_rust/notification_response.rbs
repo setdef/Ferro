@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module NotifyRust
+    module NotificationResponse : Object
+      class Unit
+        include NotificationResponse
+
+        @name: :Default
+
+        def initialize: (:Default name) -> void
+        def inspect: () -> String
+      end
+
+      Default: Unit
+
+      class Action < Data
+        include NotificationResponse
+
+        attr_reader key: String
+
+        def self.new: (String key) -> instance
+                    | (key: String) -> instance
+      end
+
+      class Reply < Data
+        include NotificationResponse
+
+        attr_reader text: String
+
+        def self.new: (String text) -> instance
+                    | (text: String) -> instance
+      end
+
+      class Closed < Data
+        include NotificationResponse
+
+        attr_reader reason: CloseReason
+
+        def self.new: (CloseReason reason) -> instance
+                    | (reason: CloseReason) -> instance
+      end
+
+      def self.from: (String key) -> NotificationResponse
+      private def self.from_native: (response_tag tag) -> NotificationResponse
+
+      def is_default_action: () -> bool
+    end
+  end
+end

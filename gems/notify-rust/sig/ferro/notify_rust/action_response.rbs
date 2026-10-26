@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module NotifyRust
+    module ActionResponse : Object
+      class Custom < Data
+        include ActionResponse
+
+        attr_reader key: String
+
+        def self.new: (String key) -> instance
+                    | (key: String) -> instance
+      end
+
+      class Closed < Data
+        include ActionResponse
+
+        attr_reader reason: CloseReason
+
+        def self.new: (CloseReason reason) -> instance
+                    | (reason: CloseReason) -> instance
+      end
+
+      def self.from: (String key) -> ActionResponse
+      private def self.from_native: (action_response_tag tag) -> ActionResponse
+    end
+  end
+end

@@ -1,0 +1,229 @@
+--
+SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: CC-BY-SA-4.0
+++
+
+= ferro-notify-rust
+
+{rdoc-image:https://justin.searls.co/img/shovelware.svg}[https://justin.searls.co/shovelware/]
+
+Desktop notifications for Ruby, through notify-rust 4.18.2.
+
+A program that finishes a long job, or hears about something the user
+cares about, should say so where the user looks: a notification in the
+corner of the screen. Each system has its own way to show one: the XDG
+notification server over D-Bus on Linux and the BSDs, the notification
+center on macOS, toasts on Windows.
+
+ferro-notify-rust binds notify-rust (https://github.com/hoodie/notify-rust)
+one to one. It keeps notify-rust's names and behavior and adds nothing of
+its own. Use it to tell the user a build finished, ask them to approve
+something with an action button, or keep a progress notification up to
+date.
+
+== Install
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  bundle add ferro-notify-rust
+
+--
+SPDX-SnippetEnd
+++
+
+The gem compiles a Rust extension when it installs, so the machine that
+installs it needs Rust and Cargo: Rust 1.89 or newer (notify-rust's
++rust-version+), and 1.99 or newer on macOS 27, where earlier toolchains
+strip the extension in a way the new loader rejects. The build runs
+<tt>cargo --locked</tt>, so it compiles exactly the dependency versions
+this gem was tested with. To build against newer ones anyway, set
++RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will do); it replaces
+<tt>--locked</tt>.
+
+On Linux, notify-rust talks to D-Bus through zbus, pure Rust, so building
+needs no system libraries. Showing a notification needs a session bus and
+a notification server, which desktops run (GNOME Shell, Plasma, dunst,
+mako, and others).
+
+== Use
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  require "ferro/notify_rust"
+
+  Ferro::NotifyRust::Notification.new
+    .summary("Firefox News")
+    .body("This will almost look like a real firefox notification.")
+    .icon("firefox")
+    .timeout(Ferro::NotifyRust::Timeout::Milliseconds.new(6000))
+    .show
+
+--
+SPDX-SnippetEnd
+++
+
+Each setter returns the notification, so calls chain, and +show+ sends it.
+Without an argument, a method with a field of the same name returns it:
++summary+ returns the summary.
+
+=== Actions
+
+On Linux, +show+ returns a NotificationHandle, which can wait for the user.
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  Ferro::NotifyRust::Notification.new
+    .summary("click me")
+    .action("default", "default")
+    .action("clicked", "click here")
+    .hint(Ferro::NotifyRust::Hint::Resident.new(true))
+    .show
+    .wait_for_action do |action|
+      case action
+      when "default" then puts "you clicked \"default\""
+      when "clicked" then puts "that was correct"
+      when "__closed" then puts "the notification was closed" # a hard-coded keyword
+      end
+    end
+
+--
+SPDX-SnippetEnd
+++
+
++wait_for_response+ yields a NotificationResponse instead, which tells a
+click, an action, and a close apart without keywords, and +on_close+ yields
+the CloseReason when the notification goes away. A handle can also +close+
+the notification, or change it and +update+ it in place.
+
+Every wait releases Ruby's global VM lock, so other threads keep running.
+On Linux an interrupt (Ctrl-C, <tt>Thread#raise</tt>, +Timeout+) ends it;
+notify-rust offers no way to stop a wait on macOS or Windows, or
++handle_action+, +update+, +get_capabilities+, and
++get_server_information+ on Linux, so there they end only when the user
+answers or the call returns. zbus sets no timeout on a D-Bus call, so a
+server that never answers blocks those Linux calls for good, as it does
+in Rust.
+
+=== macOS
+
+On macOS, notify-rust sends a notification when its handle drops, unless
+one of the handle's waits sends it and waits first. Ruby has no moment when
+an object drops, so +show+ decides:
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  # Without a block, the notification is sent at once.
+  Ferro::NotifyRust::Notification.new.summary("Done").show
+
+  # With a block, it is sent when the block ends, unless a wait sent it.
+  Ferro::NotifyRust::Notification.new.summary("Approve?").action("yes", "Yes").show do |handle|
+    handle.wait_for_action { |action| puts action }
+  end
+
+--
+SPDX-SnippetEnd
+++
+
+Notifications come from an application: Finder, unless you choose another
+with +set_application+ before the first one. notify-rust does it by
+replacing what <tt>NSBundle.mainBundle</tt> reports as its bundle
+identifier, and by making itself the notification center's one delegate.
+Both are set once per process, so the first +set_application+ wins, and no
+other library in the same process may link notify-rust or
+mac-notification-sys.
+
+A wait needs the main thread's run loop. On the main thread, it runs the
+loop itself; on any other thread it finishes only while the main thread
+runs its run loop, as a windowed app's event loop does, and otherwise
+blocks indefinitely. macOS does not let a program set a notification's
+icon, timeout, or app name; +hint+ and +urgency+ do not exist there.
+
+== How it maps notify-rust
+
+The API is notify-rust's, translated where Rust has no Ruby meaning:
+
+* Notification wraps notify-rust's builder. +dup+ and +finalize+ copy it,
+  as Rust's +Clone+ does; #inspect shows notify-rust's +Debug+ text; a
+  frozen one refuses its setters.
+* Enums are constants (Urgency::Critical, Timeout::Never,
+  CloseReason::Dismissed); variants with data are Data classes
+  (Timeout::Milliseconds, Hint::Category, NotificationResponse::Action).
+  +Default+ is <tt>.default</tt>. Conversions keep notify-rust's rules:
+  <tt>From</tt> is +from+, <tt>TryFrom</tt> is +try_from+, <tt>FromStr</tt>
+  is +from_str+, and <tt>i32::from(timeout)</tt> is Timeout#to_i.
+* Closures are blocks, called after the wait ends, with Ruby's lock held.
+* A Rust future is a Future (Linux), and <tt>.await</tt> is Future#value.
+  As a Rust future does, it starts its work when first awaited.
+* Each kind of error is a subclass of Ferro::NotifyRust::Error with
+  notify-rust's message. A wrong argument type raises +TypeError+; an
+  error that is not notify-rust's own, such as Timeout.from_str's parse
+  failure, raises +ArgumentError+ with Rust's message.
+* Methods a platform lacks are not defined there, so <tt>respond_to?</tt>
+  answers. On Linux and Windows a NotificationHandle answers every
+  Notification setter, as notify-rust's +Deref+ gives.
+* notify-rust's <tt>#[deprecated]</tt> items warn in Ruby's
+  <tt>:deprecated</tt> category: Notification#actions with an argument,
+  Notification.at_bus, and on macOS the Urgency constant.
+
+What differs from calling notify-rust from Rust:
+
+* A handle's waits consume it in Rust. In Ruby, a Linux handle stays
+  usable, and a second wait waits for the next signal; on macOS and
+  Windows a wait takes the notification out, as notify-rust does, and a
+  second wait returns without calling its block.
+* Rust refuses at compile time to change a handle a wait borrows. In
+  Ruby, a setter or +update+ on a Linux handle while another thread waits
+  on it or closes it raises Ferro::NotifyRust::Error
+  (<tt>already borrowed: ...</tt>), rather than wait; on Windows, a handle
+  a wait consumed raises from every setter and field.
+* A panic inside notify-rust would end your Ruby process. It raises
+  Ferro::NotifyRust::Error with <tt>notify-rust panicked: ...</tt>
+  instead, and Notification.at_bus raises Error::Msg for a sub-bus
+  notify-rust would panic on. Rust still prints its usual panic message to
+  stderr first.
+* notify-rust's Error keeps its kind private, so ferro reads it from
+  notify-rust's +Debug+ text.
+* Not bound: <tt>From<Duration> for Timeout</tt> (pass Integer
+  milliseconds), +show_debug+ (deprecated, "never meant to be public
+  API"), +SPEC_VERSION+ (use get_server_information), macOS's
+  <tt>NotificationHandle::new</tt> (+show+ makes the same handle), and
+  Image's conversions from the image crate's types (use Image.open).
+
+notify-rust's Cargo features built here are +z+ (zbus, the default),
++images+, and +chrono+. Not built: +d+ and +d_vendored+, which add dbus-rs
+beside zbus and link the system's libdbus; +tokio+ and +z-with-tokio+,
+which need a tokio runtime around every call; +debug_namespace+, which
+renames the bus for notify-rust's own tests; and +preview-macos-un+, which
+replaces the macOS backend with +UNUserNotificationCenter+, a preview that
+needs a signed app bundle.
+
+The extension is Ractor-safe, and a frozen Notification, Image, or value may
+cross Ractors. On Windows, Ruby 4.0.9 can hang when a Ractor starts a
+garbage collection while the main Ractor has another thread asleep; the bug
+is Ruby's (ferro-arboard's README says more).
+
+ferro-notify-rust 0.1.0.pre.1 binds notify-rust 4.18.2. The gem's version
+follows its own API; its +notify_rust_version+ metadata names the
+notify-rust release.
+
+== License
+
+ferro-notify-rust's code is MIT OR Apache-2.0, as notify-rust's is. This
+README is CC-BY-SA-4.0, and its code examples are MIT-0, so paste them
+freely. The lockfile is CC0-1.0. The license texts are in LICENSES/.

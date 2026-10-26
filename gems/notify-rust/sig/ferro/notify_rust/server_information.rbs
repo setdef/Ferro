@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module NotifyRust
+    class ServerInformation < Data
+      attr_reader name: String
+      attr_reader vendor: String
+      attr_reader version: String
+      attr_reader spec_version: String
+
+      def self.new: (String name, String vendor, String version, String spec_version) -> instance
+                  | (name: String, vendor: String, version: String, spec_version: String) -> instance
+    end
+  end
+end

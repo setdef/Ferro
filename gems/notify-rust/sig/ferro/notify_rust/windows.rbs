@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module NotifyRust
+    module Builder
+      def app_id: (String app_id) -> self
+    end
+  end
+end

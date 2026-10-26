@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module NotifyRust
+    VERSION: String
+
+    type urgency_tag = :Low | :Normal | :Critical
+    type timeout_tag = :Default | :Never | Integer
+    type close_reason_tag = :Expired | :Dismissed | :CloseAction | Integer
+    type response_tag = [:Default] | [:Action, String] | [:Reply, String] | [:Closed, close_reason_tag]
+    type action_response_tag = [:Custom, String] | [:Closed, close_reason_tag]
+    type hint_tag = Array[Object]
+
+    private def self.string: (Object value) -> String
+
+    module Native
+      def self.urgency_try_from: (String string) -> urgency_tag
+      def self.urgency_from: (Integer? value) -> urgency_tag
+      def self.timeout_from_i32: (Integer milliseconds) -> timeout_tag
+      def self.timeout_from_str: (String string) -> timeout_tag
+      def self.timeout_to_i32: (timeout_tag tag) -> Integer
+      def self.close_reason_from: (Integer raw_reason) -> close_reason_tag
+      def self.notification_response_from: (String key) -> response_tag
+      def self.action_response_from: (String key) -> action_response_tag
+      def self.notification_id_from: (Integer | String value) -> ([:Xdg, Integer] | [:Mac, String])
+      def self.hint_from_key_val: (String name, String value) -> hint_tag
+      def self.hint_as_bool: (hint_tag tag) -> bool?
+      def self.hint_as_i32: (hint_tag tag) -> Integer?
+      def self.hint_as_str: (hint_tag tag) -> String?
+    end
+  end
+end

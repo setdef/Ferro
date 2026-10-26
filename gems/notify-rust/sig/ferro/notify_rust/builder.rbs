@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module NotifyRust
+    module Builder
+      NONE: Object
+
+      def appname: () -> String
+                 | (String appname) -> self
+      def appname=: (String appname) -> void
+      def summary: () -> String
+                 | (String summary) -> self
+      def summary=: (String summary) -> void
+      def subtitle: () -> String?
+                  | (String subtitle) -> self
+      def subtitle=: (String? subtitle) -> void
+      def body: () -> String
+              | (String body) -> self
+      def body=: (String body) -> void
+      def icon: () -> String
+              | (String icon) -> self
+      def icon=: (String icon) -> void
+      def auto_icon: () -> self
+      def image_path: (String path) -> self
+      def sound_name: (String name) -> self
+      def timeout: () -> (Timeout::Unit | Timeout::Milliseconds)
+                 | (Timeout | Integer timeout) -> self
+      def timeout=: (Timeout timeout) -> void
+      def actions: () -> Array[String]
+                 | (Array[String] actions) -> self
+      def actions=: (Array[String] actions) -> void
+      def action: (String identifier, String label) -> self
+      def id: (Integer id) -> self
+      def finalize: () -> Notification
+      def show: () -> NotificationHandle
+              | [T] () { (NotificationHandle handle) -> T } -> T
+
+      private
+
+      def timeout_tag: (Timeout? timeout) -> timeout_tag
+    end
+  end
+end

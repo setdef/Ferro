@@ -63,13 +63,27 @@ class Bump
     from = current
     target = yield(from)
     check_target!(from, target)
+    commit!(from, target)
+  rescue Changelog::Failure, ArgumentError => e
+    raise Failure, e.message
+  end
 
-    edit(from, target)
-    raise Failure, "the gate failed; #{target}'s changes are left uncommitted for you to inspect" unless @gate.call
-
-    git("add", "--", *files)
-    git("commit", "--quiet", "--message", commit_message(target))
-    target
+  # Releases the version the gem has now, without moving it.
+  #
+  # A new gem starts at <tt>0.1.0.pre.1</tt> with its changes under
+  # Unreleased. #run! only moves forward, so without this the first release
+  # would skip to <tt>0.1.0.pre.2</tt>, as ferro-arboard's and ferro-rfd's
+  # did. Releasing the current version is safe only while nobody has it,
+  # so this refuses when the gem's tag exists here or on origin (asking
+  # origin, so a missing remote is a failure, not a pass), when the
+  # CHANGELOG already has the version's section, or when a later version is
+  # already tagged here or in the CHANGELOG.
+  def release_current!
+    preflight!
+    version = current
+    check_unreleased!(version)
+    check_target!(nil, version)
+    commit!(version, version)
   rescue Changelog::Failure, ArgumentError => e
     raise Failure, e.message
   end
@@ -86,6 +100,16 @@ class Bump
 
       #{FOOTER}
     MESSAGE
+  end
+
+  # Writes +target+ over +from+, runs the gate, and commits the release.
+  private def commit!(from, target)
+    edit(from, target)
+    raise Failure, "the gate failed; #{target}'s changes are left uncommitted for you to inspect" unless @gate.call
+
+    git("add", "--", *files)
+    git("commit", "--quiet", "--message", commit_message(target))
+    target
   end
 
   # Rewrites every file, or none: the tree was clean, so a failure part way
@@ -109,8 +133,37 @@ class Bump
     raise Failure, "commit or stash your changes first" unless git("status", "--porcelain").empty?
   end
 
+  # Refuses a +version+ anyone could already have.
+  private def check_unreleased!(version)
+    tag = "#{@gem.tag_prefix}#{version}"
+    _, status = Open3.capture2e("git", "rev-parse", "--quiet", "--verify", "refs/tags/#{tag}", chdir: @root)
+    raise Failure, "#{tag} already exists, so #{version} is released; bump past it" if status.success?
+    unless git("ls-remote", "--tags", "origin", "refs/tags/#{tag}").empty?
+      raise Failure, "origin already has #{tag}, so #{version} is released; bump past it"
+    end
+    if Changelog.new(path(@gem.changelog), tag_prefix: @gem.tag_prefix).released?(version)
+      raise Failure, "#{File.join(@gem.dir, @gem.changelog)} already has a #{version} section; bump past it"
+    end
+
+    newest = released_versions.max
+    raise Failure, "#{version} is below #{newest}, which is released; bump past it" if newest && newest > version
+  end
+
+  # The versions the gem's local tags and CHANGELOG sections name.
+  private def released_versions
+    tags = git("tag", "--list", "#{@gem.tag_prefix}*").lines.map { |line| line.strip.delete_prefix(@gem.tag_prefix) }
+    sections = File.read(path(@gem.changelog)).scan(/^## \[([^\]]+)\]/).flatten - ["Unreleased"]
+    (tags + sections).filter_map do |text|
+      GemVersion.parse(text)
+    rescue ArgumentError
+      nil
+    end
+  end
+
+  # Refuses a +target+ that does not follow +from+ (+nil+ when the version
+  # stays), or a stable one.
   private def check_target!(from, target)
-    raise Failure, "#{target} does not come after #{from}" unless target > from
+    raise Failure, "#{target} does not come after #{from}" if from && !(target > from)
     return unless target.stable?
 
     raise Failure, "#{target} is 1.0 or later, which needs a release-branch policy Ferro does not have yet (plan 001)"

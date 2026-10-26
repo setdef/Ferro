@@ -1,0 +1,162 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module NotifyRust
+    module Hint : Object
+      class ActionIcons < Data
+        include Hint
+
+        attr_reader value: bool
+
+        def self.new: (bool value) -> instance
+                    | (value: bool) -> instance
+      end
+
+      class Category < Data
+        include Hint
+
+        attr_reader value: String
+
+        def self.new: (String value) -> instance
+                    | (value: String) -> instance
+      end
+
+      class DesktopEntry < Data
+        include Hint
+
+        attr_reader value: String
+
+        def self.new: (String value) -> instance
+                    | (value: String) -> instance
+      end
+
+      class ImagePath < Data
+        include Hint
+
+        attr_reader value: String
+
+        def self.new: (String value) -> instance
+                    | (value: String) -> instance
+      end
+
+      class Resident < Data
+        include Hint
+
+        attr_reader value: bool
+
+        def self.new: (bool value) -> instance
+                    | (value: bool) -> instance
+      end
+
+      class SoundFile < Data
+        include Hint
+
+        attr_reader value: String
+
+        def self.new: (String value) -> instance
+                    | (value: String) -> instance
+      end
+
+      class SoundName < Data
+        include Hint
+
+        attr_reader value: String
+
+        def self.new: (String value) -> instance
+                    | (value: String) -> instance
+      end
+
+      class SuppressSound < Data
+        include Hint
+
+        attr_reader value: bool
+
+        def self.new: (bool value) -> instance
+                    | (value: bool) -> instance
+      end
+
+      class Transient < Data
+        include Hint
+
+        attr_reader value: bool
+
+        def self.new: (bool value) -> instance
+                    | (value: bool) -> instance
+      end
+
+      class X < Data
+        include Hint
+
+        attr_reader value: Integer
+
+        def self.new: (Integer value) -> instance
+                    | (value: Integer) -> instance
+      end
+
+      class Y < Data
+        include Hint
+
+        attr_reader value: Integer
+
+        def self.new: (Integer value) -> instance
+                    | (value: Integer) -> instance
+      end
+
+      class Urgency < Data
+        include Hint
+
+        attr_reader value: NotifyRust::Urgency
+
+        def self.new: (NotifyRust::Urgency value) -> instance
+                    | (value: NotifyRust::Urgency) -> instance
+      end
+
+      class Custom < Data
+        include Hint
+
+        attr_reader key: String
+        attr_reader value: String
+
+        def self.new: (String key, String value) -> instance
+                    | (key: String, value: String) -> instance
+      end
+
+      class CustomInt < Data
+        include Hint
+
+        attr_reader key: String
+        attr_reader value: Integer
+
+        def self.new: (String key, Integer value) -> instance
+                    | (key: String, value: Integer) -> instance
+      end
+
+      class Unit
+        include Hint
+
+        @name: :Invalid
+
+        def initialize: (:Invalid name) -> void
+        def inspect: () -> String
+
+        private
+
+        def to_native: () -> [:Invalid]
+      end
+
+      Invalid: Unit
+
+      def self.from_key_val: (String name, String value) -> Hint
+      private def self.from_native: (hint_tag tag) -> Hint
+
+      def as_bool: () -> bool?
+      def as_i32: () -> Integer?
+      def as_str: () -> String?
+
+      private
+
+      def to_native: () -> hint_tag
+    end
+  end
+end

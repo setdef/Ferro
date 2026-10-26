@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+[package]
+name = "ferro_notify_rust"
+version = "0.1.0-pre.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# notify-rust's default (z: zbus, with async), images, and chrono. d,
+# d_vendored, tokio, z-with-tokio, debug_namespace, and preview-macos-un
+# stay off; plan 003, decision 2 says why.
+notify-rust = { version = "=4.18.2", features = ["images", "chrono"] }
+magnus = { version = "0.9.3", features = ["bytes"] }
+rb-sys = "0.9.130"
+
+# chrono, notify-rust's own, to build the DateTime `schedule` takes (plan
+# 003, decision 9).
+[target.'cfg(target_os = "macos")'.dependencies]
+chrono = "0.4"
+
+# Each crate states its lints itself instead of inheriting them with
+# `workspace = true`: an installed gem ships only its own workspace.
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+all = { level = "deny", priority = -1 }
+# Every unsafe block carries a SAFETY comment (AGENTS.md).
+undocumented_unsafe_blocks = "deny"
+
+# Unsafe code is denied. An exception gets #[allow(unsafe_code)] on its
+# block, a SAFETY comment citing its source, and a test (AGENTS.md).
+[lints.rust]
+unsafe_code = "deny"
+
+# zbus, notify-rust's own, so a test can build the error it returns.
+[target.'cfg(all(unix, not(target_os = "macos")))'.dev-dependencies]
+zbus = { version = "5", default-features = false }
