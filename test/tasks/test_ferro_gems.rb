@@ -6,6 +6,7 @@
 #++
 
 require "test_helper"
+require_relative "../../tasks/changelog"
 require_relative "../../tasks/ferro_gems"
 
 # Tests what the root tasks read from a FerroGem: where its version lives,
@@ -31,6 +32,17 @@ class TestFerroGems < Minitest::Test
 
       assert_path_exists path
       assert_includes File.read(path), %(VERSION = "#{ferro_gem.spec.version}")
+    end
+  end
+
+  # A release moves the Unreleased link at the bottom of the gem's
+  # CHANGELOG.md (tasks/changelog.rb), so a gem without one cannot be
+  # released; ferro-global-hotkey's first release found that out.
+  def test_every_registered_gem_has_an_unreleased_link_to_move
+    FERRO_GEMS.each do |ferro_gem|
+      content = File.read(File.join(ROOT, ferro_gem.dir, ferro_gem.changelog))
+
+      assert_match Changelog::UNRELEASED_LINK, content, "#{ferro_gem.name} has no [Unreleased]: link"
     end
   end
 
