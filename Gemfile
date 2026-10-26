@@ -11,6 +11,7 @@ source "https://rubygems.org"
 gemspec path: "gems/arboard"
 gemspec path: "gems/rfd"
 gemspec path: "gems/notify-rust"
+gemspec path: "gems/global-hotkey"
 
 gem "irb"
 gem "rake", "~> 13.0"

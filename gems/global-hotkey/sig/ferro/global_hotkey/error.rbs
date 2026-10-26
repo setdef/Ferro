@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+module Ferro
+  module GlobalHotkey
+    class Error < StandardError
+      class OsError < Error
+      end
+
+      class HotKeyParseError < Error
+      end
+
+      class UnrecognizedHotKeyCode < Error
+      end
+
+      class EmptyHotKeyToken < Error
+      end
+
+      class UnexpectedHotKeyFormat < Error
+      end
+
+      class FailedToRegister < Error
+      end
+
+      class FailedToUnRegister < Error
+        attr_reader hotkey: Hotkey::HotKey?
+
+        def initialize: (?String? message, ?Hotkey::HotKey? hotkey) -> void
+      end
+
+      class AlreadyRegistered < Error
+        attr_reader hotkey: Hotkey::HotKey?
+
+        def initialize: (?String? message, ?Hotkey::HotKey? hotkey) -> void
+      end
+
+      class FailedToWatchMediaKeyEvent < Error
+        def initialize: (?String? message) -> void
+      end
+    end
+  end
+end

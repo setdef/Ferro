@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+module Ferro
+  module GlobalHotkey
+    VERSION: String
+    PLATFORM: :macos | :linux | :windows
+
+    type parts = [Integer, String, Integer]
+    type native_error = [:error, String, String, parts?]
+    type native_result[T] = [:ok, T] | native_error
+    type native_event = [Integer, :Pressed | :Released]
+
+    private def self.settle: [T] (native_result[T] result) -> T
+    private def self.parts: (Object hotkey) -> parts
+    private def self.event: (native_event pair) -> GlobalHotKeyEvent
+
+    module Native
+      def self.manager_new: () -> native_result[Manager]
+      def self.manager_register: (Manager manager, parts hotkey) -> native_result[nil]
+      def self.manager_unregister: (Manager manager, parts hotkey) -> native_result[nil]
+      def self.manager_register_all: (Manager manager, Array[parts] hotkeys) -> native_result[nil]
+      def self.manager_unregister_all: (Manager manager, Array[parts] hotkeys) -> native_result[nil]
+      def self.hotkey_new: (Integer? bits, String key) -> native_result[parts]
+      def self.hotkey_parse: (String text) -> native_result[parts]
+      def self.hotkey_matches: (parts hotkey, Integer bits, String key) -> native_result[bool]
+      def self.hotkey_into_string: (parts hotkey) -> native_result[String]
+      def self.cmd_or_ctrl: () -> Integer
+      def self.code_from_str: (String name) -> native_result[Integer]
+      def self.code_count: () -> Integer
+      def self.modifier_flags: () -> Array[[String, Integer]]
+      def self.u32: (Integer value) -> Integer
+      def self.modifiers_debug: (Integer bits) -> String
+      def self.modifiers_from_name: (String name) -> Integer?
+      def self.receiver_try_recv: () -> native_result[native_event]
+      def self.receiver_recv: (Numeric? seconds) -> native_result[native_event]
+      def self.receiver_len: () -> Integer
+      def self.receiver_is_empty: () -> bool
+      def self.receiver_is_full: () -> bool
+      def self.receiver_capacity: () -> Integer?
+      def self.set_event_handler: (bool forward) -> nil
+      def self.handler_recv: () -> native_result[native_event]
+      def self.handler_close: () -> nil
+
+      class Manager
+      end
+    end
+  end
+end

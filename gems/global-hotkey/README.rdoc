@@ -1,0 +1,202 @@
+--
+SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: CC-BY-SA-4.0
+++
+
+= ferro-global-hotkey
+
+{rdoc-image:https://justin.searls.co/img/shovelware.svg}[https://justin.searls.co/shovelware/]
+
+Global hotkeys for Ruby, through global-hotkey 0.9.0.
+
+A keyboard shortcut normally reaches only the window that has focus. A
+launcher, a push-to-talk button, or a screenshot tool wants its shortcut
+to work from anywhere, while another app is in front. Each system offers
+that its own way: Carbon hot keys on macOS, +RegisterHotKey+ on Windows,
+X11 key grabs on Linux.
+
+ferro-global-hotkey binds global-hotkey
+(https://github.com/tauri-apps/global-hotkey), Tauri's hotkey crate, one to
+one. It keeps global-hotkey's names and behavior and adds nothing of its
+own. Use it to give a tray app a summon key, toggle recording from
+anywhere, or read the shortcuts a user typed into your settings.
+
+== Install
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  bundle add ferro-global-hotkey
+
+--
+SPDX-SnippetEnd
+++
+
+The gem compiles a Rust extension when it installs, so the machine that
+installs it needs Rust and Cargo: Rust 1.80 or newer, and 1.99 or newer on
+macOS 27, where earlier toolchains strip the extension in a way the new
+loader rejects. The build runs <tt>cargo --locked</tt>, so it compiles
+exactly the dependency versions this gem was tested with. To build against
+newer ones anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will
+do); it replaces <tt>--locked</tt>.
+
+On Linux, global-hotkey talks to the X server through x11rb, pure Rust, so
+building needs no system libraries.
+
+== Use
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  require "ferro/global_hotkey"
+
+  hotkey = Ferro::GlobalHotkey::Hotkey
+  manager = Ferro::GlobalHotkey::GlobalHotKeyManager.new
+
+  summon = hotkey::HotKey.new(hotkey::Modifiers::SHIFT | hotkey::Modifiers::ALT, hotkey::Code::Space)
+  record = hotkey::HotKey.from_str("CmdOrCtrl+Shift+R")
+  manager.register_all([summon, record])
+
+  receiver = Ferro::GlobalHotkey::GlobalHotKeyEvent.receiver
+  receiver.iter.each do |event|
+    next unless event.state == Ferro::GlobalHotkey::HotKeyState::Pressed
+
+    case event.id
+    when summon.id then show_window
+    when record.id then toggle_recording
+    end
+  end
+
+--
+SPDX-SnippetEnd
+++
+
+Every event carries the id of its HotKey and whether the key went down or
+came up. Read them from the receiver, which can wait (+recv+,
++recv_timeout+, +iter+) or not (+try_recv+, +try_iter+), or have a block
+called for each one:
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  Ferro::GlobalHotkey::GlobalHotKeyEvent.set_event_handler do |event|
+    toggle_recording if event.id == record.id
+  end
+
+--
+SPDX-SnippetEnd
+++
+
+The first +set_event_handler+ call decides for the whole process, as
+global-hotkey keeps the handler in a cell it sets once. After it, events go
+to the block, not the receiver. global-hotkey calls its handler on the
+thread that saw the key, where Ruby cannot run, so the gem passes each
+event to a Ruby thread it starts, and that thread calls your block. An
+exception from the block ends that thread; Ruby reports it, and later
+events are dropped.
+
+=== What your app must run
+
+global-hotkey's platform notes hold here too. On Windows a win32 event
+loop must be running on the thread. It doesn't need to be the main thread,
+but you have to create the manager on the same thread as the event loop.
+On macOS an event loop must be running on the main thread, so you also
+need to create the manager on the main thread. A windowed app already runs
+one: Tokra's tao loop is one. A command-line script does not, and then
+registering works but no event ever arrives.
+
+On Linux the manager starts an X11 thread of its own, so events arrive
+without a loop, but only from an X server. Under Wayland with no XWayland,
+that thread cannot connect and stops, and every call returns as if it had
+worked, as in Rust: global-hotkey logs the reason through +tracing+,
+which no Ruby program listens to.
+
+In Rust a manager unregisters its hotkeys when it goes out of scope. Ruby
+frees it when the garbage collector next runs, so call +unregister_all+
+when you are done. On macOS keep one manager for the process: while one
+lives, Carbon refuses to install global-hotkey's handler again, and a
+second +GlobalHotKeyManager.new+ raises Error::OsError.
+
+== How it maps global-hotkey
+
+The API is global-hotkey's, translated where Rust has no Ruby meaning:
+
+* global-hotkey's +hotkey+ module is Ferro::GlobalHotkey::Hotkey, with
+  HotKey, Code, Modifiers, and +CMD_OR_CTRL+, as Rust code names them
+  <tt>global_hotkey::hotkey::HotKey</tt>.
+* HotKey is a Data with global-hotkey's three public fields.
+  <tt>HotKey.new(mods, key)</tt> is global-hotkey's +new+, which computes
+  the id; <tt>HotKey.new(mods:, key:, id:)</tt> is the Rust struct literal.
+  <tt>FromStr</tt> and <tt>TryFrom</tt> are +from_str+ and +try_from+;
+  +Display+ is +to_s+.
+* Code and HotKeyState are constants (<tt>Code::KeyA</tt>,
+  HotKeyState::Pressed), ordered as Rust derives +Ord+. Modifiers is a
+  frozen value with bitflags' methods and operators; Rust's
+  <tt>!flags</tt> is <tt>~flags</tt>, and the methods that change a value
+  in place are left out, since <tt>|</tt>, <tt>-</tt>, and <tt>^</tt>
+  give the same result.
+* GlobalHotKeyEvent is a Data. The receiver is global-hotkey's crossbeam
+  channel, with crossbeam's method names; +iter+ and +try_iter+ return
+  Enumerators, and +recv_timeout+ takes seconds.
+* Each error variant is a subclass of Ferro::GlobalHotkey::Error with
+  global-hotkey's message; Error::AlreadyRegistered and
+  Error::FailedToUnRegister carry the +hotkey+. A bad hotkey string raises
+  Hotkey::HotKeyParseError's subclasses, and crossbeam's receive errors
+  sit under GlobalHotKeyEventReceiver.
+* keyboard-types' deprecated items warn in Ruby's <tt>:deprecated</tt>
+  category: <tt>Modifiers::HYPER</tt>, <tt>Modifiers::SUPER</tt>,
+  <tt>Code::Hyper</tt>, <tt>Code::Super</tt>, and <tt>Code::Turbo</tt>.
+
+What differs from calling global-hotkey from Rust:
+
+* The handler runs on a Ruby thread, not on the thread that saw the key.
+* +recv+ and +recv_timeout+ release Ruby's global VM lock, and Ctrl-C,
+  <tt>Thread#raise</tt>, and +Timeout+ end them; an event that arrives at
+  the very moment of the interrupt can be lost. Registering keeps the lock
+  and cannot be interrupted: on Linux it waits for the X11 thread, which
+  looks for work every 50 ms, and blocks with no limit if the X connection
+  hangs.
+* On macOS and Windows a manager's cleanup runs on the thread that made
+  it. When the garbage collector frees it on another thread, the cleanup
+  waits, and its hotkeys keep firing, until that thread next makes or uses
+  a manager.
+* A panic inside global-hotkey would end your Ruby process. It raises
+  Ferro::GlobalHotkey::Error with <tt>global-hotkey panicked: ...</tt>
+  instead. Rust still prints its usual panic message to stderr first.
+* Not bound: crossbeam's +recv_deadline+ (use +recv_timeout+), and
+  bitflags' in-place methods, +Extend+, +FromIterator+, and formatters
+  (use <tt>|</tt>, <tt>inject(:|)</tt>, and <tt>bits.to_s(16)</tt>).
+
+Both of global-hotkey's Cargo features are built. +serde+ adds no Ruby
+API: the text serde writes for a HotKey is HotKey#to_s, which
+HotKey.from_str reads. +tracing+ logs only why the Linux X11 thread
+stopped.
+
+global-hotkey keeps state once per process: on macOS each copy installs a
+Carbon event handler that swallows every hotkey, so no other library in
+the same process may link global-hotkey.
+
+The extension is Ractor-safe, and a HotKey, Code, Modifiers, event, or
+receiver may cross Ractors; a manager stays in its own. On Windows, Ruby
+4.0.9 can hang when a Ractor starts a garbage collection while the main
+Ractor has another thread asleep; the bug is Ruby's (ferro-arboard's
+README says more).
+
+ferro-global-hotkey 0.1.0.pre.1 binds global-hotkey 0.9.0. The gem's
+version follows its own API; its +global_hotkey_version+ metadata names
+the global-hotkey release.
+
+== License
+
+ferro-global-hotkey's code is Apache-2.0 OR MIT, as global-hotkey's is.
+This README is CC-BY-SA-4.0, and its code examples are MIT-0, so paste
+them freely. The lockfile is CC0-1.0. The license texts are in LICENSES/.

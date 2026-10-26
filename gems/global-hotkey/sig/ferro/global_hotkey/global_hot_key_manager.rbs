@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+module Ferro
+  module GlobalHotkey
+    class GlobalHotKeyManager
+      @manager: Native::Manager
+
+      def initialize: () -> void
+      def register: (Hotkey::HotKey hotkey) -> nil
+      def unregister: (Hotkey::HotKey hotkey) -> nil
+      def register_all: (Array[Hotkey::HotKey] hotkeys) -> nil
+      def unregister_all: (Array[Hotkey::HotKey] hotkeys) -> nil
+
+      private
+
+      def list: (Object hotkeys) -> Array[parts]
+    end
+  end
+end

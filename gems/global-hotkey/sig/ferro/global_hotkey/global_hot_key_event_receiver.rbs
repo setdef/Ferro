@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+module Ferro
+  module GlobalHotkey
+    class GlobalHotKeyEventReceiver
+      class TryRecvError < StandardError
+        class Empty < TryRecvError
+        end
+
+        class Disconnected < TryRecvError
+        end
+      end
+
+      class RecvError < StandardError
+      end
+
+      class RecvTimeoutError < StandardError
+        class Timeout < RecvTimeoutError
+        end
+
+        class Disconnected < RecvTimeoutError
+        end
+      end
+
+      private def self.new: () -> instance
+
+      def initialize: () -> void
+      def try_recv: () -> GlobalHotKeyEvent
+      def recv: () -> GlobalHotKeyEvent
+      def recv_timeout: (Numeric timeout) -> GlobalHotKeyEvent
+      def iter: () -> Enumerator[GlobalHotKeyEvent, nil]
+      def try_iter: () -> Enumerator[GlobalHotKeyEvent, nil]
+      def is_empty: () -> bool
+      def is_full: () -> bool
+      def len: () -> Integer
+      def capacity: () -> Integer?
+      def same_channel: (GlobalHotKeyEventReceiver other) -> bool
+    end
+  end
+end

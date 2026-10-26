@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+module Ferro
+  module GlobalHotkey
+    module Hotkey
+      class HotKeyParseError < StandardError
+        class UnsupportedKey < HotKeyParseError
+        end
+
+        class EmptyToken < HotKeyParseError
+        end
+
+        class InvalidFormat < HotKeyParseError
+        end
+      end
+
+      class UnrecognizedCodeError < StandardError
+        def initialize: (?String? message) -> void
+      end
+    end
+  end
+end

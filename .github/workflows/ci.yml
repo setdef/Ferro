@@ -138,12 +138,19 @@ jobs:
       # (gems/notify-rust/test/test_helper.rb). dunst draws on X11 or
       # Wayland, so it runs under both passes below. notify-rust speaks
       # D-Bus through zbus, pure Rust, so building it needs nothing more.
+      #
+      # ferro-global-hotkey's tests start an Xvfb server of their own, give
+      # its keymap the keys they register with xmodmap, and press hotkeys on
+      # it with xdotool, so the events global-hotkey's X11 thread reports
+      # are real (gems/global-hotkey/test/test_helper.rb). They use that
+      # server under both passes below. global-hotkey speaks X11 through
+      # x11rb, pure Rust, so building it needs nothing more.
       - name: Install display servers
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends xvfb xauth sway libclang-dev libwayland-dev pkg-config \
-            dbus dunst
+            dbus dunst xdotool x11-xserver-utils
 
       # Minitest prints each test's name and time (A is Minitest::TestTask's
       # argument variable), and tasks/test_watchdog.rb ends a test that hangs

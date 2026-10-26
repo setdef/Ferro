@@ -28,6 +28,7 @@ own documentation stays your guide. Ferro spun out of
 | [ferro-arboard](gems/arboard/README.rdoc) | [arboard](https://github.com/1Password/arboard) 3.7.0, the system clipboard | 0.1.0.pre.2 |
 | [ferro-rfd](gems/rfd/README.rdoc) | [rfd](https://github.com/PolyMeilex/rfd) 0.17.2, native file and message dialogs | 0.1.0.pre.2 |
 | [ferro-notify-rust](gems/notify-rust/README.rdoc) | [notify-rust](https://github.com/hoodie/notify-rust) 4.18.2, desktop notifications | 0.1.0.pre.1, unreleased |
+| [ferro-global-hotkey](gems/global-hotkey/README.rdoc) | [global-hotkey](https://github.com/tauri-apps/global-hotkey) 0.9.0, global hotkeys | 0.1.0.pre.1, unreleased |
 
 ## Using a gem
 
@@ -95,8 +96,9 @@ a crate becomes a gem.
 ## License
 
 Each gem takes its crate's license: ferro-arboard is MIT OR Apache-2.0, as
-arboard is, ferro-rfd is MIT, as rfd is, and ferro-notify-rust is MIT OR
-Apache-2.0, as notify-rust is. The repository's tooling is
+arboard is, ferro-rfd is MIT, as rfd is, ferro-notify-rust is MIT OR
+Apache-2.0, as notify-rust is, and ferro-global-hotkey is Apache-2.0 OR
+MIT, as global-hotkey is. The repository's tooling is
 AGPL-3.0-or-later. Documentation is CC-BY-SA-4.0, code snippets in it are
 MIT-0, and lockfiles are CC0-1.0. Every file says which applies;
 [REUSE](https://reuse.software) checks it, and the texts are in

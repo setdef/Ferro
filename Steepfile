@@ -20,3 +20,8 @@ target :"notify-rust" do
   signature "gems/notify-rust/sig"
   check "gems/notify-rust/lib"
 end
+
+target :"global-hotkey" do
+  signature "gems/global-hotkey/sig"
+  check "gems/global-hotkey/lib"
+end

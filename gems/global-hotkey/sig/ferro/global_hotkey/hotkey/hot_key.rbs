@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+module Ferro
+  module GlobalHotkey
+    module Hotkey
+      class HotKey < Data
+        attr_reader mods: Modifiers
+        attr_reader key: Code
+        attr_reader id: Integer
+
+        def self.new: (?Modifiers? given_mods, ?Code? given_key, ?Integer? given_id,
+                       ?mods: Modifiers?, ?key: Code?, ?id: Integer?) -> HotKey
+        def self.from_str: (String string) -> HotKey
+        def self.try_from: (String value) -> HotKey
+        private def self.from_parts: (parts parts) -> HotKey
+        private def self.literal: (Object? mods, Object? key, Integer id) -> HotKey
+
+        def matches: (Modifiers modifiers, Code key) -> bool
+        def into_string: () -> String
+        def to_s: () -> String
+      end
+    end
+  end
+end

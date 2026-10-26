@@ -1,0 +1,72 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+module Ferro
+  module GlobalHotkey
+    module Hotkey
+      class Modifiers
+        include Comparable
+
+        ALT: Modifiers
+        ALT_GRAPH: Modifiers
+        CAPS_LOCK: Modifiers
+        CONTROL: Modifiers
+        FN: Modifiers
+        FN_LOCK: Modifiers
+        META: Modifiers
+        NUM_LOCK: Modifiers
+        SCROLL_LOCK: Modifiers
+        SHIFT: Modifiers
+        SYMBOL: Modifiers
+        SYMBOL_LOCK: Modifiers
+        HYPER: Modifiers
+        SUPER: Modifiers
+        FLAGS: Hash[String, Modifiers]
+        ALL_BITS: Integer
+
+        attr_reader bits: Integer
+
+        private def self.new: (Integer bits) -> instance
+
+        def self.empty: () -> Modifiers
+        def self.all: () -> Modifiers
+        def self.default: () -> Modifiers
+        def self.from_bits: (Integer bits) -> Modifiers?
+        def self.from_bits_truncate: (Integer bits) -> Modifiers
+        def self.from_bits_retain: (Integer bits) -> Modifiers
+        def self.from_name: (String name) -> Modifiers?
+
+        def initialize: (Integer bits) -> void
+        def is_empty: () -> bool
+        def is_all: () -> bool
+        def contains: (Modifiers other) -> bool
+        def intersects: (Modifiers other) -> bool
+        def union: (Modifiers other) -> Modifiers
+        def |: (Modifiers other) -> Modifiers
+        def intersection: (Modifiers other) -> Modifiers
+        def &: (Modifiers other) -> Modifiers
+        def difference: (Modifiers other) -> Modifiers
+        def -: (Modifiers other) -> Modifiers
+        def symmetric_difference: (Modifiers other) -> Modifiers
+        def ^: (Modifiers other) -> Modifiers
+        def complement: () -> Modifiers
+        def ~: () -> Modifiers
+        def iter: () -> Array[Modifiers]
+        def iter_names: () -> Array[[String, Modifiers]]
+        def shift: () -> bool
+        def ctrl: () -> bool
+        def alt: () -> bool
+        def meta: () -> bool
+        def <=>: (Object other) -> Integer?
+        def eql?: (Object other) -> bool
+        def hash: () -> Integer
+        def inspect: () -> String
+
+        private
+
+        def names_and_remaining: () -> [Array[[String, Modifiers]], Integer]
+        def bits_of: (Object other) -> Integer
+      end
+    end
+  end
+end

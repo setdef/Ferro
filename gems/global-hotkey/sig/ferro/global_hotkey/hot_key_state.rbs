@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+module Ferro
+  module GlobalHotkey
+    class HotKeyState
+      include Comparable
+
+      Pressed: HotKeyState
+      Released: HotKeyState
+
+      @name: Symbol
+      @index: Integer
+
+      private def self.new: (Symbol name, Integer index) -> instance
+
+      def self._load: (String name) -> HotKeyState
+
+      def initialize: (Symbol name, Integer index) -> void
+      def _dump: (Integer level) -> String
+      def inspect: () -> String
+      def <=>: (Object other) -> Integer?
+
+      attr_reader index: Integer
+    end
+  end
+end

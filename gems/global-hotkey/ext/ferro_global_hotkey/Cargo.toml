@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+[package]
+name = "ferro_global_hotkey"
+version = "0.1.0-pre.1"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Both of global-hotkey's features, serde and tracing, are on (plan 004,
+# decision 2).
+global-hotkey = { version = "=0.9.0", features = ["serde", "tracing"] }
+# global-hotkey's own channel crate, for a wait Ruby can interrupt and the
+# handler's channel (plan 004, decisions 5 and 6).
+crossbeam-channel = "0.5"
+magnus = { version = "0.9.3", features = ["bytes"] }
+rb-sys = "0.9.130"
+
+# Each crate states its lints itself instead of inheriting them with
+# `workspace = true`: an installed gem ships only its own workspace.
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+all = { level = "deny", priority = -1 }
+# Every unsafe block carries a SAFETY comment (AGENTS.md).
+undocumented_unsafe_blocks = "deny"
+
+# Unsafe code is denied. An exception gets #[allow(unsafe_code)] on its
+# block, a SAFETY comment citing its source, and a test (AGENTS.md).
+[lints.rust]
+unsafe_code = "deny"

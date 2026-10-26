@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+module Ferro
+  module GlobalHotkey
+    class GlobalHotKeyEvent < Data
+      include Comparable
+
+      interface _Handler
+        def call: (GlobalHotKeyEvent event) -> void
+      end
+
+      attr_reader id: Integer
+      attr_reader state: HotKeyState
+
+      self.@handler_chosen: bool
+      self.@handler_thread: Thread
+
+      def self.new: (Integer id, HotKeyState state) -> instance
+                  | (id: Integer, state: HotKeyState) -> instance
+      def self.receiver: () -> GlobalHotKeyEventReceiver
+      def self.set_event_handler: (?_Handler? handler) ?{ (GlobalHotKeyEvent event) -> void } -> nil
+      private def self.start_handler: (_Handler handler) -> Thread
+
+      def <=>: (Object other) -> Integer?
+    end
+  end
+end

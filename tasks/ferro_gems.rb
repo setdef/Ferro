@@ -190,4 +190,28 @@ FERRO_GEMS = [
       abort "notify-rust did not parse an urgency" unless Ferro::NotifyRust::Urgency.try_from("High") == Ferro::NotifyRust::Urgency::Critical
       puts "ferro-notify-rust \#{Ferro::NotifyRust::VERSION} loads its extension (\#{notification.class})"
     RUBY
+  FerroGem.new(
+    short_name: "global-hotkey",
+    name: "ferro-global-hotkey",
+    crate: "ext/ferro_global_hotkey",
+    extension: "lib/ferro/global_hotkey/ferro_global_hotkey",
+    packaged: %w[lib sig ext Cargo.toml Cargo.lock Cargo.lock.license README.rdoc CHANGELOG.md LICENSES],
+    native_namespace: "Ferro::GlobalHotkey",
+    platform_sigs: {},
+    platform_probe: %(require "ferro/global_hotkey"; print Ferro::GlobalHotkey.const_get(:PLATFORM)),
+    smoke: <<~RUBY),
+      require "ferro/global_hotkey"
+      # Registering a hotkey takes it from every other program, so the
+      # smoke test registers none. It parses a hotkey and writes it back
+      # through global-hotkey, and reads the event channel without
+      # waiting, which proves the extension loads and reaches the crate.
+      hotkey = Ferro::GlobalHotkey::Hotkey::HotKey.from_str("shift+alt+KeyQ")
+      abort "global-hotkey did not write the hotkey back: \#{hotkey}" unless hotkey.to_s == "shift+alt+KeyQ"
+      begin
+        Ferro::GlobalHotkey::GlobalHotKeyEvent.receiver.try_recv
+        abort "an event arrived with no hotkey registered"
+      rescue Ferro::GlobalHotkey::GlobalHotKeyEventReceiver::TryRecvError::Empty
+      end
+      puts "ferro-global-hotkey \#{Ferro::GlobalHotkey::VERSION} loads its extension (\#{hotkey.class})"
+    RUBY
 ].freeze
