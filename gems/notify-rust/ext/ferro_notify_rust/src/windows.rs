@@ -110,7 +110,9 @@ impl Holds for Handle {
         operation: impl FnOnce(&mut notify_rust::Notification) -> R,
     ) -> Result<R, Error> {
         let mut guard = self.lock();
-        let outcome = guard.as_mut().map(operation);
+        // The handle dereferences to its notification, as notify-rust's
+        // Windows NotificationHandle does; the call coerces it.
+        let outcome = guard.as_mut().map(|handle| operation(handle));
         drop(guard);
         outcome.ok_or_else(|| error::base(ruby, CONSUMED))
     }
