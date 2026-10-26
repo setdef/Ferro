@@ -3,7 +3,7 @@
 
 [package]
 name = "ferro_rfd"
-version = "0.1.0-pre.1"
+version = "0.1.0-pre.2"
 edition = "2021"
 license = "MIT"
 publish = false
