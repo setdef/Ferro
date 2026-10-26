@@ -28,8 +28,22 @@ class TestPlatform < Minitest::Test
     %i[Image DbusStack Future].each { |name| assert_equal linux, NotifyRust.const_defined?(name, false), name }
     assert_equal linux, NotifyRust::Hint.const_defined?(:ImageData, false)
     assert_equal linux, NotifyRust::Notification.respond_to?(:at_bus)
-    %i[id close close_async update wait_for_action_async].each do |name|
+    %i[close close_async update wait_for_action_async].each do |name|
       assert_equal linux, NotifyRust::NotificationHandle.method_defined?(name), name
+    end
+  end
+
+  # notify-rust's Linux handle has an id of its own, the server's
+  # (src/xdg/mod.rs:319-327), which shadows Notification's id(u32) setter
+  # its Deref reaches. Windows' handle has none (src/windows.rs:109-144),
+  # so there id is that setter, through Deref; macOS's handle has neither.
+  def test_a_handles_id_is_the_servers_on_linux_and_the_setter_on_windows
+    owner = NotifyRust::NotificationHandle.method_defined?(:id) && NotifyRust::NotificationHandle.instance_method(:id)
+
+    case PLATFORM
+    when :linux then assert_equal [NotifyRust::NotificationHandle, 0], [owner.owner, owner.arity]
+    when :windows then assert_equal [NotifyRust::Builder, 1], [owner.owner, owner.arity]
+    else refute owner
     end
   end
 
