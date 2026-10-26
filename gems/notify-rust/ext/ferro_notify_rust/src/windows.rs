@@ -12,9 +12,7 @@
 
 use std::sync::{Mutex, MutexGuard, PoisonError, TryLockError};
 
-use magnus::{
-    method, prelude::*, typed_data::Obj, Error, RArray, RClass, RModule, Ruby, TypedData, Value,
-};
+use magnus::{method, prelude::*, typed_data::Obj, Error, RArray, RModule, Ruby, TypedData, Value};
 use notify_rust::NotificationResponse;
 
 use crate::notification::{plain_set, Holds};
@@ -112,10 +110,9 @@ impl Holds for Handle {
         operation: impl FnOnce(&mut notify_rust::Notification) -> R,
     ) -> Result<R, Error> {
         let mut guard = self.lock();
-        let Some(handle) = guard.as_mut() else {
-            return Err(error::base(ruby, CONSUMED));
-        };
-        Ok(operation(handle))
+        let outcome = guard.as_mut().map(operation);
+        drop(guard);
+        outcome.ok_or_else(|| error::base(ruby, CONSUMED))
     }
 
     fn with_ref<R>(
@@ -123,7 +120,7 @@ impl Holds for Handle {
         ruby: &Ruby,
         operation: impl FnOnce(&notify_rust::Notification) -> R,
     ) -> Result<R, Error> {
-        self.with(ruby, |notification| operation(notification))
+        self.with(ruby, |notification| operation(&*notification))
     }
 }
 
@@ -142,7 +139,7 @@ pub fn app_id<T: Holds + TypedData>(
     rb_self: Obj<T>,
     app_id: String,
 ) -> Result<(), Error> {
-    plain_set(ruby, rb_self, |notification| {
+    plain_set(ruby, rb_self, move |notification| {
         notification.app_id(&app_id);
     })
 }
@@ -177,11 +174,6 @@ macro_rules! define_builder {
     }};
 }
 pub(crate) use define_builder;
-
-/// Nothing is `Notification`'s alone on Windows.
-pub const fn define_notification(_ruby: &Ruby, _class: RClass) -> Result<(), Error> {
-    Ok(())
-}
 
 /// Defines the Windows handle.
 pub fn define(ruby: &Ruby, notify_rust: RModule, _native: RModule) -> Result<(), Error> {

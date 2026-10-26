@@ -441,7 +441,10 @@ pub fn define(ruby: &Ruby, notify_rust: magnus::RModule) -> Result<(), Error> {
     class.define_private_method("initialize_copy", method!(Notification::initialize_copy, 1))?;
     class.define_private_method("native_inspect", method!(Notification::inspect, 0))?;
     define_builder!(class, Notification);
-    crate::platform::define_notification(ruby, class)
+    // Windows' Notification has nothing of its own beside the builder.
+    #[cfg(not(windows))]
+    crate::platform::define_notification(ruby, class)?;
+    Ok(())
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
