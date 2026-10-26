@@ -35,6 +35,11 @@ module RfdSuite
   UNBUNDLED = %w[BUNDLE_GEMFILE BUNDLE_BIN_PATH BUNDLER_SETUP BUNDLER_VERSION RUBYOPT RUBYLIB]
     .to_h { |name| [name, nil] }.freeze
 
+  # Load paths a child needs from the bundle: Fiddle, which the macOS
+  # dialog tests use to close real panels, is a bundled gem in Ruby 4.0,
+  # not a default one, so an unbundled child finds it only if told where.
+  BUNDLED_PATHS = %w[fiddle].flat_map { |name| Gem.loaded_specs[name]&.full_require_paths || [] }.freeze
+
   # How long a child may run before it is killed, in seconds: well under
   # the watchdog's limit, so a dialog left open never outlives the test.
   CHILD_LIMIT = 30
@@ -52,7 +57,7 @@ module RfdSuite
       value = eval(#{script.dump}, TOPLEVEL_BINDING)
       $stdout.binmode.write(Marshal.dump(value))
     RUBY
-    Open3.popen3(UNBUNDLED.merge(env), RbConfig.ruby, "-I", LIB, "-e", child) do |stdin, stdout, stderr, thread|
+    Open3.popen3(UNBUNDLED.merge(env), RbConfig.ruby, "-I", LIB, *BUNDLED_PATHS.flat_map { |path| ["-I", path] }, "-e", child) do |stdin, stdout, stderr, thread|
       stdin.close
       output = Thread.new { stdout.binmode.read }
       errors = Thread.new { stderr.read }
