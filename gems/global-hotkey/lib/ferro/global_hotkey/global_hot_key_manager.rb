@@ -98,7 +98,16 @@ module Ferro
 
       # Unregisters +hotkey+. A hotkey this manager never registered is no
       # error on macOS and Linux; on Windows it raises
-      # Error::FailedToUnRegister. Mirrors <tt>GlobalHotKeyManager::unregister</tt>.
+      # Error::FailedToUnRegister.
+      #
+      # On Linux this manager stops reporting the hotkey at once, but the X
+      # server releases the keys later: global-hotkey sends the ungrab
+      # without waiting for an answer, and its X connection sends a request
+      # only when a later one waits for a reply, as this manager's next
+      # #register does. Until then no other program can grab them. Freeing
+      # the manager closes its connection, which releases every grab.
+      # Mirrors <tt>GlobalHotKeyManager::unregister</tt>
+      # (<tt>x11/mod.rs:188-219</tt>).
       #
       # [hotkey] Hotkey::HotKey.
       #

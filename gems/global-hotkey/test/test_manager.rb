@@ -147,11 +147,13 @@ class TestManager < Minitest::Test
 
   # A freed manager's Drop ends its X11 thread and closes its connection,
   # which releases its grabs, so another manager can grab the same keys.
+  # The hotkey is one no test in this process grabs: an unregister here
+  # may not have reached the X server yet (the next test).
   def test_linux_a_freed_managers_grab_is_released
     skip_unless_platform(:linux)
 
     registered, = in_child(<<~RUBY, XServer.env)
-      HOTKEY = Ferro::GlobalHotkey::Hotkey::HotKey.from_str("ctrl+alt+shift+super+F19")
+      HOTKEY = Ferro::GlobalHotkey::Hotkey::HotKey.from_str("ctrl+alt+shift+super+F24")
       def grab
         Ferro::GlobalHotkey::GlobalHotKeyManager.new.register(HOTKEY)
         nil
@@ -171,6 +173,33 @@ class TestManager < Minitest::Test
       end
     RUBY
     assert_equal "nil", registered
+  end
+
+  # global-hotkey's X11 unregister sends its ungrabs without waiting for
+  # an answer (x11/mod.rs:210-214), and x11rb sends a request only when a
+  # later one waits for its reply, so the X server releases the keys only
+  # at that manager's next register. Until then another client cannot grab
+  # them.
+  def test_linux_an_unregister_reaches_the_x_server_with_the_next_register
+    skip_unless_platform(:linux)
+
+    attempts, = in_child(<<~RUBY, XServer.env)
+      hotkey = Ferro::GlobalHotkey::Hotkey::HotKey.from_str("ctrl+alt+shift+super+F24")
+      first = Ferro::GlobalHotkey::GlobalHotKeyManager.new
+      second = Ferro::GlobalHotkey::GlobalHotKeyManager.new
+      first.register(hotkey)
+      first.unregister(hotkey)
+      sleep 0.5
+      attempt = lambda do
+        second.register(hotkey).inspect.tap { second.unregister(hotkey) }
+      rescue Ferro::GlobalHotkey::Error::AlreadyRegistered => e
+        e.class.name
+      end
+      before = attempt.call
+      first.register(Ferro::GlobalHotkey::Hotkey::HotKey.from_str("ctrl+alt+shift+super+F18"))
+      [before, attempt.call]
+    RUBY
+    assert_equal ["Ferro::GlobalHotkey::Error::AlreadyRegistered", "nil"], attempts
   end
 
   # Another X client's grab of the same keys is X's BadAccess, which

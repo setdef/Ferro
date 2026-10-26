@@ -120,6 +120,13 @@ that thread cannot connect and stops, and every call returns as if it had
 worked, as in Rust: global-hotkey logs the reason through +tracing+,
 which no Ruby program listens to.
 
+On Linux, +unregister+ stops the manager reporting a hotkey at once, but
+the X server releases the keys only when that manager next sends a request
+that waits for an answer, such as its next +register+, or when it is
+freed: global-hotkey sends the ungrab without waiting, and its X
+connection holds requests until one needs a reply. Until then no other
+program can grab those keys.
+
 In Rust a manager unregisters its hotkeys when it goes out of scope. Ruby
 frees it when the garbage collector next runs, so call +unregister_all+
 when you are done. On macOS keep one manager for the process: while one
