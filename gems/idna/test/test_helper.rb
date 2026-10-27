@@ -37,7 +37,10 @@ module IdnaSuite
     @crate_dir ||= begin
       version = File.read(File.join(ROOT, "Cargo.lock"))[/^name = "idna"\nversion = "([^"]+)"$/, 1]
       home = ENV.fetch("CARGO_HOME", File.join(Dir.home, ".cargo"))
-      Dir.glob(File.join(home, "registry", "src", "*", "idna-#{version}")).first ||
+      # A pattern treats backslashes as escapes, and a Windows CARGO_HOME
+      # has them, so the home is the glob's base rather than its pattern.
+      found = Dir.glob(File.join("registry", "src", "*", "idna-#{version}"), base: home).first
+      (found && File.join(home, found)) ||
         raise("idna #{version} is not unpacked under #{home}; compile the gem first")
     end
   end
