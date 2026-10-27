@@ -733,7 +733,7 @@ class TestPortParsing < Minitest::Test
     [
       ["00:00", fd("[hour]:[minute][end]"), clock(0, 0, 0, 0)],
       ["00:00abcdef", fd("[hour]:[minute][end trailing_input:discard]"), clock(0, 0, 0, 0)],
-      # left out: untranslated fd!(version = 2,  0 )
+      # left out: untranslated fd!(version = 2, "[hour]:[minute][optional [[end]]]:[second]"), a version 2 description
     ].each do |input, description, expected|
       assert_case expected, T::Time.parse(input, description)
     end
