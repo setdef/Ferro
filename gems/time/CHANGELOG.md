@@ -12,6 +12,8 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0.pre.1] - 2026-10-27
+
 ### Added
 
 - `Ferro::Time` binding time 0.3.55, with `large-dates` off: `Date`, `Time`, `PlainDateTime` (also `PrimitiveDateTime`), `UtcDateTime`, `OffsetDateTime`, `UtcOffset`, and `SignedDuration` (also `Duration`), frozen values with time's constructors, readers, `replace_*`, `truncate_*`, checked, saturating, and operator arithmetic, equality, ordering, and hashing.
@@ -21,4 +23,5 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 - `UtcOffset.current_local_offset`, `.local_offset_at`, `OffsetDateTime.now_local`, and `Util` with `refresh_tz`.
 - `Error` with a class for each of time's error types and variants, and time's messages. Inputs time panics on raise `RangeError` with time's message instead of ending the process.
 
-[Unreleased]: https://github.com/setdef/Ferro/commits/trunk/gems/time
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.1...HEAD
+[0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-time/v0.1.0.pre.1
