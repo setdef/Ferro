@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    module FormatDescription
+      module WellKnown
+        class Iso8601
+          DEFAULT: Iso8601
+          PARSING: Iso8601
+          DATE: Iso8601
+          TIME: Iso8601
+          OFFSET: Iso8601
+          DATE_TIME: Iso8601
+          DATE_TIME_OFFSET: Iso8601
+          TIME_OFFSET: Iso8601
+
+          @config: Config
+
+          def initialize: (Config config) -> void
+          def ==: (Object other) -> bool
+          def inspect: () -> String
+
+          attr_reader config: Config
+        end
+      end
+    end
+  end
+end

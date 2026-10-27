@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    class Weekday
+      Monday: Weekday
+      Tuesday: Weekday
+      Wednesday: Weekday
+      Thursday: Weekday
+      Friday: Weekday
+      Saturday: Weekday
+      Sunday: Weekday
+      ALL: Array[Weekday]
+
+      @days_from_monday: Integer
+      @name: Symbol
+
+      private def self.new: (Integer days_from_monday, Symbol name) -> instance
+
+      def self.from_str: (String text) -> Weekday
+
+      def initialize: (Integer days_from_monday, Symbol name) -> void
+      def previous: () -> Weekday
+      def next: () -> Weekday
+      def nth_next: (Integer n) -> Weekday
+      def nth_prev: (Integer n) -> Weekday
+      def number_from_monday: () -> Integer
+      def number_from_sunday: () -> Integer
+      def number_days_from_monday: () -> Integer
+      def number_days_from_sunday: () -> Integer
+      def to_s: () -> String
+      def inspect: () -> String
+
+      private
+
+      attr_reader days_from_monday: Integer
+    end
+  end
+end

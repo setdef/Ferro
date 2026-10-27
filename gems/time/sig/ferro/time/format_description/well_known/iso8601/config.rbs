@@ -1,0 +1,120 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    module FormatDescription
+      module WellKnown
+        class Iso8601
+          class FormattedComponents
+            None: FormattedComponents
+            Date: FormattedComponents
+            Time: FormattedComponents
+            Offset: FormattedComponents
+            DateTime: FormattedComponents
+            DateTimeOffset: FormattedComponents
+            TimeOffset: FormattedComponents
+
+            @index: Integer
+            @name: Symbol
+
+            private def self.new: (Integer index, Symbol name) -> instance
+
+            def initialize: (Integer index, Symbol name) -> void
+            def inspect: () -> String
+
+            private
+
+            attr_reader index: Integer
+          end
+
+          class DateKind
+            Calendar: DateKind
+            Week: DateKind
+            Ordinal: DateKind
+
+            @index: Integer
+            @name: Symbol
+
+            private def self.new: (Integer index, Symbol name) -> instance
+
+            def initialize: (Integer index, Symbol name) -> void
+            def inspect: () -> String
+
+            private
+
+            attr_reader index: Integer
+          end
+
+          module TimePrecision
+            type variant = Hour | Minute | Second
+
+            class Hour < Data
+              attr_reader decimal_digits: Integer?
+
+              def self.new: (decimal_digits: Integer?) -> instance
+                          | (Integer? decimal_digits) -> instance
+            end
+
+            class Minute < Data
+              attr_reader decimal_digits: Integer?
+
+              def self.new: (decimal_digits: Integer?) -> instance
+                          | (Integer? decimal_digits) -> instance
+            end
+
+            class Second < Data
+              attr_reader decimal_digits: Integer?
+
+              def self.new: (decimal_digits: Integer?) -> instance
+                          | (Integer? decimal_digits) -> instance
+            end
+          end
+
+          class OffsetPrecision
+            Hour: OffsetPrecision
+            Minute: OffsetPrecision
+
+            @index: Integer
+            @name: Symbol
+
+            private def self.new: (Integer index, Symbol name) -> instance
+
+            def initialize: (Integer index, Symbol name) -> void
+            def inspect: () -> String
+
+            private
+
+            attr_reader index: Integer
+          end
+
+          class Config
+            DEFAULT: Config
+
+            @settings: settings
+
+            private def self.new: (settings settings) -> instance
+            private def self.with: (settings settings) -> Config
+
+            def initialize: (settings settings) -> void
+            def set_formatted_components: (FormattedComponents formatted_components) -> Config
+            def set_use_separators: (bool use_separators) -> Config
+            def set_year_is_six_digits: (bool year_is_six_digits) -> Config
+            def set_date_kind: (DateKind date_kind) -> Config
+            def set_time_precision: (TimePrecision::variant time_precision) -> Config
+            def set_offset_precision: (OffsetPrecision offset_precision) -> Config
+            def encode: () -> Integer
+            def inspect: () -> String
+
+            private
+
+            attr_reader settings: settings
+            def replace: (Integer index, Integer | bool value) -> Config
+            def variant: (FormattedComponents | DateKind | OffsetPrecision value, Class enum) -> Integer
+            def boolean: (bool value) -> bool
+          end
+        end
+      end
+    end
+  end
+end

@@ -14,6 +14,7 @@ gemspec path: "gems/notify-rust"
 gemspec path: "gems/global-hotkey"
 gemspec path: "gems/idna"
 gemspec path: "gems/url"
+gemspec path: "gems/time"
 
 gem "irb"
 gem "rake", "~> 13.0"

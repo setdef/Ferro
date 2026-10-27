@@ -123,7 +123,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::NotifyRust::Notification.new.schedule(Time.now - 60)
+          #   Ferro::NotifyRust::Notification.new.schedule(::Time.now - 60)
           #   # raises Ferro::NotifyRust::Error::MacNotificationSys::Notification::ScheduleInThePast
           class ScheduleInThePast < Notification
             # Creates the error. Without a +message+, or with +nil+, the
@@ -230,7 +230,7 @@ module Ferro
     #++
 
     class Notification
-      # Schedules a copy of the notification for +time+, a Time, read to
+      # Schedules a copy of the notification for +time+, a Ruby ::Time, read to
       # the second, and returns a NotificationHandle whose waits return at
       # once, as notify-rust's does. Raises
       # Error::MacNotificationSys::Notification::ScheduleInThePast for a
@@ -238,13 +238,13 @@ module Ferro
       # <tt>Notification::schedule</tt> (<tt>src/notification.rs:489-496</tt>),
       # which takes a chrono <tt>DateTime</tt>.
       #
-      # [time] Time.
+      # [time] ::Time.
       #
       # === Example
       #
-      #   Ferro::NotifyRust::Notification.new.summary("Stand up").schedule(Time.now + 3600)
+      #   Ferro::NotifyRust::Notification.new.summary("Stand up").schedule(::Time.now + 3600)
       def schedule(time)
-        raise TypeError, "no implicit conversion of #{time.class} into Time" unless time.is_a?(Time)
+        raise TypeError, "no implicit conversion of #{time.class} into Time" unless time.is_a?(::Time)
 
         native_schedule(time.to_i)
       end
@@ -258,7 +258,7 @@ module Ferro
       #
       # === Example
       #
-      #   Ferro::NotifyRust::Notification.new.summary("Stand up").schedule_raw(Time.now.to_f + 3600)
+      #   Ferro::NotifyRust::Notification.new.summary("Stand up").schedule_raw(::Time.now.to_f + 3600)
       def schedule_raw(timestamp)
         native_schedule_raw(timestamp)
       end

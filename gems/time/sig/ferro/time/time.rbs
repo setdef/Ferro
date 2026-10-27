@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    class Time
+      include Comparable
+
+      MIDNIGHT: Time
+      MAX: Time
+
+      def self.from_hms: (Integer hour, Integer minute, Integer second) -> Time
+      def self.from_hms_milli: (Integer hour, Integer minute, Integer second, Integer millisecond) -> Time
+      def self.from_hms_micro: (Integer hour, Integer minute, Integer second, Integer microsecond) -> Time
+      def self.from_hms_nano: (Integer hour, Integer minute, Integer second, Integer nanosecond) -> Time
+      def self.parse: (String input, FormatDescription::description description) -> Time
+
+      def hour: () -> Integer
+      def minute: () -> Integer
+      def second: () -> Integer
+      def millisecond: () -> Integer
+      def microsecond: () -> Integer
+      def nanosecond: () -> Integer
+      def as_hms: () -> [Integer, Integer, Integer]
+      def as_hms_milli: () -> [Integer, Integer, Integer, Integer]
+      def as_hms_micro: () -> [Integer, Integer, Integer, Integer]
+      def as_hms_nano: () -> [Integer, Integer, Integer, Integer]
+      def duration_until: (Time other) -> SignedDuration
+      def duration_since: (Time other) -> SignedDuration
+      def replace_hour: (Integer hour) -> Time
+      def replace_minute: (Integer minute) -> Time
+      def replace_second: (Integer second) -> Time
+      def replace_millisecond: (Integer millisecond) -> Time
+      def replace_microsecond: (Integer microsecond) -> Time
+      def replace_nanosecond: (Integer nanosecond) -> Time
+      def truncate_to_hour: () -> Time
+      def truncate_to_minute: () -> Time
+      def truncate_to_second: () -> Time
+      def truncate_to_millisecond: () -> Time
+      def truncate_to_microsecond: () -> Time
+      def +: (SignedDuration duration) -> Time
+      def -: (SignedDuration other) -> Time | (Time other) -> SignedDuration
+      def format: (FormatDescription::description description) -> String
+      def format_into: (String output, FormatDescription::description description) -> Integer
+      def ==: (Object other) -> bool
+      def eql?: (Object other) -> bool
+      def hash: () -> Integer
+      def <=>: (Time other) -> Integer | (Object other) -> Integer?
+      def to_s: () -> String
+      def inspect: () -> String
+      def dup: () -> self
+      def clone: (?freeze: bool?) -> self
+    end
+  end
+end

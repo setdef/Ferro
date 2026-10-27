@@ -1,0 +1,64 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    class Date
+      include Comparable
+
+      MIN: Date
+      MAX: Date
+
+      def self.from_calendar_date: (Integer year, Month month, Integer day) -> Date
+      def self.from_ordinal_date: (Integer year, Integer ordinal) -> Date
+      def self.from_iso_week_date: (Integer year, Integer week, Weekday weekday) -> Date
+      def self.from_julian_day: (Integer julian_day) -> Date
+      def self.parse: (String input, FormatDescription::description description) -> Date
+
+      def year: () -> Integer
+      def month: () -> Month
+      def day: () -> Integer
+      def ordinal: () -> Integer
+      def iso_week: () -> Integer
+      def sunday_based_week: () -> Integer
+      def monday_based_week: () -> Integer
+      def to_calendar_date: () -> [Integer, Month, Integer]
+      def to_ordinal_date: () -> [Integer, Integer]
+      def to_iso_week_date: () -> [Integer, Integer, Weekday]
+      def weekday: () -> Weekday
+      def to_julian_day: () -> Integer
+      def next_day: () -> Date?
+      def previous_day: () -> Date?
+      def next_occurrence: (Weekday weekday) -> Date
+      def prev_occurrence: (Weekday weekday) -> Date
+      def nth_next_occurrence: (Weekday weekday, Integer n) -> Date
+      def nth_prev_occurrence: (Weekday weekday, Integer n) -> Date
+      def checked_add: (SignedDuration duration) -> Date?
+      def checked_sub: (SignedDuration duration) -> Date?
+      def saturating_add: (SignedDuration duration) -> Date
+      def saturating_sub: (SignedDuration duration) -> Date
+      def +: (SignedDuration duration) -> Date
+      def -: (SignedDuration other) -> Date | (Date other) -> SignedDuration
+      def replace_year: (Integer year) -> Date
+      def replace_month: (Month month) -> Date
+      def replace_day: (Integer day) -> Date
+      def replace_ordinal: (Integer ordinal) -> Date
+      def midnight: () -> PlainDateTime
+      def with_time: (Time time) -> PlainDateTime
+      def with_hms: (Integer hour, Integer minute, Integer second) -> PlainDateTime
+      def with_hms_milli: (Integer hour, Integer minute, Integer second, Integer millisecond) -> PlainDateTime
+      def with_hms_micro: (Integer hour, Integer minute, Integer second, Integer microsecond) -> PlainDateTime
+      def with_hms_nano: (Integer hour, Integer minute, Integer second, Integer nanosecond) -> PlainDateTime
+      def format: (FormatDescription::description description) -> String
+      def format_into: (String output, FormatDescription::description description) -> Integer
+      def ==: (Object other) -> bool
+      def eql?: (Object other) -> bool
+      def hash: () -> Integer
+      def <=>: (Date other) -> Integer | (Object other) -> Integer?
+      def to_s: () -> String
+      def inspect: () -> String
+      def dup: () -> self
+      def clone: (?freeze: bool?) -> self
+    end
+  end
+end

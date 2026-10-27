@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# The ferro-time gem's Cargo workspace. It ships in the gem beside
+# Cargo.lock, so an installed gem compiles against exactly the dependency
+# versions this repository tests (ADR 001, section 3).
+
+[workspace]
+members = ["ext/ferro_time"]
+resolver = "2"
+
+# Keep symbols in released builds, as the other gems do, so a crash or
+# panic backtrace from an installed gem names Ferro's and time's
+# functions. Debug info stays off (plan 001, decision 19). Profiles take
+# effect only at the workspace root, so this lives here, beside the
+# lockfile the gem ships.
+[profile.release]
+debug = false
+strip = false

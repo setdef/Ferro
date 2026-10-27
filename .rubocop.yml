@@ -30,3 +30,18 @@ Style/EndlessMethod:
   EnforcedStyle: disallow
   Include:
     - "gems/*/lib/**/*.rb"
+
+# ferro-time defines Ferro::Time and Ferro::Time::Date, so a bare Time or
+# Date inside module Ferro can name the binding instead of Ruby's class
+# wherever ferro-time is bundled. Every other gem names Ruby's from the
+# top level (ADR 001, amendment of 2026-10-27);
+# test/tasks/test_top_level_constants.rb checks the signatures.
+Lint/ConstantResolution:
+  Enabled: true
+  Only:
+    - Time
+    - Date
+  Include:
+    - "gems/*/lib/**/*.rb"
+  Exclude:
+    - "gems/time/**/*"

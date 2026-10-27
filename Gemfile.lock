@@ -29,6 +29,12 @@ PATH
       rb_sys (~> 0.9.129)
 
 PATH
+  remote: gems/time
+  specs:
+    ferro-time (0.1.0.pre.1)
+      rb_sys (~> 0.9.129)
+
+PATH
   remote: gems/url
   specs:
     ferro-url (0.1.0.pre.1)
@@ -189,6 +195,7 @@ DEPENDENCIES
   ferro-idna!
   ferro-notify-rust!
   ferro-rfd!
+  ferro-time!
   ferro-url!
   fiddle
   irb
@@ -217,6 +224,7 @@ CHECKSUMS
   ferro-idna (0.1.0.pre.1)
   ferro-notify-rust (0.1.0.pre.2)
   ferro-rfd (0.1.0.pre.2)
+  ferro-time (0.1.0.pre.1)
   ferro-url (0.1.0.pre.1)
   ffi (1.17.4) sha256=bcd1642e06f0d16fc9e09ac6d49c3a7298b9789bcb58127302f934e437d60acf
   ffi (1.17.4-aarch64-linux-gnu) sha256=b208f06f91ffd8f5e1193da3cae3d2ccfc27fc36fba577baf698d26d91c080df

@@ -1,0 +1,93 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    class SignedDuration
+      include Comparable
+
+      ZERO: SignedDuration
+      NANOSECOND: SignedDuration
+      MICROSECOND: SignedDuration
+      MILLISECOND: SignedDuration
+      SECOND: SignedDuration
+      MINUTE: SignedDuration
+      HOUR: SignedDuration
+      DAY: SignedDuration
+      WEEK: SignedDuration
+      MIN: SignedDuration
+      MAX: SignedDuration
+
+      def self.default: () -> SignedDuration
+      def self.new: (Integer seconds, Integer nanoseconds) -> SignedDuration
+      def self.weeks: (Integer weeks) -> SignedDuration
+      def self.days: (Integer days) -> SignedDuration
+      def self.hours: (Integer hours) -> SignedDuration
+      def self.minutes: (Integer minutes) -> SignedDuration
+      def self.seconds: (Integer seconds) -> SignedDuration
+      def self.milliseconds: (Integer milliseconds) -> SignedDuration
+      def self.microseconds: (Integer microseconds) -> SignedDuration
+      def self.nanoseconds: (Integer nanoseconds) -> SignedDuration
+      def self.nanoseconds_i128: (Integer nanoseconds) -> SignedDuration
+      def self.seconds_f64: (Float seconds) -> SignedDuration
+      def self.seconds_f32: (Float seconds) -> SignedDuration
+      def self.saturating_seconds_f64: (Float seconds) -> SignedDuration
+      def self.saturating_seconds_f32: (Float seconds) -> SignedDuration
+      def self.checked_seconds_f64: (Float seconds) -> SignedDuration?
+      def self.checked_seconds_f32: (Float seconds) -> SignedDuration?
+
+      def is_zero: () -> bool
+      def is_negative: () -> bool
+      def is_positive: () -> bool
+      def abs: () -> SignedDuration
+      def whole_weeks: () -> Integer
+      def whole_days: () -> Integer
+      def whole_hours: () -> Integer
+      def whole_minutes: () -> Integer
+      def whole_seconds: () -> Integer
+      def whole_milliseconds: () -> Integer
+      def subsec_milliseconds: () -> Integer
+      def whole_microseconds: () -> Integer
+      def subsec_microseconds: () -> Integer
+      def whole_nanoseconds: () -> Integer
+      def subsec_nanoseconds: () -> Integer
+      def as_seconds_f64: () -> Float
+      def as_seconds_f32: () -> Float
+      def checked_add: (SignedDuration rhs) -> SignedDuration?
+      def checked_sub: (SignedDuration rhs) -> SignedDuration?
+      def saturating_add: (SignedDuration rhs) -> SignedDuration
+      def saturating_sub: (SignedDuration rhs) -> SignedDuration
+      def checked_mul: (Integer rhs) -> SignedDuration?
+      def checked_div: (Integer rhs) -> SignedDuration?
+      def saturating_mul: (Integer rhs) -> SignedDuration
+      def checked_neg: () -> SignedDuration?
+      def +: (SignedDuration rhs) -> SignedDuration
+      def -: (SignedDuration rhs) -> SignedDuration
+      def -@: () -> SignedDuration
+      def *: (Integer | Float rhs) -> SignedDuration
+      def coerce: (Integer | Float number) -> [Scalar, SignedDuration]
+      def /: (Integer | Float rhs) -> SignedDuration | (SignedDuration rhs) -> Float
+      def ==: (Object other) -> bool
+      def eql?: (Object other) -> bool
+      def hash: () -> Integer
+      def <=>: (SignedDuration other) -> Integer | (Object other) -> Integer?
+      def to_s: () -> String
+      def inspect: () -> String
+      def dup: () -> self
+      def clone: (?freeze: bool?) -> self
+
+      class Scalar
+        @number: Integer | Float
+
+        def initialize: (Integer | Float number) -> void
+        def *: (SignedDuration other) -> SignedDuration
+        def <: (Object _other) -> nil
+        def <=: (Object _other) -> nil
+        def >: (Object _other) -> nil
+        def >=: (Object _other) -> nil
+        def method_missing: (Symbol _name, *Object) -> bot
+        def respond_to_missing?: (Symbol _name, bool _include_private) -> false
+      end
+    end
+  end
+end

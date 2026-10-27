@@ -1,0 +1,244 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    VERSION: String
+    PrimitiveDateTime: singleton(PlainDateTime)
+    Duration: singleton(SignedDuration)
+
+    type settings = [Integer, bool, bool, Integer, Integer, Integer, Integer]
+    type native_description = FormatDescription::FormatDescriptionV3 | :rfc2822 | :rfc3339 | settings
+
+    module Native
+      def self.date_eq: (Date left, Date right) -> bool
+      def self.date_hash: (Date value) -> Integer
+      def self.date_display: (Date value) -> String
+      def self.date_debug: (Date value) -> String
+      def self.date_cmp: (Date left, Date right) -> Integer
+      def self.time_eq: (Time left, Time right) -> bool
+      def self.time_hash: (Time value) -> Integer
+      def self.time_display: (Time value) -> String
+      def self.time_debug: (Time value) -> String
+      def self.time_cmp: (Time left, Time right) -> Integer
+      def self.plain_eq: (PlainDateTime left, PlainDateTime right) -> bool
+      def self.plain_hash: (PlainDateTime value) -> Integer
+      def self.plain_display: (PlainDateTime value) -> String
+      def self.plain_debug: (PlainDateTime value) -> String
+      def self.plain_cmp: (PlainDateTime left, PlainDateTime right) -> Integer
+      def self.utc_eq: (UtcDateTime left, UtcDateTime right) -> bool
+      def self.utc_hash: (UtcDateTime value) -> Integer
+      def self.utc_display: (UtcDateTime value) -> String
+      def self.utc_debug: (UtcDateTime value) -> String
+      def self.utc_cmp: (UtcDateTime left, UtcDateTime right) -> Integer
+      def self.offset_date_time_eq: (OffsetDateTime left, OffsetDateTime right) -> bool
+      def self.offset_date_time_hash: (OffsetDateTime value) -> Integer
+      def self.offset_date_time_display: (OffsetDateTime value) -> String
+      def self.offset_date_time_debug: (OffsetDateTime value) -> String
+      def self.offset_date_time_cmp: (OffsetDateTime left, OffsetDateTime right) -> Integer
+      def self.utc_offset_eq: (UtcOffset left, UtcOffset right) -> bool
+      def self.utc_offset_hash: (UtcOffset value) -> Integer
+      def self.utc_offset_display: (UtcOffset value) -> String
+      def self.utc_offset_debug: (UtcOffset value) -> String
+      def self.utc_offset_cmp: (UtcOffset left, UtcOffset right) -> Integer
+      def self.duration_eq: (SignedDuration left, SignedDuration right) -> bool
+      def self.duration_hash: (SignedDuration value) -> Integer
+      def self.duration_display: (SignedDuration value) -> String
+      def self.duration_debug: (SignedDuration value) -> String
+      def self.duration_cmp: (SignedDuration left, SignedDuration right) -> Integer
+
+      def self.month_length: (Integer number, Integer year) -> Integer
+      def self.month_step: (Integer number, :previous | :next | :nth_next | :nth_prev name, Integer n) -> Integer
+      def self.month_from_str: (String text) -> Integer
+      def self.month_try_from: (Integer value) -> Integer
+      def self.month_display: (Integer number) -> String
+      def self.weekday_step: (Integer days, :previous | :next | :nth_next | :nth_prev name, Integer n) -> Integer
+      def self.weekday_number: (Integer days, Symbol name) -> Integer
+      def self.weekday_from_str: (String text) -> Integer
+      def self.weekday_display: (Integer days) -> String
+      def self.util_is_leap_year: (Integer year) -> bool
+      def self.util_days_in_year: (Integer year) -> Integer
+      def self.util_weeks_in_year: (Integer year) -> Integer
+      def self.util_days_in_month: (Integer month, Integer year) -> Integer
+      def self.util_days_in_year_month: (Integer year, Integer month) -> Integer
+      def self.util_refresh_tz: () -> true?
+
+      def self.duration_constant: (Symbol name) -> SignedDuration
+      def self.duration_new: (Integer seconds, Integer nanoseconds) -> SignedDuration
+      def self.duration_unit: (Symbol name, Integer value) -> SignedDuration
+      def self.duration_nanoseconds_i128: (Integer nanoseconds) -> SignedDuration
+      def self.duration_float: (Symbol name, Float seconds) -> SignedDuration
+      def self.duration_float32: (Symbol name, Float seconds) -> SignedDuration
+      def self.duration_checked_float: (Float seconds) -> SignedDuration?
+      def self.duration_checked_float32: (Float seconds) -> SignedDuration?
+      def self.duration_bool: (SignedDuration value, Symbol name) -> bool
+      def self.duration_int: (SignedDuration value, Symbol name) -> Integer
+      def self.duration_as_float: (SignedDuration value, Symbol name) -> Float
+      def self.duration_abs: (SignedDuration value) -> SignedDuration
+      def self.duration_with: (SignedDuration value, :checked_add | :checked_sub name, SignedDuration other) -> SignedDuration?
+                            | (SignedDuration value, :saturating_add | :saturating_sub name, SignedDuration other) -> SignedDuration
+      def self.duration_by: (SignedDuration value, :checked_mul | :checked_div name, Integer scalar) -> SignedDuration?
+                          | (SignedDuration value, :saturating_mul name, Integer scalar) -> SignedDuration
+      def self.duration_checked_neg: (SignedDuration value) -> SignedDuration?
+      def self.duration_op: (SignedDuration value, :+ | :- | :-@ name, SignedDuration other) -> SignedDuration
+      def self.duration_scale_int: (SignedDuration value, :* | :/ name, Integer rhs) -> SignedDuration
+      def self.duration_scale_float: (SignedDuration value, :* | :/ name, Float rhs) -> SignedDuration
+      def self.duration_ratio: (SignedDuration value, SignedDuration other) -> Float
+
+      def self.utc_offset_constant: (Symbol name) -> UtcOffset
+      def self.utc_offset_from_hms: (Integer hours, Integer minutes, Integer seconds) -> UtcOffset
+      def self.utc_offset_from_whole_seconds: (Integer seconds) -> UtcOffset
+      def self.utc_offset_as_hms: (UtcOffset offset) -> [Integer, Integer, Integer]
+      def self.utc_offset_int: (UtcOffset offset, Symbol name) -> Integer
+      def self.utc_offset_bool: (UtcOffset offset, Symbol name) -> bool
+      def self.utc_offset_neg: (UtcOffset offset) -> UtcOffset
+      def self.utc_offset_local_offset_at: (OffsetDateTime datetime) -> UtcOffset
+      def self.utc_offset_current_local_offset: () -> UtcOffset
+
+      def self.date_constant: (Symbol name) -> Date
+      def self.date_from_calendar_date: (Integer year, Integer month, Integer day) -> Date
+      def self.date_from_ordinal_date: (Integer year, Integer ordinal) -> Date
+      def self.date_from_iso_week_date: (Integer year, Integer week, Integer weekday) -> Date
+      def self.date_from_julian_day: (Integer julian_day) -> Date
+      def self.date_int: (Date date, Symbol name) -> Integer
+      def self.date_ints: (Date date, :to_ordinal_date name) -> [Integer, Integer]
+                        | (Date date, :to_calendar_date | :to_iso_week_date name) -> [Integer, Integer, Integer]
+      def self.date_option: (Date date, :next_day | :previous_day name) -> Date?
+      def self.date_occurrence: (Date date, Symbol name, Integer weekday, Integer n) -> Date
+      def self.date_arith: (Date date, :checked_add | :checked_sub name, SignedDuration duration) -> Date?
+                         | (Date date, :saturating_add | :saturating_sub | :+ | :- name, SignedDuration duration) -> Date
+      def self.date_difference: (Date date, Date other) -> SignedDuration
+      def self.date_replace: (Date date, Symbol name, Integer value) -> Date
+      def self.date_midnight: (Date date) -> PlainDateTime
+      def self.date_with_time: (Date date, Time time) -> PlainDateTime
+      def self.date_with_hms: (Date date, Integer hour, Integer minute, Integer second) -> PlainDateTime
+      def self.date_with_hms_milli: (Date date, Integer hour, Integer minute, Integer second, Integer millisecond) -> PlainDateTime
+      def self.date_with_hms_micro: (Date date, Integer hour, Integer minute, Integer second, Integer microsecond) -> PlainDateTime
+      def self.date_with_hms_nano: (Date date, Integer hour, Integer minute, Integer second, Integer nanosecond) -> PlainDateTime
+
+      def self.time_constant: (Symbol name) -> Time
+      def self.time_from_hms: (Integer hour, Integer minute, Integer second) -> Time
+      def self.time_from_hms_milli: (Integer hour, Integer minute, Integer second, Integer millisecond) -> Time
+      def self.time_from_hms_micro: (Integer hour, Integer minute, Integer second, Integer microsecond) -> Time
+      def self.time_from_hms_nano: (Integer hour, Integer minute, Integer second, Integer nanosecond) -> Time
+      def self.time_int: (Time time, Symbol name) -> Integer
+      def self.time_ints: (Time time, :as_hms name) -> [Integer, Integer, Integer]
+                        | (Time time, :as_hms_milli | :as_hms_micro | :as_hms_nano name) -> [Integer, Integer, Integer, Integer]
+      def self.time_truncate: (Time time, Symbol name) -> Time
+      def self.time_replace: (Time time, Symbol name, Integer value) -> Time
+      def self.time_arith: (Time time, :+ | :- name, SignedDuration duration) -> Time
+      def self.time_between: (Time time, :duration_until | :duration_since | :- name, Time other) -> SignedDuration
+
+      def self.plain_int: (PlainDateTime value, Symbol name) -> Integer
+      def self.plain_ints: (PlainDateTime value, :to_ordinal_date name) -> [Integer, Integer]
+                         | (PlainDateTime value, :to_calendar_date | :to_iso_week_date | :as_hms name) -> [Integer, Integer, Integer]
+                         | (PlainDateTime value, :as_hms_milli | :as_hms_micro | :as_hms_nano name) -> [Integer, Integer, Integer, Integer]
+      def self.plain_truncate: (PlainDateTime value, Symbol name) -> PlainDateTime
+      def self.plain_replace: (PlainDateTime value, Symbol name, Integer number) -> PlainDateTime
+      def self.plain_arith: (PlainDateTime value, :checked_add | :checked_sub name, SignedDuration duration) -> PlainDateTime?
+                          | (PlainDateTime value, :saturating_add | :saturating_sub | :+ | :- name, SignedDuration duration) -> PlainDateTime
+      def self.plain_date: (PlainDateTime value) -> Date
+      def self.plain_time: (PlainDateTime value) -> Time
+      def self.plain_constant: (Symbol name) -> PlainDateTime
+      def self.plain_new: (Date date, Time time) -> PlainDateTime
+      def self.plain_replace_time: (PlainDateTime value, Time time) -> PlainDateTime
+      def self.plain_replace_date: (PlainDateTime value, Date date) -> PlainDateTime
+      def self.plain_assume_offset: (PlainDateTime value, UtcOffset offset) -> OffsetDateTime
+      def self.plain_assume_utc: (PlainDateTime value) -> OffsetDateTime
+      def self.plain_as_utc: (PlainDateTime value) -> UtcDateTime
+      def self.plain_difference: (PlainDateTime value, PlainDateTime other) -> SignedDuration
+
+      def self.utc_int: (UtcDateTime value, Symbol name) -> Integer
+      def self.utc_ints: (UtcDateTime value, :to_ordinal_date name) -> [Integer, Integer]
+                       | (UtcDateTime value, :to_calendar_date | :to_iso_week_date | :as_hms name) -> [Integer, Integer, Integer]
+                       | (UtcDateTime value, :as_hms_milli | :as_hms_micro | :as_hms_nano name) -> [Integer, Integer, Integer, Integer]
+      def self.utc_truncate: (UtcDateTime value, Symbol name) -> UtcDateTime
+      def self.utc_replace: (UtcDateTime value, Symbol name, Integer number) -> UtcDateTime
+      def self.utc_arith: (UtcDateTime value, :checked_add | :checked_sub name, SignedDuration duration) -> UtcDateTime?
+                        | (UtcDateTime value, :saturating_add | :saturating_sub | :+ | :- name, SignedDuration duration) -> UtcDateTime
+      def self.utc_date: (UtcDateTime value) -> Date
+      def self.utc_time: (UtcDateTime value) -> Time
+      def self.utc_constant: (Symbol name) -> UtcDateTime
+      def self.utc_now: () -> UtcDateTime
+      def self.utc_new: (Date date, Time time) -> UtcDateTime
+      def self.utc_from_unix_timestamp: (Integer timestamp) -> UtcDateTime
+      def self.utc_from_unix_timestamp_nanos: (Integer timestamp) -> UtcDateTime
+      def self.utc_to_offset: (UtcDateTime value, :to_offset name, UtcOffset offset) -> OffsetDateTime
+                            | (UtcDateTime value, :checked_to_offset name, UtcOffset offset) -> OffsetDateTime?
+      def self.utc_replace_time: (UtcDateTime value, Time time) -> UtcDateTime
+      def self.utc_replace_date: (UtcDateTime value, Date date) -> UtcDateTime
+      def self.utc_difference: (UtcDateTime value, UtcDateTime other) -> SignedDuration
+      def self.utc_difference_offset: (UtcDateTime value, OffsetDateTime other) -> SignedDuration
+      def self.utc_eq_offset: (UtcDateTime value, OffsetDateTime other) -> bool
+      def self.utc_cmp_offset: (UtcDateTime value, OffsetDateTime other) -> Integer?
+      def self.utc_from_offset: (OffsetDateTime value) -> UtcDateTime
+
+      def self.offset_date_time_int: (OffsetDateTime value, Symbol name) -> Integer
+      def self.offset_date_time_ints: (OffsetDateTime value, :to_ordinal_date name) -> [Integer, Integer]
+                                    | (OffsetDateTime value, :to_calendar_date | :to_iso_week_date | :to_hms name) -> [Integer, Integer, Integer]
+                                    | (OffsetDateTime value, :to_hms_milli | :to_hms_micro | :to_hms_nano name) -> [Integer, Integer, Integer, Integer]
+      def self.offset_date_time_truncate: (OffsetDateTime value, Symbol name) -> OffsetDateTime
+      def self.offset_date_time_replace: (OffsetDateTime value, Symbol name, Integer number) -> OffsetDateTime
+      def self.offset_date_time_arith: (OffsetDateTime value, :checked_add | :checked_sub name, SignedDuration duration) -> OffsetDateTime?
+                                     | (OffsetDateTime value, :saturating_add | :saturating_sub | :+ | :- name, SignedDuration duration) -> OffsetDateTime
+      def self.offset_date_time_date: (OffsetDateTime value) -> Date
+      def self.offset_date_time_time: (OffsetDateTime value) -> Time
+      def self.offset_date_time_constant: (Symbol name) -> OffsetDateTime
+      def self.offset_date_time_now_utc: () -> OffsetDateTime
+      def self.offset_date_time_now_local: () -> OffsetDateTime
+      def self.offset_date_time_new_in_offset: (Date date, Time time, UtcOffset offset) -> OffsetDateTime
+      def self.offset_date_time_new_utc: (Date date, Time time) -> OffsetDateTime
+      def self.offset_date_time_to_offset: (OffsetDateTime value, :to_offset name, UtcOffset offset) -> OffsetDateTime
+                                         | (OffsetDateTime value, :checked_to_offset name, UtcOffset offset) -> OffsetDateTime?
+      def self.offset_date_time_to_utc: (OffsetDateTime value, :to_utc name) -> UtcDateTime
+                                      | (OffsetDateTime value, :checked_to_utc name) -> UtcDateTime?
+      def self.offset_date_time_from_unix_timestamp: (Integer timestamp) -> OffsetDateTime
+      def self.offset_date_time_from_unix_timestamp_nanos: (Integer timestamp) -> OffsetDateTime
+      def self.offset_date_time_offset: (OffsetDateTime value) -> UtcOffset
+      def self.offset_date_time_replace_time: (OffsetDateTime value, Time time) -> OffsetDateTime
+      def self.offset_date_time_replace_date: (OffsetDateTime value, Date date) -> OffsetDateTime
+      def self.offset_date_time_replace_date_time: (OffsetDateTime value, PlainDateTime date_time) -> OffsetDateTime
+      def self.offset_date_time_replace_offset: (OffsetDateTime value, UtcOffset offset) -> OffsetDateTime
+      def self.offset_date_time_difference: (OffsetDateTime value, OffsetDateTime other) -> SignedDuration
+      def self.offset_date_time_difference_utc: (OffsetDateTime value, UtcDateTime other) -> SignedDuration
+      def self.offset_date_time_eq_utc: (OffsetDateTime value, UtcDateTime other) -> bool
+      def self.offset_date_time_cmp_utc: (OffsetDateTime value, UtcDateTime other) -> Integer?
+      def self.offset_date_time_from_utc: (UtcDateTime value) -> OffsetDateTime
+
+      def self.format_description_parse: (Integer version, bool owned, String input) -> FormatDescription::FormatDescriptionV3
+      def self.format_description_debug: (FormatDescription::FormatDescriptionV3 description) -> String
+      def self.iso8601_debug: (settings settings) -> String
+      def self.iso8601_encode: (settings settings) -> Integer
+      def self.iso8601_config_debug: (settings settings) -> String
+      def self.date_format: (Date value, native_description description) -> String
+      def self.date_format_into: (Date value, native_description description) -> [String, Integer?, Exception?]
+      def self.date_parse: (String input, native_description description) -> Date
+      def self.time_format: (Time value, native_description description) -> String
+      def self.time_format_into: (Time value, native_description description) -> [String, Integer?, Exception?]
+      def self.time_parse: (String input, native_description description) -> Time
+      def self.utc_offset_format: (UtcOffset value, native_description description) -> String
+      def self.utc_offset_format_into: (UtcOffset value, native_description description) -> [String, Integer?, Exception?]
+      def self.utc_offset_parse: (String input, native_description description) -> UtcOffset
+      def self.plain_format: (PlainDateTime value, native_description description) -> String
+      def self.plain_format_into: (PlainDateTime value, native_description description) -> [String, Integer?, Exception?]
+      def self.plain_parse: (String input, native_description description) -> PlainDateTime
+      def self.utc_format: (UtcDateTime value, native_description description) -> String
+      def self.utc_format_into: (UtcDateTime value, native_description description) -> [String, Integer?, Exception?]
+      def self.utc_parse: (String input, native_description description) -> UtcDateTime
+      def self.offset_date_time_format: (OffsetDateTime value, native_description description) -> String
+      def self.offset_date_time_format_into: (OffsetDateTime value, native_description description) -> [String, Integer?, Exception?]
+      def self.offset_date_time_parse: (String input, native_description description) -> OffsetDateTime
+
+      def self.offset_date_time_from_system_time: (Integer seconds, Integer nanoseconds) -> OffsetDateTime
+      def self.utc_from_system_time: (Integer seconds, Integer nanoseconds) -> UtcDateTime
+      def self.offset_date_time_to_system_time: (OffsetDateTime value) -> [Integer, Integer]
+      def self.utc_to_system_time: (UtcDateTime value) -> [Integer, Integer]
+      def self.offset_date_time_with_system_time: (OffsetDateTime value, :== operator, Integer seconds, Integer nanoseconds) -> bool
+                                                | (OffsetDateTime value, :<=> operator, Integer seconds, Integer nanoseconds) -> Integer?
+                                                | (OffsetDateTime value, :- operator, Integer seconds, Integer nanoseconds) -> SignedDuration
+      def self.utc_with_system_time: (UtcDateTime value, :== operator, Integer seconds, Integer nanoseconds) -> bool
+                                   | (UtcDateTime value, :<=> operator, Integer seconds, Integer nanoseconds) -> Integer?
+                                   | (UtcDateTime value, :- operator, Integer seconds, Integer nanoseconds) -> SignedDuration
+    end
+  end
+end

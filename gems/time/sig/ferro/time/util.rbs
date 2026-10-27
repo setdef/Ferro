@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    module Util
+      def self.is_leap_year: (Integer year) -> bool
+      def self.days_in_year: (Integer year) -> Integer
+      def self.weeks_in_year: (Integer year) -> Integer
+      def self.days_in_month: (Month month, Integer year) -> Integer
+      def self.days_in_year_month: (Integer year, Month month) -> Integer
+      def self.refresh_tz: () -> true?
+    end
+  end
+end

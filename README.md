@@ -31,6 +31,7 @@ own documentation stays your guide. Ferro spun out of
 | [ferro-global-hotkey](gems/global-hotkey/README.rdoc) | [global-hotkey](https://github.com/tauri-apps/global-hotkey) 0.9.0, global hotkeys | 0.1.0.pre.1, unreleased |
 | [ferro-idna](gems/idna/README.rdoc) | [idna](https://github.com/servo/rust-url/tree/main/idna) 1.1.0, internationalized domain names | 0.1.0.pre.1, unreleased |
 | [ferro-url](gems/url/README.rdoc) | [url](https://github.com/servo/rust-url) 2.5.8, WHATWG URLs | 0.1.0.pre.1, unreleased |
+| [ferro-time](gems/time/README.rdoc) | [time](https://github.com/time-rs/time) 0.3.55, dates, times, offsets, and durations | 0.1.0.pre.1, unreleased |
 
 ## Using a gem
 
@@ -100,8 +101,8 @@ a crate becomes a gem.
 Each gem takes its crate's license: ferro-arboard is MIT OR Apache-2.0, as
 arboard is, ferro-rfd is MIT, as rfd is, ferro-notify-rust is MIT OR
 Apache-2.0, as notify-rust is, ferro-global-hotkey is Apache-2.0 OR MIT,
-as global-hotkey is, and ferro-idna and ferro-url are MIT OR Apache-2.0,
-as idna and url are. The repository's tooling is
+as global-hotkey is, and ferro-idna, ferro-url, and ferro-time are MIT OR
+Apache-2.0, as idna, url, and time are. The repository's tooling is
 AGPL-3.0-or-later. Documentation is CC-BY-SA-4.0, code snippets in it are
 MIT-0, and lockfiles are CC0-1.0. Every file says which applies;
 [REUSE](https://reuse.software) checks it, and the texts are in

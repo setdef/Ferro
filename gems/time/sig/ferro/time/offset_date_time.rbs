@@ -1,0 +1,90 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    class OffsetDateTime
+      include Comparable
+
+      UNIX_EPOCH: OffsetDateTime
+
+      def self.now_utc: () -> OffsetDateTime
+      def self.now_local: () -> OffsetDateTime
+      def self.new_in_offset: (Date date, Time time, UtcOffset offset) -> OffsetDateTime
+      def self.new_utc: (Date date, Time time) -> OffsetDateTime
+      def self.from_unix_timestamp: (Integer timestamp) -> OffsetDateTime
+      def self.from_unix_timestamp_nanos: (Integer timestamp) -> OffsetDateTime
+      def self.from: (UtcDateTime | ::Time value) -> OffsetDateTime
+      def self.parse: (String input, FormatDescription::description description) -> OffsetDateTime
+
+      def to_offset: (UtcOffset offset) -> OffsetDateTime
+      def checked_to_offset: (UtcOffset offset) -> OffsetDateTime?
+      def to_utc: () -> UtcDateTime
+      def checked_to_utc: () -> UtcDateTime?
+      def offset: () -> UtcOffset
+      def unix_timestamp: () -> Integer
+      def unix_timestamp_nanos: () -> Integer
+      def date: () -> Date
+      def time: () -> Time
+      def year: () -> Integer
+      def month: () -> Month
+      def day: () -> Integer
+      def ordinal: () -> Integer
+      def iso_week: () -> Integer
+      def sunday_based_week: () -> Integer
+      def monday_based_week: () -> Integer
+      def to_calendar_date: () -> [Integer, Month, Integer]
+      def to_ordinal_date: () -> [Integer, Integer]
+      def to_iso_week_date: () -> [Integer, Integer, Weekday]
+      def weekday: () -> Weekday
+      def to_julian_day: () -> Integer
+      def hour: () -> Integer
+      def minute: () -> Integer
+      def second: () -> Integer
+      def millisecond: () -> Integer
+      def microsecond: () -> Integer
+      def nanosecond: () -> Integer
+      def to_hms: () -> [Integer, Integer, Integer]
+      def to_hms_milli: () -> [Integer, Integer, Integer, Integer]
+      def to_hms_micro: () -> [Integer, Integer, Integer, Integer]
+      def to_hms_nano: () -> [Integer, Integer, Integer, Integer]
+      def checked_add: (SignedDuration duration) -> OffsetDateTime?
+      def checked_sub: (SignedDuration duration) -> OffsetDateTime?
+      def saturating_add: (SignedDuration duration) -> OffsetDateTime
+      def saturating_sub: (SignedDuration duration) -> OffsetDateTime
+      def +: (SignedDuration duration) -> OffsetDateTime
+      def replace_time: (Time time) -> OffsetDateTime
+      def replace_date: (Date date) -> OffsetDateTime
+      def replace_date_time: (PlainDateTime date_time) -> OffsetDateTime
+      def replace_offset: (UtcOffset offset) -> OffsetDateTime
+      def replace_year: (Integer year) -> OffsetDateTime
+      def replace_month: (Month month) -> OffsetDateTime
+      def replace_day: (Integer day) -> OffsetDateTime
+      def replace_ordinal: (Integer ordinal) -> OffsetDateTime
+      def replace_hour: (Integer hour) -> OffsetDateTime
+      def replace_minute: (Integer minute) -> OffsetDateTime
+      def replace_second: (Integer second) -> OffsetDateTime
+      def replace_millisecond: (Integer millisecond) -> OffsetDateTime
+      def replace_microsecond: (Integer microsecond) -> OffsetDateTime
+      def replace_nanosecond: (Integer nanosecond) -> OffsetDateTime
+      def truncate_to_day: () -> OffsetDateTime
+      def truncate_to_hour: () -> OffsetDateTime
+      def truncate_to_minute: () -> OffsetDateTime
+      def truncate_to_second: () -> OffsetDateTime
+      def truncate_to_millisecond: () -> OffsetDateTime
+      def truncate_to_microsecond: () -> OffsetDateTime
+      def -: (SignedDuration other) -> OffsetDateTime | (OffsetDateTime | UtcDateTime | ::Time other) -> SignedDuration
+      def ==: (Object other) -> bool
+      def eql?: (Object other) -> bool
+      def hash: () -> Integer
+      def <=>: (OffsetDateTime | UtcDateTime | ::Time other) -> Integer | (Object other) -> Integer?
+      def to_time: () -> ::Time
+      def format: (FormatDescription::description description) -> String
+      def format_into: (String output, FormatDescription::description description) -> Integer
+      def to_s: () -> String
+      def inspect: () -> String
+      def dup: () -> self
+      def clone: (?freeze: bool?) -> self
+    end
+  end
+end

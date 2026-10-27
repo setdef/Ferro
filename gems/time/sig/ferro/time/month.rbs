@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    class Month
+      include Comparable
+
+      January: Month
+      February: Month
+      March: Month
+      April: Month
+      May: Month
+      June: Month
+      July: Month
+      August: Month
+      September: Month
+      October: Month
+      November: Month
+      December: Month
+      ALL: Array[Month]
+
+      @number: Integer
+      @name: Symbol
+
+      private def self.new: (Integer number, Symbol name) -> instance
+
+      def self.from_str: (String text) -> Month
+      def self.try_from: (Integer value) -> Month
+
+      def initialize: (Integer number, Symbol name) -> void
+      def length: (Integer year) -> Integer
+      def previous: () -> Month
+      def next: () -> Month
+      def nth_next: (Integer n) -> Month
+      def nth_prev: (Integer n) -> Month
+      def to_i: () -> Integer
+      def <=>: (Month other) -> Integer | (Object other) -> Integer?
+      def to_s: () -> String
+      def inspect: () -> String
+    end
+  end
+end

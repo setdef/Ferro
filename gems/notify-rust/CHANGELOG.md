@@ -12,6 +12,10 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Fixed
+
+- On macOS, `Notification#schedule` accepts a Ruby `Time` again when ferro-time is loaded: it checks for `::Time`, which a bare `Time` inside `Ferro` no longer names once `Ferro::Time` exists.
+
 ## [0.1.0.pre.2] - 2026-10-27
 
 ### Fixed

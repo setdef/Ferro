@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    class UtcOffset
+      include Comparable
+
+      UTC: UtcOffset
+
+      def self.from_hms: (Integer hours, Integer minutes, Integer seconds) -> UtcOffset
+      def self.from_whole_seconds: (Integer seconds) -> UtcOffset
+      def self.local_offset_at: (OffsetDateTime datetime) -> UtcOffset
+      def self.current_local_offset: () -> UtcOffset
+      def self.parse: (String input, FormatDescription::description description) -> UtcOffset
+
+      def as_hms: () -> [Integer, Integer, Integer]
+      def whole_hours: () -> Integer
+      def whole_minutes: () -> Integer
+      def minutes_past_hour: () -> Integer
+      def whole_seconds: () -> Integer
+      def seconds_past_minute: () -> Integer
+      def is_utc: () -> bool
+      def is_positive: () -> bool
+      def is_negative: () -> bool
+      def -@: () -> UtcOffset
+      def format: (FormatDescription::description description) -> String
+      def format_into: (String output, FormatDescription::description description) -> Integer
+      def ==: (Object other) -> bool
+      def eql?: (Object other) -> bool
+      def hash: () -> Integer
+      def <=>: (UtcOffset other) -> Integer | (Object other) -> Integer?
+      def to_s: () -> String
+      def inspect: () -> String
+      def dup: () -> self
+      def clone: (?freeze: bool?) -> self
+    end
+  end
+end

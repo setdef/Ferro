@@ -282,4 +282,36 @@ FERRO_GEMS = [
       end
       puts "ferro-url \#{Ferro::Url::VERSION} loads its extension (\#{url})"
     RUBY
+  FerroGem.new(
+    short_name: "time",
+    name: "ferro-time",
+    crate: "ext/ferro_time",
+    extension: "lib/ferro/time/ferro_time",
+    packaged: %w[lib sig ext Cargo.toml Cargo.lock Cargo.lock.license README.rdoc CHANGELOG.md LICENSES],
+    native_namespace: "Ferro::Time",
+    platform_sigs: {},
+    platform_probe: %(require "ferro/time"; print "any"),
+    smoke: <<~RUBY),
+      require "ferro/time"
+      # time is pure computation over its own types, so the smoke test runs
+      # it: a parse with time's ISO 8601 parser, a format with a version 3
+      # description, time's own parse error, and an overflow refused before
+      # time would panic.
+      t = Ferro::Time
+      at = t::OffsetDateTime.parse("2026-10-26T12:00:00.000Z", t::FormatDescription::WellKnown::Iso8601::DEFAULT)
+      abort "time did not parse the date: \#{at}" unless at.unix_timestamp == 1_793_016_000
+      day = t::FormatDescription.parse_owned(3, "[year]-[month]-[day]")
+      abort "time did not format the date" unless at.format(day) == "2026-10-26"
+      begin
+        t::OffsetDateTime.parse("2026-13-01T00:00:00Z", t::FormatDescription::WellKnown::Iso8601::DEFAULT)
+        abort "a thirteenth month parsed"
+      rescue t::Error::Parse
+      end
+      begin
+        t::Date::MAX + t::Duration::DAY
+        abort "an overflow reached time"
+      rescue RangeError
+      end
+      puts "ferro-time \#{t::VERSION} loads its extension (\#{at})"
+    RUBY
 ].freeze

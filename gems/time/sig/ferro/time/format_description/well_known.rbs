@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    module FormatDescription
+      module WellKnown
+        class Rfc2822
+          private def self.new: () -> instance
+        end
+
+        class Rfc3339
+          private def self.new: () -> instance
+        end
+      end
+    end
+  end
+end

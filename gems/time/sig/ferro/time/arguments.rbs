@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    module Arguments
+      def self.month: (Month month) -> Integer
+      def self.month_of: (Integer number) -> Month
+      def self.weekday: (Weekday weekday) -> Integer
+      def self.weekday_of: (Integer days) -> Weekday
+      def self.duration: (SignedDuration duration) -> SignedDuration
+      def self.calendar_date: ([Integer, Integer, Integer] parts) -> [Integer, Month, Integer]
+      def self.iso_week_date: ([Integer, Integer, Integer] parts) -> [Integer, Integer, Weekday]
+      def self.description: (FormatDescription::description description) -> native_description
+      def self.sink: (String output) -> void
+      def self.system_time: (::Time time) -> [Integer, Integer]
+      def self.ruby_time: ([Integer, Integer] parts) -> ::Time
+    end
+  end
+end

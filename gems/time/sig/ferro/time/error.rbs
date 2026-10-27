@@ -1,0 +1,169 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    class Error < StandardError
+      def initialize: (?String? message) -> void
+
+      class ConversionRange < Error
+      end
+
+      class ComponentRange < Error
+        attr_reader name: String
+        attr_reader is_conditional: bool
+
+        def initialize: (String name, bool is_conditional) -> void
+      end
+
+      class IndeterminateOffset < Error
+      end
+
+      class DifferentVariant < Error
+      end
+
+      class InvalidVariant < Error
+      end
+
+      class Format < Error
+        class InsufficientTypeInformation < Format
+        end
+
+        class InvalidComponent < Format
+          attr_reader component: String
+
+          def initialize: (String component) -> void
+        end
+
+        class ComponentRange < Format
+          attr_reader name: String
+          attr_reader is_conditional: bool
+
+          def initialize: (String name, bool is_conditional) -> void
+        end
+
+        class StdIo < Format
+        end
+      end
+
+      class ParseFromDescription < Error
+        class InvalidLiteral < ParseFromDescription
+        end
+
+        class InvalidComponent < ParseFromDescription
+          attr_reader name: String
+
+          def initialize: (String name) -> void
+        end
+
+        class UnexpectedTrailingCharacters < ParseFromDescription
+        end
+      end
+
+      class TryFromParsed < Error
+        class InsufficientInformation < TryFromParsed
+        end
+
+        class ComponentRange < TryFromParsed
+          attr_reader name: String
+          attr_reader is_conditional: bool
+
+          def initialize: (String name, bool is_conditional) -> void
+        end
+      end
+
+      class Parse < Error
+        class TryFromParsed < Parse
+          class InsufficientInformation < TryFromParsed
+          end
+
+          class ComponentRange < TryFromParsed
+            attr_reader name: String
+            attr_reader is_conditional: bool
+
+            def initialize: (String name, bool is_conditional) -> void
+          end
+        end
+
+        class ParseFromDescription < Parse
+          class InvalidLiteral < ParseFromDescription
+          end
+
+          class InvalidComponent < ParseFromDescription
+            attr_reader name: String
+
+            def initialize: (String name) -> void
+          end
+
+          class UnexpectedTrailingCharacters < ParseFromDescription
+          end
+        end
+      end
+
+      class InvalidFormatDescription < Error
+        class UnclosedOpeningBracket < InvalidFormatDescription
+          attr_reader index: Integer
+
+          def initialize: (Integer index) -> void
+        end
+
+        class InvalidComponentName < InvalidFormatDescription
+          attr_reader name: String
+          attr_reader index: Integer
+
+          def initialize: (String name, Integer index) -> void
+        end
+
+        class InvalidModifier < InvalidFormatDescription
+          attr_reader value: String
+          attr_reader index: Integer
+
+          def initialize: (String value, Integer index) -> void
+        end
+
+        class MissingComponentName < InvalidFormatDescription
+          attr_reader index: Integer
+
+          def initialize: (Integer index) -> void
+        end
+
+        class MissingRequiredModifier < InvalidFormatDescription
+          attr_reader name: String
+          attr_reader index: Integer
+
+          def initialize: (String name, Integer index) -> void
+        end
+
+        class Expected < InvalidFormatDescription
+          attr_reader what: String
+          attr_reader index: Integer
+
+          def initialize: (String what, Integer index) -> void
+        end
+
+        class NotSupported < InvalidFormatDescription
+          attr_reader what: String
+          attr_reader context: String
+          attr_reader index: Integer
+
+          def initialize: (String what, String context, Integer index) -> void
+        end
+
+        class DuplicateModifier < InvalidFormatDescription
+          attr_reader name: String
+          attr_reader index: Integer
+
+          def initialize: (String name, Integer index) -> void
+        end
+
+        class InvalidModifierCombination < InvalidFormatDescription
+          attr_reader modifier: String
+          attr_reader context: String
+          attr_reader index: Integer
+
+          def initialize: (String modifier, String context, Integer index) -> void
+        end
+      end
+    end
+  end
+end

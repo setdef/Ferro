@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    module FormatDescription
+      type description = FormatDescriptionV3 | singleton(WellKnown::Rfc2822) | singleton(WellKnown::Rfc3339)
+                       | WellKnown::Iso8601 | singleton(WellKnown::Iso8601)
+
+      def self.parse_borrowed: (Integer version, String input) -> FormatDescriptionV3
+      def self.parse_owned: (Integer version, String input) -> FormatDescriptionV3
+    end
+  end
+end

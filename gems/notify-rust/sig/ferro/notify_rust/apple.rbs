@@ -42,7 +42,7 @@ module Ferro
     end
 
     class Notification
-      def schedule: (Time time) -> NotificationHandle
+      def schedule: (::Time time) -> NotificationHandle
       def schedule_raw: (Float | Integer timestamp) -> NotificationHandle
 
       private

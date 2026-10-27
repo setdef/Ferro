@@ -1,0 +1,177 @@
+--
+SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: CC-BY-SA-4.0
+++
+
+= ferro-time
+
+{rdoc-image:https://justin.searls.co/img/shovelware.svg}[https://justin.searls.co/shovelware/]
+
+Dates, times, offsets, and durations for Ruby, through time 0.3.55.
+
+Ruby's ::Time and ::Date answer most date questions, by Ruby's rules. A
+program that exchanges dates with a Rust service, or must agree with
+Tauri, needs the Rust side's rules instead: which ISO 8601 and RFC 3339
+strings parse, how RFC 2822 writes a date, how far a date may range, and
+the words an error uses. Getting those right by hand means porting a
+parser step for step and keeping the port current.
+
+ferro-time binds time (https://github.com/time-rs/time), Rust's date and
+time library, one to one. It keeps time's names and behavior and adds
+nothing of its own. Use it to parse a date the way a Rust program will,
+format one it will read back, or do calendar arithmetic with time's
+answers.
+
+== Install
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  bundle add ferro-time
+
+--
+SPDX-SnippetEnd
+++
+
+The gem compiles a Rust extension when it installs, so the machine that
+installs it needs Rust and Cargo: Rust 1.88 or newer, and 1.99 or newer on
+macOS 27, where earlier toolchains strip the extension in a way the new
+loader rejects. The build runs <tt>cargo --locked</tt>, so it compiles
+exactly the dependency versions this gem was tested with. To build against
+newer ones anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will
+do); it replaces <tt>--locked</tt>. Building needs no system libraries.
+
+== Use
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  require "ferro/time"
+
+  t = Ferro::Time
+  well_known = t::FormatDescription::WellKnown
+
+  # Parse an instant as time's ISO 8601 parser reads it:
+  at = t::OffsetDateTime.parse("2026-10-26T12:00:00.000Z", well_known::Iso8601::DEFAULT)
+  at.unix_timestamp # => 1_793_016_000
+
+  # Move it, and write it back:
+  later = (at + t::Duration.hours(36)).to_offset(t::UtcOffset.from_hms(9, 0, 0))
+  later.format(well_known::Rfc3339) # => "2026-10-28T09:00:00+09:00"
+
+  # Describe your own format, checked once and used as often as you like:
+  day = t::FormatDescription.parse_owned(3, "[weekday], [month repr:long] [day padding:none]")
+  later.format(day) # => "Wednesday, October 28"
+
+  # time's errors, as classes:
+  t::Date.from_calendar_date(2026, t::Month::February, 29)
+  # raises Ferro::Time::Error::ComponentRange: day was not in range
+
+--
+SPDX-SnippetEnd
+++
+
+Every error time raises is a Ferro::Time::Error, with a class for each of
+time's error types and variants nested as Rust nests them, so <tt>rescue
+Ferro::Time::Error::Parse</tt> catches any failed parse. Every message is
+time's own.
+
+== Ferro::Time, Ruby's Time, and Ruby's Date
+
+Ferro::Time::Time and Ferro::Time::Date are time's types, not Ruby's
+::Time and ::Date. The names are time's, and the module keeps them apart,
+with one consequence: wherever ferro-time is loaded, a bare +Time+ inside
+<tt>module Ferro</tt> names Ferro::Time, because Ruby looks a constant up
+lexically first. Code in the Ferro namespace writes <tt>::Time</tt> and
+<tt>::Date</tt> for Ruby's own.
+
+OffsetDateTime and UtcDateTime convert to and from Ruby's ::Time, which
+stands for Rust's +SystemTime+: OffsetDateTime.from(time), #to_time (a UTC
+::Time), and <tt>==</tt>, <tt><=></tt>, and <tt>-</tt> with a ::Time on the
+right, as time's +SystemTime+ impls do. Ruby's own ::Time is not
+changed; its <tt><=></tt> already asks the other value when that value is
+not a ::Time, so <tt>time == offset_date_time</tt> and
+<tt>time < offset_date_time</tt> work as well, while <tt>time - offset_date_time</tt>
+stays Ruby's +TypeError+. Nothing converts to or from Ruby's ::Date,
+because time has no conversion for it.
+
+== How it maps time
+
+The API is time's, translated where Rust has no Ruby meaning:
+
+* Rust's modules are Ruby modules: <tt>time::format_description::well_known::Rfc3339</tt>
+  is Ferro::Time::FormatDescription::WellKnown::Rfc3339. The aliases
+  +PrimitiveDateTime+ and +Duration+ are the same classes as PlainDateTime
+  and SignedDuration.
+* +Result+ raises; +Option+ is +nil+; tuples are Arrays; Month and Weekday
+  are frozen constants.
+* Every value is frozen and immutable, as Rust's +Copy+ values are, and
+  compares, orders, and hashes as time's +PartialEq+, +Ord+, and +Hash+ do.
+* Rust's operators are Ruby's: <tt>date + duration</tt>,
+  <tt>datetime - other</tt>, <tt>duration * 3</tt>, <tt>-offset</tt>.
+  Multiplying uses time's <tt>i32</tt> impl, Rust's type for an integer
+  literal, from either side: <tt>2 * duration</tt> reaches time's
+  reflexive impl through SignedDuration#coerce, and no other operator
+  takes a number on the left, as in Rust.
+* A description is a FormatDescriptionV3, the classes Rfc2822 and
+  Rfc3339, or an Iso8601 with any Config. +format_into+ appends to a
+  String.
+* time's macros check their input when Rust compiles; their run-time
+  equivalents are bound. <tt>date!(2020-01-02)</tt> is
+  <tt>Date.from_calendar_date(2020, Month::January, 2)</tt>; +time!+,
+  +offset!+, +datetime!+, and +utc_datetime!+ are Time.from_hms,
+  UtcOffset.from_hms, PlainDateTime.new with #assume_offset, and
+  UtcDateTime.new; and <tt>format_description!(version = 3, "...")</tt> is
+  <tt>FormatDescription.parse_owned(3, "...")</tt>.
+
+What differs from calling time from Rust:
+
+* time panics on arithmetic that leaves its range, on a NaN or
+  overflowing float, and on integer division by zero. The gem checks the
+  same conditions first and raises +RangeError+ with time's message, or
+  +ZeroDivisionError+, instead. Any other panic raises Ferro::Time::Error
+  with <tt>time panicked: ...</tt> rather than ending your Ruby process.
+* Formatting a type with a well-known format that needs more than the type
+  holds, such as RFC 3339 for a Date, is a compile-time error in Rust. The
+  gem raises +TypeError+ with time's assertion.
+* Each ISO 8601 configuration is its own compiled type in Rust. The gem
+  formats any configuration by formatting the date, time, and offset parts
+  with time's formatters and joining them as time does; a test checks the
+  result against time's own formatter.
+
+Not bound yet, each for a later release: +Timestamp+, +Parsed+ and
++parse_with_defaults+, the +iter+ module, version 1 and 2 and +strftime+
+format descriptions with their format items, the +unit+ module, and every
+impl with std's unsigned +Duration+. ferro-time's plan 007 says why for
+each. time's +serde+ and +macros+ features are built and add no Ruby API.
+
+time's +large-dates+ feature is off, as Tauri and its plugins build time,
+so years run from -9999 to 9999. The +rand+, +quickcheck+, and
++wasm-bindgen+ features are off: they serve Rust callers only.
+
+The local offset (UtcOffset.current_local_offset,
+OffsetDateTime.now_local) comes from the system's time-zone rules and is
+safe in a multi-threaded process, as time guarantees. Util.refresh_tz
+refreshes those rules only where time can prove the call sound: on macOS
+it runs, and on Linux, where a Ruby process is never single-threaded, it
+returns +nil+.
+
+The extension is Ractor-safe, and every value the gem makes is frozen and
+shareable. On Windows, Ruby 4.0.9 can hang when a Ractor starts a garbage
+collection while the main Ractor has another thread asleep; the bug is
+Ruby's (ferro-arboard's README says more).
+
+ferro-time 0.1.0.pre.1 binds time 0.3.55. The gem's version follows its
+own API; its +time_version+ metadata names the time release.
+
+== License
+
+ferro-time's code is MIT OR Apache-2.0, as time's is. This README is
+CC-BY-SA-4.0, and its code examples are MIT-0, so paste them freely. The
+lockfile is CC0-1.0. The license texts are in LICENSES/.
