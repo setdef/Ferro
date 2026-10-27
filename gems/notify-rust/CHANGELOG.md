@@ -12,6 +12,8 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0.pre.2] - 2026-10-27
+
 ### Fixed
 
 - Reading a field of a `Notification` shared between Ractors no longer hangs the process: Ruby values are made after the notification's lock is released, so a garbage collection never waits on a Ractor blocked in that lock.
@@ -29,5 +31,6 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 - Showing and waiting release Ruby's global VM lock; on Linux an interrupt ends a wait.
 - Built with notify-rust's `z` (zbus), `images`, and `chrono` features; `d`, `tokio`, `debug_namespace`, and `preview-macos-un` are not built.
 
-[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.1...HEAD
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.2...HEAD
+[0.1.0.pre.2]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.1...ferro-notify-rust/v0.1.0.pre.2
 [0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-notify-rust/v0.1.0.pre.1

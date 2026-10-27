@@ -12,6 +12,6 @@ module Ferro
     # It follows this gem's own API, not notify-rust's. The gemspec's
     # <tt>notify_rust_version</tt> metadata names the notify-rust release it
     # binds.
-    VERSION = "0.1.0.pre.1"
+    VERSION = "0.1.0.pre.2"
   end
 end
