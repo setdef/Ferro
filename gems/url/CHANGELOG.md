@@ -12,6 +12,8 @@ own API. Releases are tagged `ferro-url/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0.pre.1] - 2026-10-27
+
 ### Added
 
 - `Ferro::Url::Url` binding url 2.5.8: `parse`, `parse_with_params`, `from_str`, `try_from`, `options`, `join`, `make_relative`, every getter and setter, `origin`, `socket_addrs`, `from_file_path`, `from_directory_path`, `to_file_path`, slicing by `Position`, `check_invariants`, and the deprecated `into_string`.
@@ -22,4 +24,5 @@ own API. Releases are tagged `ferro-url/vX.Y.Z`.
 - `ParseError` with a subclass per variant, and `Error` for url's `Err(())` results. A panic inside url raises `Error` instead of ending the process.
 - Built with url's `serde` and `expose_internals` features.
 
-[Unreleased]: https://github.com/setdef/Ferro/commits/trunk/gems/url
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-url/v0.1.0.pre.1...HEAD
+[0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-url/v0.1.0.pre.1
