@@ -19,7 +19,7 @@ PATH
 PATH
   remote: gems/notify-rust
   specs:
-    ferro-notify-rust (0.1.0.pre.2)
+    ferro-notify-rust (0.1.0.pre.3)
       rb_sys (~> 0.9.129)
 
 PATH
@@ -222,7 +222,7 @@ CHECKSUMS
   ferro-arboard (0.1.0.pre.2)
   ferro-global-hotkey (0.1.0.pre.1)
   ferro-idna (0.1.0.pre.1)
-  ferro-notify-rust (0.1.0.pre.2)
+  ferro-notify-rust (0.1.0.pre.3)
   ferro-rfd (0.1.0.pre.2)
   ferro-time (0.1.0.pre.1)
   ferro-url (0.1.0.pre.1)

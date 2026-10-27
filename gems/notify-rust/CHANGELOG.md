@@ -12,6 +12,8 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0.pre.3] - 2026-10-27
+
 ### Fixed
 
 - On macOS, `Notification#schedule` accepts a Ruby `Time` again when ferro-time is loaded: it checks for `::Time`, which a bare `Time` inside `Ferro` no longer names once `Ferro::Time` exists.
@@ -35,6 +37,7 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 - Showing and waiting release Ruby's global VM lock; on Linux an interrupt ends a wait.
 - Built with notify-rust's `z` (zbus), `images`, and `chrono` features; `d`, `tokio`, `debug_namespace`, and `preview-macos-un` are not built.
 
-[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.2...HEAD
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.3...HEAD
+[0.1.0.pre.3]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.2...ferro-notify-rust/v0.1.0.pre.3
 [0.1.0.pre.2]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.1...ferro-notify-rust/v0.1.0.pre.2
 [0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-notify-rust/v0.1.0.pre.1
