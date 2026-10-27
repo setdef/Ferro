@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    module Origin : Object
+      def self.new_opaque: () -> Origin
+
+      def is_tuple: () -> bool
+      def ascii_serialization: () -> String
+      def unicode_serialization: () -> String
+
+      class Opaque < Data
+        include Origin
+
+        attr_reader value: OpaqueOrigin
+
+        def self.new: (OpaqueOrigin value) -> instance
+                    | (value: OpaqueOrigin) -> instance
+      end
+
+      class Tuple < Data
+        include Origin
+
+        attr_reader scheme: String
+        attr_reader host: Host
+        attr_reader port: Integer
+
+        def self.new: (String scheme, Host host, Integer port) -> instance
+                    | (scheme: String, host: Host, port: Integer) -> instance
+      end
+    end
+  end
+end

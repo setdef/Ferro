@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    class UrlQuery
+      @url: Url
+
+      private def self.new: (Url url) -> instance
+
+      def initialize: (Url url) -> void
+
+      private
+
+      attr_reader url: Url
+    end
+  end
+end

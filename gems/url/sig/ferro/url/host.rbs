@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    module Host : Object
+      include Comparable
+
+      def self.parse: (String input) -> Host
+      def self.parse_opaque: (String input) -> Host
+
+      def to_s: () -> String
+      def <=>: (Object other) -> Integer?
+
+      class Domain < Data
+        include Host
+
+        attr_reader domain: String
+
+        def self.new: (String domain) -> instance
+                    | (domain: String) -> instance
+      end
+
+      class Ipv4 < Data
+        include Host
+
+        attr_reader address: IPAddr
+
+        def self.new: (IPAddr address) -> instance
+                    | (address: IPAddr) -> instance
+      end
+
+      class Ipv6 < Data
+        include Host
+
+        attr_reader address: IPAddr
+
+        def self.new: (IPAddr address) -> instance
+                    | (address: IPAddr) -> instance
+      end
+    end
+  end
+end

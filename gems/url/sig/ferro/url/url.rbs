@@ -1,0 +1,74 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    class Url
+      include Comparable
+
+      @native: Native::Url
+
+      def self.parse: (String input) -> Url
+      def self.parse_with_params: (String input, Enumerable[[String, String]] iter) -> Url
+      def self.from_str: (String input) -> Url
+      def self.try_from: (String input) -> Url
+      def self.options: () -> ParseOptions
+      def self.from_file_path: (String | _ToPath path) -> Url
+      def self.from_directory_path: (String | _ToPath path) -> Url
+
+      private def self.new: () -> instance
+
+      def join: (String input) -> Url
+      def make_relative: (Url url) -> String?
+      def as_str: () -> String
+      def to_s: () -> String
+      def into_string: () -> String
+      def inspect: () -> String
+      def check_invariants: () -> nil
+      def origin: () -> Origin
+      def scheme: () -> String
+      def is_special: () -> bool
+      def has_authority: () -> bool
+      def authority: () -> String
+      def cannot_be_a_base: () -> bool
+      def username: () -> String
+      def password: () -> String?
+      def has_host: () -> bool
+      def host_str: () -> String?
+      def host: () -> Host?
+      def domain: () -> String?
+      def port: () -> Integer?
+      def port_or_known_default: () -> Integer?
+      def socket_addrs: () ?{ () -> Integer? } -> Array[Addrinfo]
+      def path: () -> String
+      def path_segments: () -> Enumerator[String, Array[String]]?
+      def query: () -> String?
+      def query_pairs: () -> Enumerator[[String, String], Array[[String, String]]]
+      def fragment: () -> String?
+      def set_fragment: (String? fragment) -> nil
+      def set_query: (String? query) -> nil
+      def query_pairs_mut: () -> FormUrlencoded::Serializer
+      def set_path: (String path) -> nil
+      def path_segments_mut: () -> PathSegmentsMut
+      def set_port: (Integer? port) -> nil
+      def set_host: (String? host) -> nil
+      def set_ip_host: (IPAddr address) -> nil
+      def set_password: (String? password) -> nil
+      def set_username: (String username) -> nil
+      def set_scheme: (String scheme) -> nil
+      def to_file_path: () -> String
+      def []: (Range[Position?] range) -> String
+      def ==: (Object other) -> bool
+      alias eql? ==
+      def <=>: (Object other) -> Integer?
+      def hash: () -> Integer
+
+      private
+
+      def initialize_native: (Native::Url native) -> void
+      def initialize_copy: (Url source) -> void
+      attr_reader native: Native::Url
+      def writable!: () -> void
+    end
+  end
+end

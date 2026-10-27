@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Idna
+    module Uts46
+      class Uts46
+        type callable = ^(String label, String tld, bool is_bidi) -> boolish
+                      | Proc
+
+        def self.default: () -> Uts46
+
+        def initialize: () -> void
+        def to_ascii: (String domain_name, AsciiDenyList ascii_deny_list, Hyphens hyphens, DnsLength dns_length) -> String
+        def to_unicode: (String domain_name, AsciiDenyList ascii_deny_list, Hyphens hyphens) -> pair
+        def to_user_interface: (String domain_name, AsciiDenyList ascii_deny_list, Hyphens hyphens, ?callable? output_as_unicode) ?{ (String label, String tld, bool is_bidi) -> boolish } -> pair
+        def process: (String domain_name, AsciiDenyList ascii_deny_list, Hyphens hyphens, ErrorPolicy error_policy, callable output_as_unicode, String sink, String? ascii_sink) -> ProcessingSuccess
+
+        private
+
+        def callback: (callable? output_as_unicode, Proc? block) -> callable
+        def check_sink: (Object sink) -> void
+        def settle: (String outcome) -> ProcessingSuccess
+      end
+    end
+  end
+end

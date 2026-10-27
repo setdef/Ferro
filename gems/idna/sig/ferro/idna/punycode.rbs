@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Idna
+    module Punycode
+      def self.decode_to_string: (String input) -> String?
+      def self.decode: (String input) -> Array[String]?
+      def self.encode_str: (String input) -> String?
+      def self.encode: (Array[String] input) -> String?
+    end
+  end
+end

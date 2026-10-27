@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Idna
+    module Uts46
+      class AsciiDenyList
+        EMPTY: AsciiDenyList
+        STD3: AsciiDenyList
+        URL: AsciiDenyList
+
+        @native: Native::AsciiDenyList
+
+        def self.new: (bool deny_glyphless, String deny_list) -> AsciiDenyList
+
+        private def self.from_native: (Native::AsciiDenyList native) -> AsciiDenyList
+
+        def initialize: (Native::AsciiDenyList native) -> void
+        def ==: (Object other) -> bool
+
+        private
+
+        attr_reader native: Native::AsciiDenyList
+      end
+    end
+  end
+end

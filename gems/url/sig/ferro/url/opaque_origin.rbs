@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    class OpaqueOrigin
+      @native: Native::OpaqueOrigin
+
+      private def self.new: (Native::OpaqueOrigin native) -> instance
+
+      def initialize: (Native::OpaqueOrigin native) -> void
+      def ==: (Object other) -> bool
+      alias eql? ==
+      def hash: () -> Integer
+      def inspect: () -> String
+
+      private
+
+      attr_reader native: Native::OpaqueOrigin
+    end
+  end
+end

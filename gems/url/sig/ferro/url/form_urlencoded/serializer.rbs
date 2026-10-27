@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    module FormUrlencoded
+      class Serializer
+        @target: String | UrlQuery
+        @start_position: Integer?
+        @encoding: Object?
+        @finished: bool
+
+        def self.new: (String target) -> Serializer
+        def self.for_suffix: (String target, Integer start_position) -> Serializer
+
+        private def self.over_url_query: (UrlQuery query) -> Serializer
+
+        def initialize: (String | UrlQuery target, Integer? start_position) -> void
+        def clear: () -> self
+        def encoding_override: (Object? new) -> self
+        def append_pair: (String name, String value) -> self
+        def append_key_only: (String name) -> self
+        def extend_pairs: (Enumerable[[String, String]] iter) -> self
+        def extend_keys_only: (Enumerable[String] iter) -> self
+        def finish: () -> (String | Url)
+
+        private
+
+        def run: (operation operation, Array[String] texts) -> self
+        def encode: (Array[String] texts) -> encodings?
+      end
+    end
+  end
+end

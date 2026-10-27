@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    class SyntaxViolation
+      Backslash: SyntaxViolation
+      C0SpaceIgnored: SyntaxViolation
+      EmbeddedCredentials: SyntaxViolation
+      ExpectedDoubleSlash: SyntaxViolation
+      ExpectedFileDoubleSlash: SyntaxViolation
+      FileWithHostAndWindowsDrive: SyntaxViolation
+      NonUrlCodePoint: SyntaxViolation
+      NullInFragment: SyntaxViolation
+      PercentDecode: SyntaxViolation
+      TabOrNewlineIgnored: SyntaxViolation
+      UnencodedAtSign: SyntaxViolation
+
+      @name: Symbol
+      @description: String
+
+      private def self.new: (Symbol name) -> instance
+
+      attr_reader description: String
+
+      def initialize: (Symbol name) -> void
+      def to_s: () -> String
+      def inspect: () -> String
+    end
+  end
+end

@@ -1,0 +1,161 @@
+--
+SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: CC-BY-SA-4.0
+++
+
+= ferro-url
+
+{rdoc-image:https://justin.searls.co/img/shovelware.svg}[https://justin.searls.co/shovelware/]
+
+URLs the way browsers read them, for Ruby, through url 2.5.8.
+
+Browsers parse URLs by the WHATWG URL Standard. Ruby's +URI+ follows RFC
+3986, an older grammar, so the two disagree about strings people type
+every day: a backslash for a slash, a missing pair of slashes, a host in
+Unicode, a port of 99999. A Ruby program that must agree with a browser,
+or with a Tauri app, gets different answers from +URI+.
+
+ferro-url binds url (https://github.com/servo/rust-url), the crate Servo,
+Firefox's Rust code, and Tauri use, one to one. It keeps url's names and
+behavior, and its form_urlencoded module, and adds nothing of its own. Use
+it to validate a link the way a webview will follow it, resolve relative
+references against a page, change a URL's parts with a browser's setters,
+or read and write query strings.
+
+== Install
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  bundle add ferro-url
+
+--
+SPDX-SnippetEnd
+++
+
+The gem compiles a Rust extension when it installs, so the machine that
+installs it needs Rust and Cargo: Rust 1.88 or newer, and 1.99 or newer on
+macOS 27, where earlier toolchains strip the extension in a way the new
+loader rejects. The build runs <tt>cargo --locked</tt>, so it compiles
+exactly the dependency versions this gem was tested with. To build against
+newer ones anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will
+do); it replaces <tt>--locked</tt>. url's Unicode data comes from ICU4X
+through idna and is compiled in, so building needs no system libraries.
+
+== Use
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  require "ferro/url"
+
+  url = Ferro::Url::Url.parse("https://github.com/rust-lang/rust/issues?labels=E-easy&state=open")
+  url.scheme               # => "https"
+  url.host_str             # => "github.com"
+  url.path_segments.to_a   # => ["rust-lang", "rust", "issues"]
+  url.query_pairs.to_a     # => [["labels", "E-easy"], ["state", "open"]]
+
+  Ferro::Url::Url.parse("../main.css")
+  # raises Ferro::Url::ParseError::RelativeUrlWithoutBase: relative URL without a base
+
+  page = Ferro::Url::Url.parse("http://servo.github.io/rust-url/url/index.html")
+  page.join("../main.css").as_str # => "http://servo.github.io/rust-url/main.css"
+
+  url.set_query(nil)
+  url.query_pairs_mut.append_pair("q", "café & crème")
+  url.as_str # => "https://github.com/rust-lang/rust/issues?q=caf%C3%A9+%26+cr%C3%A8me"
+
+--
+SPDX-SnippetEnd
+++
+
+A string that is not a URL raises a subclass of Ferro::Url::ParseError
+with url's message, the text a Tauri app reports. The setters url answers
+only yes or no for, such as +set_port+ on a <tt>mailto:</tt> URL, raise
+Ferro::Url::Error instead of failing in silence.
+
+== How it maps url
+
+The API is url's, translated where Rust has no Ruby meaning:
+
+* <tt>url::Url</tt> is Ferro::Url::Url, beside url's other root items:
+  Host, Origin, OpaqueOrigin, ParseError, SyntaxViolation, Position,
+  ParseOptions, PathSegmentsMut, UrlQuery. url re-exports the
+  form_urlencoded crate, which is Ferro::Url::FormUrlencoded, and its
+  hidden +quirks+ module, the WHATWG URL API's getters and setters, is
+  Ferro::Url::Quirks.
+* A Url changes in place, as in Rust. +dup+ copies it, a frozen Url
+  refuses every setter, and URLs compare and hash by their serialization.
+  +inspect+ is url's +Debug+ text.
+* Host's and Origin's variants are Data classes; addresses are IPAddr, and
+  socket_addrs returns Addrinfo.
+* <tt>url[Position::BeforePath..]</tt> slices as url's +Index+ impls do,
+  with Ruby ranges of Position.
+* ParseOptions is a frozen value whose setters return a new one, as
+  Rust's +Copy+ value does. Its callbacks, and a Serializer's encoding
+  override, are any callables.
+* +path_segments_mut+ and +query_pairs_mut+ return objects that change the
+  URL with each call, where Rust's borrow the URL until dropped;
+  +query_pairs_mut+ gives the URL its <tt>?</tt> at once, as url's does.
+* +path_segments+, +query_pairs+, and FormUrlencoded's +parse+ and
+  +byte_serialize+ return Enumerators.
+
+What differs from calling url from Rust:
+
+* A <tt>Result<_, ()></tt> raises Ferro::Url::Error, which url does not
+  have, with a message naming the function.
+* Where Rust would panic, the gem raises instead: Error for a Serializer
+  used after +finish+ and for a slice that runs backward, +ArgumentError+
+  for a +for_suffix+ start past the end of its target. Any other panic
+  inside url raises Error with <tt>url panicked: ...</tt> rather than
+  ending your Ruby process, and a Url keeps its value from before the call.
+* +socket_addrs+ resolves the host on a thread of its own and waits with
+  Ruby's global VM lock released, so other threads run, and Ctrl-C,
+  <tt>Thread#raise</tt>, and +Timeout+ end the wait at once; the lookup,
+  which nothing can cancel, then finishes alone, as Ruby's own
+  <tt>Addrinfo.getaddrinfo</tt> leaves its resolver thread. Every other
+  call keeps the lock.
+* Nothing of Ruby's runs while a Url's native lock is held, so threads and
+  Ractors sharing one Url never wait on each other inside the VM.
+* A Serializer calls its encoding override for each name and value before
+  form_urlencoded runs, in form_urlencoded's order, rather than during.
+* Not bound: +serialize_internal+ and +deserialize_internal+, which exist
+  for serde.
+
+url's +std+, +serde+, and +expose_internals+ features are built; +serde+
+adds no Ruby API, since the string serde writes is Url#as_str. Its
++debugger_visualizer+ feature names a file the published crate does not
+include, so it cannot build and is left off; it would add no Ruby API.
+
+url keeps one piece of process-wide state, the counter that numbers opaque
+origins, and nothing the operating system holds, so another library in the
+same process may link its own copy. url's host parser uses its own copy of
+idna; ferro-idna binds idna directly and locks the same release.
+
+The extension is Ractor-safe; Host, Origin, Position, SyntaxViolation, and
+a frozen Url may cross Ractors. On Windows, Ruby 4.0.9 can hang when a
+Ractor starts a garbage collection while the main Ractor has another
+thread asleep; the bug is Ruby's (ferro-arboard's README says more).
+
+ferro-url 0.1.0.pre.1 binds url 2.5.8 and form_urlencoded 1.2.2. The gem's
+version follows its own API; its +url_version+ metadata names the url
+release.
+
+== License
+
+ferro-url's code is MIT OR Apache-2.0, as url's is. The Unicode data and
+the ICU4X crates that read it, which Cargo downloads to build the
+extension (url reaches them through idna, and idna through idna_adapter:
+icu_normalizer, icu_properties, their +_data+ crates, zerovec, and the
+rest), are Unicode-3.0. This gem ships none of their code, only the
+lockfile that names them, so it carries no copy of that license; a
+precompiled gem, which would contain them, would ship
+LICENSES/Unicode-3.0.txt. This README is CC-BY-SA-4.0, and its code
+examples are MIT-0, so paste them freely. The lockfile is CC0-1.0. The
+license texts are in LICENSES/.

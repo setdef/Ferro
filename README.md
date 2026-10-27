@@ -12,9 +12,9 @@ Ruby gems that bind Rust crates one to one.
 
 Rust has well-tested crates for jobs Ruby's standard library leaves alone:
 the system clipboard, native file dialogs, desktop notifications, global
-hotkeys. Binding one yourself means writing and maintaining native code, and
-a binding that invents its own API leaves you translating between its docs
-and the crate's.
+hotkeys, URLs parsed the way browsers parse them. Binding one yourself
+means writing and maintaining native code, and a binding that invents its
+own API leaves you translating between its docs and the crate's.
 
 Each Ferro gem binds one crate and mirrors it: the crate's names, errors,
 and behavior, translated only where Rust has no Ruby meaning. The crate's
@@ -29,6 +29,8 @@ own documentation stays your guide. Ferro spun out of
 | [ferro-rfd](gems/rfd/README.rdoc) | [rfd](https://github.com/PolyMeilex/rfd) 0.17.2, native file and message dialogs | 0.1.0.pre.2 |
 | [ferro-notify-rust](gems/notify-rust/README.rdoc) | [notify-rust](https://github.com/hoodie/notify-rust) 4.18.2, desktop notifications | 0.1.0.pre.1, unreleased |
 | [ferro-global-hotkey](gems/global-hotkey/README.rdoc) | [global-hotkey](https://github.com/tauri-apps/global-hotkey) 0.9.0, global hotkeys | 0.1.0.pre.1, unreleased |
+| [ferro-idna](gems/idna/README.rdoc) | [idna](https://github.com/servo/rust-url/tree/main/idna) 1.1.0, internationalized domain names | 0.1.0.pre.1, unreleased |
+| [ferro-url](gems/url/README.rdoc) | [url](https://github.com/servo/rust-url) 2.5.8, WHATWG URLs | 0.1.0.pre.1, unreleased |
 
 ## Using a gem
 
@@ -97,8 +99,9 @@ a crate becomes a gem.
 
 Each gem takes its crate's license: ferro-arboard is MIT OR Apache-2.0, as
 arboard is, ferro-rfd is MIT, as rfd is, ferro-notify-rust is MIT OR
-Apache-2.0, as notify-rust is, and ferro-global-hotkey is Apache-2.0 OR
-MIT, as global-hotkey is. The repository's tooling is
+Apache-2.0, as notify-rust is, ferro-global-hotkey is Apache-2.0 OR MIT,
+as global-hotkey is, and ferro-idna and ferro-url are MIT OR Apache-2.0,
+as idna and url are. The repository's tooling is
 AGPL-3.0-or-later. Documentation is CC-BY-SA-4.0, code snippets in it are
 MIT-0, and lockfiles are CC0-1.0. Every file says which applies;
 [REUSE](https://reuse.software) checks it, and the texts are in

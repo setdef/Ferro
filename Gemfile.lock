@@ -11,6 +11,12 @@ PATH
       rb_sys (~> 0.9.129)
 
 PATH
+  remote: gems/idna
+  specs:
+    ferro-idna (0.1.0.pre.1)
+      rb_sys (~> 0.9.129)
+
+PATH
   remote: gems/notify-rust
   specs:
     ferro-notify-rust (0.1.0.pre.1)
@@ -20,6 +26,12 @@ PATH
   remote: gems/rfd
   specs:
     ferro-rfd (0.1.0.pre.2)
+      rb_sys (~> 0.9.129)
+
+PATH
+  remote: gems/url
+  specs:
+    ferro-url (0.1.0.pre.1)
       rb_sys (~> 0.9.129)
 
 GEM
@@ -174,8 +186,10 @@ PLATFORMS
 DEPENDENCIES
   ferro-arboard!
   ferro-global-hotkey!
+  ferro-idna!
   ferro-notify-rust!
   ferro-rfd!
+  ferro-url!
   fiddle
   irb
   minitest (~> 6.0)
@@ -200,8 +214,10 @@ CHECKSUMS
   erb (6.0.7) sha256=c5ca6dc25b0ef974a44dc8f59fe847577122483b1968a38dec305c60bf91ee92
   ferro-arboard (0.1.0.pre.2)
   ferro-global-hotkey (0.1.0.pre.1)
+  ferro-idna (0.1.0.pre.1)
   ferro-notify-rust (0.1.0.pre.1)
   ferro-rfd (0.1.0.pre.2)
+  ferro-url (0.1.0.pre.1)
   ffi (1.17.4) sha256=bcd1642e06f0d16fc9e09ac6d49c3a7298b9789bcb58127302f934e437d60acf
   ffi (1.17.4-aarch64-linux-gnu) sha256=b208f06f91ffd8f5e1193da3cae3d2ccfc27fc36fba577baf698d26d91c080df
   ffi (1.17.4-aarch64-linux-musl) sha256=9286b7a615f2676245283aef0a0a3b475ae3aae2bb5448baace630bb77b91f39

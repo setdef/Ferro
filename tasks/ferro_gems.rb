@@ -29,8 +29,22 @@ require_relative "package_check"
 #   file may serve several platforms; rbs:parity skips the others.
 # [platform_probe] Ruby source that prints the extension's platform name.
 # [smoke] Ruby source the packaging check runs against the built gem.
+# [rbs_libraries] The standard libraries whose types the gem's signatures
+#   name, such as +ipaddr+ for ferro-url's IPAddr; none by default.
 class FerroGem < Data.define(:short_name, :name, :crate, :extension, :packaged, :native_namespace,
-  :platform_sigs, :platform_probe, :smoke)
+  :platform_sigs, :platform_probe, :smoke, :rbs_libraries)
+  # Creates the description, with no standard libraries unless given.
+  def initialize(rbs_libraries: [], **fields)
+    super
+  end
+
+  # The arguments of <tt>rbs validate</tt> for +gems+: every standard
+  # library their signatures name, then each gem's signature directory.
+  def self.rbs_validate_arguments(gems)
+    libraries = gems.flat_map(&:rbs_libraries).uniq.flat_map { |library| ["-r", library] }
+    [*libraries, *gems.flat_map { |gem| ["-I", File.join(gem.dir, "sig")] }, "validate"]
+  end
+
   # The gem's directory, relative to the repository.
   def dir
     File.join("gems", short_name)
@@ -213,5 +227,59 @@ FERRO_GEMS = [
       rescue Ferro::GlobalHotkey::GlobalHotKeyEventReceiver::TryRecvError::Empty
       end
       puts "ferro-global-hotkey \#{Ferro::GlobalHotkey::VERSION} loads its extension (\#{hotkey.class})"
+    RUBY
+  FerroGem.new(
+    short_name: "idna",
+    name: "ferro-idna",
+    crate: "ext/ferro_idna",
+    extension: "lib/ferro/idna/ferro_idna",
+    packaged: %w[lib sig ext Cargo.toml Cargo.lock Cargo.lock.license README.rdoc CHANGELOG.md LICENSES],
+    native_namespace: "Ferro::Idna",
+    platform_sigs: {},
+    platform_probe: %(require "ferro/idna"; print "any"),
+    smoke: <<~RUBY),
+      require "ferro/idna"
+      # idna is pure computation over Unicode tables compiled into the
+      # extension, so the smoke test runs it: UTS 46 to ASCII and back, and
+      # a deny list idna would panic on, refused first.
+      ascii = Ferro::Idna.domain_to_ascii_cow("B\u00FCcher.example", Ferro::Idna::AsciiDenyList::URL)
+      abort "idna did not encode the domain: \#{ascii}" unless ascii == "xn--bcher-kva.example"
+      abort "idna did not decode the domain" unless Ferro::Idna.domain_to_unicode(ascii) == ["b\u00FCcher.example", nil]
+      begin
+        Ferro::Idna::AsciiDenyList.new(false, "a")
+        abort "a letter reached idna's deny list"
+      rescue ArgumentError
+      end
+      puts "ferro-idna \#{Ferro::Idna::VERSION} loads its extension (\#{ascii})"
+    RUBY
+  FerroGem.new(
+    short_name: "url",
+    name: "ferro-url",
+    crate: "ext/ferro_url",
+    extension: "lib/ferro/url/ferro_url",
+    packaged: %w[lib sig ext Cargo.toml Cargo.lock Cargo.lock.license README.rdoc CHANGELOG.md LICENSES],
+    native_namespace: "Ferro::Url",
+    platform_sigs: {},
+    rbs_libraries: %w[ipaddr socket],
+    platform_probe: %(require "ferro/url"; print "any"),
+    smoke: <<~RUBY),
+      require "ferro/url"
+      # url is pure computation, so the smoke test runs it: a parse, a
+      # join, url's own error, and a slice the gem refuses before Rust's
+      # slicing would panic.
+      url = Ferro::Url::Url.parse("https://B\u00FCcher.example/a/b?q=1#top")
+      abort "url did not parse the URL: \#{url}" unless url.host_str == "xn--bcher-kva.example"
+      abort "url did not join" unless url.join("../c").as_str == "https://xn--bcher-kva.example/c"
+      begin
+        Ferro::Url::Url.parse("../main.css")
+        abort "a relative URL parsed without a base"
+      rescue Ferro::Url::ParseError::RelativeUrlWithoutBase
+      end
+      begin
+        url[Ferro::Url::Position::AfterPath...Ferro::Url::Position::BeforePath]
+        abort "a backward slice reached Rust"
+      rescue Ferro::Url::Error
+      end
+      puts "ferro-url \#{Ferro::Url::VERSION} loads its extension (\#{url})"
     RUBY
 ].freeze

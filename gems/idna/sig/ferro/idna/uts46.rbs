@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Idna
+    module Uts46
+      def self.verify_dns_length: (String domain_name, bool allow_trailing_dot) -> bool
+    end
+  end
+end

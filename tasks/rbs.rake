@@ -37,7 +37,7 @@ end
 namespace :rbs do
   desc "Validate every gem's signatures"
   task :validate do
-    sh "bundle", "exec", "rbs", *FERRO_GEMS.flat_map { |gem| ["-I", File.join(gem.dir, "sig")] }, "validate"
+    sh "bundle", "exec", "rbs", *FerroGem.rbs_validate_arguments(FERRO_GEMS)
   end
 
   namespace :parity do

@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Idna
+    class Config
+      @flags: flags
+
+      private def self.new: (bool use_std3_ascii_rules, bool transitional_processing, bool verify_dns_length, bool check_hyphens) -> instance
+
+      def self.default: () -> Config
+
+      def initialize: (bool use_std3_ascii_rules, bool transitional_processing, bool verify_dns_length, bool check_hyphens) -> void
+      def use_std3_ascii_rules: (boolish value) -> Config
+      def transitional_processing: (boolish value) -> Config
+      def verify_dns_length: (boolish value) -> Config
+      def check_hyphens: (boolish value) -> Config
+      def use_idna_2008_rules: (bool value) -> self
+      def to_ascii: (String domain) -> String
+      def to_unicode: (String domain) -> pair
+
+      private
+
+      attr_reader flags: flags
+
+      def with: (Integer index, boolish value) -> Config
+    end
+
+    ConfigType: singleton(Config)
+  end
+end

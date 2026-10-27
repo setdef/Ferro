@@ -20,6 +20,44 @@ class TestFerroGems < Minitest::Test
       platform_sigs: {}, platform_probe: "", smoke: "", **overrides)
   end
 
+  # Most gems' signatures name only their own types and core's; one that
+  # names a standard library's, as ferro-url names IPAddr, lists it.
+  def test_a_gem_needs_no_standard_library_signatures_unless_it_says_so
+    assert_empty gem.rbs_libraries
+    assert_equal %w[ipaddr socket], gem(rbs_libraries: %w[ipaddr socket]).rbs_libraries
+    assert_equal %w[ipaddr socket], FERRO_GEMS.find { |ferro_gem| ferro_gem.short_name == "url" }.rbs_libraries
+  end
+
+  # rbs validate loads each standard library once, before the gems'
+  # signature directories, so a gem's IPAddr resolves.
+  def test_rbs_validate_loads_the_libraries_the_gems_name
+    plain = gem
+    urlish = gem(short_name: "url", rbs_libraries: %w[ipaddr socket])
+    other = gem(short_name: "idna", rbs_libraries: %w[ipaddr])
+
+    assert_equal [
+      "-r",
+      "ipaddr",
+      "-r",
+      "socket",
+      "-I",
+      "gems/notify-rust/sig",
+      "-I",
+      "gems/url/sig",
+      "-I",
+      "gems/idna/sig",
+      "validate",
+], FerroGem.rbs_validate_arguments([plain, urlish, other])
+  end
+
+  # Steep checks each gem with the same libraries rbs validate loads.
+  def test_steep_targets_come_from_the_registered_gems
+    steepfile = File.read(File.join(ROOT, "Steepfile"))
+
+    assert_includes steepfile, "FERRO_GEMS.each"
+    assert_includes steepfile, "library(*ferro_gem.rbs_libraries)"
+  end
+
   # A crate with a hyphen has a require path that follows its Rust name,
   # not the gem name with the hyphen turned into a slash (plan 003).
   def test_the_version_file_sits_beside_the_extension

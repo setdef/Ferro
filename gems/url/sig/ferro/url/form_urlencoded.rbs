@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    module FormUrlencoded
+      def self.parse: (String input) -> Enumerator[[String, String], Array[[String, String]]]
+      def self.byte_serialize: (String input) -> Enumerator[String, Array[String]]
+    end
+  end
+end

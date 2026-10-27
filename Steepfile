@@ -5,23 +5,15 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #++
 
-# One target per gem, so each gem's signatures check its own code.
-target :arboard do
-  signature "gems/arboard/sig"
-  check "gems/arboard/lib"
-end
+require_relative "tasks/ferro_gems"
 
-target :rfd do
-  signature "gems/rfd/sig"
-  check "gems/rfd/lib"
-end
-
-target :"notify-rust" do
-  signature "gems/notify-rust/sig"
-  check "gems/notify-rust/lib"
-end
-
-target :"global-hotkey" do
-  signature "gems/global-hotkey/sig"
-  check "gems/global-hotkey/lib"
+# One target per gem, so each gem's signatures check its own code, with the
+# standard libraries its signatures name (FerroGem#rbs_libraries), the same
+# list rbs:validate loads.
+FERRO_GEMS.each do |ferro_gem|
+  target ferro_gem.short_name.to_sym do
+    signature File.join(ferro_gem.dir, "sig")
+    check File.join(ferro_gem.dir, "lib")
+    library(*ferro_gem.rbs_libraries) unless ferro_gem.rbs_libraries.empty?
+  end
 end

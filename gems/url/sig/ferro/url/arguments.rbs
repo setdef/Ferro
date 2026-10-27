@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    module Arguments
+      def self.url: (Native::Url native) -> Url
+      def self.native: (Object url) -> Native::Url
+      def self.host: (host_parts parts) -> Host
+      def self.host_parts: (Host host) -> host_parts
+      def self.address: (Object address, :ipv4? | :ipv6? family) -> Integer
+      def self.origin: (origin_parts parts) -> Origin
+      def self.origin_parts: (Origin origin) -> origin_parts
+      def self.encoded: (Object bytes) -> String
+      def self.path: (String | _ToPath path) -> String
+      def self.pairs: (Enumerable[[String, String]] pairs) -> Array[[String, String]]
+    end
+  end
+end

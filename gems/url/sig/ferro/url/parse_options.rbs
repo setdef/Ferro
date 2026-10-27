@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    class ParseOptions
+      @base_url: Url?
+      @encoding_override: Object?
+      @violation_fn: Object?
+
+      private def self.new: (Url? base_url, Object? encoding_override, Object? violation_fn) -> instance
+
+      def initialize: (Url? base_url, Object? encoding_override, Object? violation_fn) -> void
+      def base_url: (Url? new) -> ParseOptions
+      def encoding_override: (Object? new) -> ParseOptions
+      def syntax_violation_callback: (Object? new) -> ParseOptions
+      def parse: (String input) -> Url
+
+      private
+
+      def callable: (Object? new) -> Object?
+      def encoder: () -> (^(String) -> String)?
+      def reporter: () -> (^(Symbol) -> void)?
+    end
+  end
+end

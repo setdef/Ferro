@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    module Quirks
+      def self.domain_to_ascii: (String domain) -> String
+      def self.domain_to_unicode: (String domain) -> String
+      def self.href: (Url url) -> String
+      def self.origin: (Url url) -> String
+      def self.protocol: (Url url) -> String
+      def self.username: (Url url) -> String
+      def self.password: (Url url) -> String
+      def self.host: (Url url) -> String
+      def self.hostname: (Url url) -> String
+      def self.port: (Url url) -> String
+      def self.pathname: (Url url) -> String
+      def self.search: (Url url) -> String
+      def self.hash: (Url url) -> String
+      def self.set_href: (Url url, String value) -> nil
+      def self.set_protocol: (Url url, String value) -> nil
+      def self.set_username: (Url url, String value) -> nil
+      def self.set_password: (Url url, String value) -> nil
+      def self.set_host: (Url url, String value) -> nil
+      def self.set_hostname: (Url url, String value) -> nil
+      def self.set_port: (Url url, String value) -> nil
+      def self.set_pathname: (Url url, String value) -> nil
+      def self.set_search: (Url url, String value) -> nil
+      def self.set_hash: (Url url, String value) -> nil
+      def self.internal_components: (Url url) -> InternalComponents
+    end
+  end
+end

@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Idna
+    module Arguments
+      def self.bytes: (Object domain) -> String
+      def self.deny_list: (Object list) -> Native::AsciiDenyList
+      def self.variant: (Object value, Module enum) -> Symbol
+      def self.pair: ([String, bool] native) -> pair
+    end
+  end
+end

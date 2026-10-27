@@ -1,0 +1,144 @@
+--
+SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: CC-BY-SA-4.0
+++
+
+= ferro-idna
+
+{rdoc-image:https://justin.searls.co/img/shovelware.svg}[https://justin.searls.co/shovelware/]
+
+Internationalized domain names for Ruby, through idna 1.1.0.
+
+A person types <tt>bücher.example</tt>; DNS only knows ASCII. Getting from
+one to the other takes Unicode's IDNA rules, UTS #46: map each character,
+normalize, check the bidi and joiner rules, and encode each non-ASCII
+label in Punycode. Those rules need Unicode's data tables, which Ruby does
+not ship, so a Ruby program usually skips the check or shells out.
+
+ferro-idna binds idna (https://github.com/servo/rust-url/tree/main/idna),
+the crate Rust's url crate and the Servo browser engine use, one to one. It
+keeps idna's names and behavior and adds nothing of its own. Use it to turn
+a typed domain into the form DNS and URLs carry, show a stored
+<tt>xn--</tt> domain to a person, or check a domain the way a browser
+would.
+
+== Install
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  bundle add ferro-idna
+
+--
+SPDX-SnippetEnd
+++
+
+The gem compiles a Rust extension when it installs, so the machine that
+installs it needs Rust and Cargo: Rust 1.88 or newer, and 1.99 or newer on
+macOS 27, where earlier toolchains strip the extension in a way the new
+loader rejects. The build runs <tt>cargo --locked</tt>, so it compiles
+exactly the dependency versions this gem was tested with. To build against
+newer ones anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will
+do); it replaces <tt>--locked</tt>. idna's Unicode data comes from ICU4X
+and is compiled in, so building needs no system libraries.
+
+== Use
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  require "ferro/idna"
+
+  idna = Ferro::Idna
+
+  # The WHATWG URL Standard's domain to ASCII, as a browser runs it:
+  idna.domain_to_ascii_cow("Bücher.example", idna::AsciiDenyList::URL)
+  # => "xn--bcher-kva.example"
+
+  # Back to Unicode, for a person to read:
+  text, errors = idna.domain_to_unicode("xn--bcher-kva.example")
+  text   # => "bücher.example"
+  errors # => nil
+
+  # Every UTS 46 option, through Uts46:
+  uts46 = idna::Uts46
+  uts46::Uts46.new.to_ascii("-a.example", uts46::AsciiDenyList::STD3,
+    uts46::Hyphens::Check, uts46::DnsLength::Verify)
+  # raises Ferro::Idna::Errors
+
+--
+SPDX-SnippetEnd
+++
+
+Most applications want +domain_to_ascii_cow+ with AsciiDenyList::URL, as
+idna's own docs say. A domain that fails raises Ferro::Idna::Errors, which,
+like idna's, says only that the domain failed. The functions that turn a
+domain back into Unicode return their text even then, with each error
+marked by U+FFFD, and the Errors beside it rather than raised; that text is
+for a person, never for a lookup.
+
+== How it maps idna
+
+The API is idna's, translated where Rust has no Ruby meaning:
+
+* Rust's modules are Ruby modules: <tt>idna::uts46::Uts46</tt> is
+  Ferro::Idna::Uts46::Uts46, and <tt>idna::punycode</tt> is
+  Ferro::Idna::Punycode. AsciiDenyList is in both places, as idna
+  re-exports it.
+* A function that returns a tuple with a +Result+ inside, such as
+  +domain_to_unicode+, returns <tt>[text, nil]</tt> or
+  <tt>[text, errors]</tt>, so the text survives.
+* Enum variants are constants: <tt>Hyphens::Allow</tt>,
+  <tt>DnsLength::Verify</tt>, <tt>ErrorPolicy::MarkErrors</tt>,
+  <tt>ProcessingSuccess::Passthrough</tt>. +ProcessingError+ raises,
+  with a subclass per variant.
+* Uts46#process writes to Strings you pass as its sinks, so
+  +SinkError+ never happens. Its +output_as_unicode+ callback, and
+  #to_user_interface's, is any callable, or a block for the latter; it
+  gets each label and the TLD as Strings.
+* A Rust +char+ is a one-character String: Punycode.decode returns an
+  Array of them, as String#chars does, and Punycode.encode takes one.
+* The deprecated Config and Idna warn in Ruby's <tt>:deprecated</tt>
+  category. A Config is a frozen value whose setters return a new one,
+  as Rust's do on a +Copy+ value.
+
+What differs from calling idna from Rust:
+
+* idna panics for an AsciiDenyList that names a letter, a digit, a hyphen,
+  a dot, or non-ASCII, and for <tt>use_idna_2008_rules(true)</tt>. The gem
+  raises +ArgumentError+ with idna's message instead. Any other panic
+  inside idna raises Ferro::Idna::Errors with <tt>idna panicked: ...</tt>
+  rather than ending your Ruby process.
+* +verify_dns_length+ asserts its argument is ASCII only in debug builds.
+  The gem is a release build, so it answers for any String.
+
+idna's three Cargo features, +std+, +alloc+, and +compiled_data+, are its
+defaults and all built. idna keeps no state of its own, so another library
+in the same process may link its own copy; ferro-url does, and locks the
+same idna release.
+
+The extension is Ractor-safe, and every value the gem makes is frozen and
+shareable. On Windows, Ruby 4.0.9 can hang when a Ractor starts a garbage
+collection while the main Ractor has another thread asleep; the bug is
+Ruby's (ferro-arboard's README says more).
+
+ferro-idna 0.1.0.pre.1 binds idna 1.1.0. The gem's version follows its
+own API; its +idna_version+ metadata names the idna release.
+
+== License
+
+ferro-idna's code is MIT OR Apache-2.0, as idna's is. The Unicode data and
+the ICU4X crates that read it, which Cargo downloads to build the
+extension (idna reaches them through idna_adapter: icu_normalizer,
+icu_properties, their +_data+ crates, zerovec, and the rest), are
+Unicode-3.0. This gem ships none of their code, only the lockfile that
+names them, so it carries no copy of that license; a precompiled gem,
+which would contain them, would ship LICENSES/Unicode-3.0.txt. This README
+is CC-BY-SA-4.0, and its code examples are MIT-0, so paste them freely.
+The lockfile is CC0-1.0. The license texts are in LICENSES/.

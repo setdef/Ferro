@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+[package]
+name = "ferro_url"
+version = "0.1.0-pre.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Every url feature that builds is on (plan 005, decision 2): std is its
+# default, and debugger_visualizer names a file the published crate lacks.
+url = { version = "=2.5.8", features = ["serde", "expose_internals"] }
+# url's own form_urlencoded, named because the native layer writes to its
+# Serializer over a String target (plan 005, decision 19).
+form_urlencoded = "=1.2.2"
+magnus = { version = "0.9.3", features = ["bytes"] }
+rb-sys = "0.9.130"
+
+# Each crate states its lints itself instead of inheriting them with
+# `workspace = true`: an installed gem ships only its own workspace.
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+all = { level = "deny", priority = -1 }
+# Every unsafe block carries a SAFETY comment (AGENTS.md).
+undocumented_unsafe_blocks = "deny"
+
+# Unsafe code is denied. An exception gets #[allow(unsafe_code)] on its
+# block, a SAFETY comment citing its source, and a test (AGENTS.md).
+[lints.rust]
+unsafe_code = "deny"

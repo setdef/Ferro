@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    class ParseError < StandardError
+      MESSAGES: Hash[Symbol, String]
+
+      def initialize: (?String? message) -> void
+
+      class EmptyHost < ParseError
+      end
+
+      class IdnaError < ParseError
+      end
+
+      class InvalidPort < ParseError
+      end
+
+      class InvalidIpv4Address < ParseError
+      end
+
+      class InvalidIpv6Address < ParseError
+      end
+
+      class InvalidDomainCharacter < ParseError
+      end
+
+      class RelativeUrlWithoutBase < ParseError
+      end
+
+      class RelativeUrlWithCannotBeABaseBase < ParseError
+      end
+
+      class SetHostOnCannotBeABaseUrl < ParseError
+      end
+
+      class Overflow < ParseError
+      end
+    end
+  end
+end

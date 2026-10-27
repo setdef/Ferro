@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    class Position
+      include Comparable
+
+      BeforeScheme: Position
+      AfterScheme: Position
+      BeforeUsername: Position
+      AfterUsername: Position
+      BeforePassword: Position
+      AfterPassword: Position
+      BeforeHost: Position
+      AfterHost: Position
+      BeforePort: Position
+      AfterPort: Position
+      BeforePath: Position
+      AfterPath: Position
+      BeforeQuery: Position
+      AfterQuery: Position
+      BeforeFragment: Position
+      AfterFragment: Position
+
+      @name: Symbol
+      @index: Integer
+
+      private def self.new: (Symbol name, Integer index) -> instance
+
+      def initialize: (Symbol name, Integer index) -> void
+      def inspect: () -> String
+      def <=>: (Object other) -> Integer?
+
+      attr_reader index: Integer
+
+      private
+
+      attr_reader name: Symbol
+    end
+  end
+end

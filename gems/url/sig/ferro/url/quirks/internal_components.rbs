@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    module Quirks
+      class InternalComponents < Data
+        attr_reader scheme_end: Integer
+        attr_reader username_end: Integer
+        attr_reader host_start: Integer
+        attr_reader host_end: Integer
+        attr_reader port: Integer?
+        attr_reader path_start: Integer
+        attr_reader query_start: Integer?
+        attr_reader fragment_start: Integer?
+
+        def self.new: (Integer scheme_end, Integer username_end, Integer host_start, Integer host_end, Integer? port, Integer path_start, Integer? query_start, Integer? fragment_start) -> instance
+                    | (scheme_end: Integer, username_end: Integer, host_start: Integer, host_end: Integer, port: Integer?, path_start: Integer, query_start: Integer?, fragment_start: Integer?) -> instance
+      end
+    end
+  end
+end

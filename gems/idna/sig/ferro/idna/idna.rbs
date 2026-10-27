@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Idna
+    class Idna
+      @config: Config
+
+      def self.default: () -> Idna
+
+      def initialize: (Config config) -> void
+      def to_ascii: (String domain, String out) -> nil
+      def to_unicode: (String domain, String out) -> nil
+
+      private
+
+      def run: (:idna_to_ascii | :idna_to_unicode function, String domain, String out) -> nil
+    end
+  end
+end

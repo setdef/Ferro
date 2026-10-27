@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    class PathSegmentsMut
+      @url: Url
+
+      private def self.new: (Url url) -> instance
+
+      def initialize: (Url url) -> void
+      def clear: () -> self
+      def pop_if_empty: () -> self
+      def pop: () -> self
+      def push: (String segment) -> self
+      def extend: (Enumerable[String] segments) -> self
+
+      private
+
+      def run: (operation operation) -> self
+    end
+  end
+end

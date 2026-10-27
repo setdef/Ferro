@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Idna
+    module Uts46
+      class ProcessingError < StandardError
+        class ValidityError < ProcessingError
+          def initialize: (?String? message) -> void
+        end
+
+        class SinkError < ProcessingError
+          def initialize: (?String? message) -> void
+        end
+      end
+    end
+  end
+end

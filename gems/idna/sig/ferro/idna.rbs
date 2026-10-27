@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Idna
+    VERSION: String
+    AsciiDenyList: singleton(Uts46::AsciiDenyList)
+
+    type flags = [bool, bool, bool, bool]
+    type pair = [String, Errors?]
+
+    def self.domain_to_ascii_cow: (String domain, Uts46::AsciiDenyList ascii_deny_list) -> String
+    def self.domain_to_ascii_from_cow: (String domain, Uts46::AsciiDenyList ascii_deny_list) -> String
+    def self.domain_to_ascii: (String domain) -> String
+    def self.domain_to_ascii_strict: (String domain) -> String
+    def self.domain_to_unicode: (String domain) -> pair
+
+    module Native
+      def self.ascii_deny_list_new: (bool deny_glyphless, String deny_list) -> AsciiDenyList
+      def self.ascii_deny_list_constant: (:EMPTY | :STD3 | :URL name) -> AsciiDenyList
+      def self.ascii_deny_list_eq: (AsciiDenyList left, AsciiDenyList right) -> bool
+      def self.domain_to_ascii_cow: (String domain, AsciiDenyList list) -> String
+      def self.domain_to_ascii_from_cow: (String domain, AsciiDenyList list) -> String
+      def self.domain_to_ascii: (String domain) -> String
+      def self.domain_to_ascii_strict: (String domain) -> String
+      def self.domain_to_unicode: (String domain) -> [String, bool]
+      def self.punycode_decode_to_string: (String input) -> String?
+      def self.punycode_decode: (String input) -> Array[String]?
+      def self.punycode_encode_str: (String input) -> String?
+      def self.punycode_encode: (Array[String] input) -> String?
+      def self.verify_dns_length: (String domain_name, bool allow_trailing_dot) -> bool
+      def self.uts46_to_ascii: (String domain_name, AsciiDenyList list, Symbol hyphens, Symbol dns_length) -> String
+      def self.uts46_to_unicode: (String domain_name, AsciiDenyList list, Symbol hyphens) -> [String, bool]
+      def self.uts46_to_user_interface: (String domain_name, AsciiDenyList list, Symbol hyphens, Uts46::Uts46::callable decide) -> [String, bool]
+      def self.uts46_process: (String domain_name, AsciiDenyList list, Symbol hyphens, Symbol error_policy, Uts46::Uts46::callable decide, bool with_ascii_sink) -> [String, String, String?]
+      def self.config_use_idna_2008_rules: (bool value) -> nil
+      def self.config_to_ascii: (flags flags, String domain) -> String
+      def self.config_to_unicode: (flags flags, String domain) -> [String, bool]
+      def self.idna_to_ascii: (flags flags, String domain, String out) -> [String, bool]
+      def self.idna_to_unicode: (flags flags, String domain, String out) -> [String, bool]
+
+      class AsciiDenyList
+      end
+    end
+  end
+end

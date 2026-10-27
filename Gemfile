@@ -12,6 +12,8 @@ gemspec path: "gems/arboard"
 gemspec path: "gems/rfd"
 gemspec path: "gems/notify-rust"
 gemspec path: "gems/global-hotkey"
+gemspec path: "gems/idna"
+gemspec path: "gems/url"
 
 gem "irb"
 gem "rake", "~> 13.0"

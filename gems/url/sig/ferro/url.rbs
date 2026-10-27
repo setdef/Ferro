@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    VERSION: String
+
+    type host_parts = [String, String | Integer]
+    type origin_parts = [String, Native::OpaqueOrigin] | [String, String, host_parts, Integer]
+    type operation = Array[Symbol | String | Array[String] | Array[[String, String]]]
+    type encodings = Array[[String, String]]
+    type address = [String, Integer, Integer]
+    type components = [Integer, Integer, Integer, Integer, Integer?, Integer, Integer?, Integer?]
+
+    module Native
+      def self.url_parse: (String input) -> Url
+      def self.url_parse_with_params: (String input, Array[[String, String]] pairs) -> Url
+      def self.url_options_parse: (String input, Url? base, (^(String) -> String)? encoding, (^(Symbol) -> void)? violation) -> Url
+      def self.url_join: (Url url, String input) -> Url
+      def self.url_make_relative: (Url url, Url other) -> String?
+      def self.url_clone: (Url url) -> Url
+      def self.url_as_str: (Url url) -> String
+      def self.url_inspect: (Url url) -> String
+      def self.url_check_invariants: (Url url) -> String?
+      def self.url_origin: (Url url) -> origin_parts
+      def self.url_str: (Url url, :scheme | :authority | :username | :path name) -> String
+      def self.url_option_str: (Url url, :password | :host_str | :domain | :query | :fragment name) -> String?
+      def self.url_bool: (Url url, :is_special | :has_authority | :cannot_be_a_base | :has_host name) -> bool
+      def self.url_port: (Url url, bool or_known_default) -> Integer?
+      def self.url_host: (Url url) -> host_parts?
+      def self.url_path_segments: (Url url) -> Array[String]?
+      def self.url_query_pairs: (Url url) -> Array[[String, String]]
+      def self.url_socket_addrs_asks_for_port: (Url url) -> bool
+      def self.url_socket_addrs: (Url url, Integer? default_port) -> Array[address]
+      def self.gvl_releases: () -> Integer
+      def self.gvl_sleep: (Float seconds) -> Float
+      def self.url_set_option_str: (Url url, :set_fragment | :set_query name, String? value) -> nil
+      def self.url_set_path: (Url url, String path) -> nil
+      def self.url_set_port: (Url url, Integer? port) -> nil
+      def self.url_set_host: (Url url, String? host) -> nil
+      def self.url_set_ip_host: (Url url, 4 | 6 family, Integer number) -> nil
+      def self.url_set_password: (Url url, String? password) -> nil
+      def self.url_set_str: (Url url, :set_username | :set_scheme name, String value) -> nil
+      def self.url_path_segments_mut: (Url url, operation operation) -> nil
+      def self.url_query_pairs_mut: (Url url, operation operation, encodings? encodings) -> nil
+      def self.url_from_path: (String path, bool directory) -> Url
+      def self.url_to_file_path: (Url url) -> String
+      def self.url_slice: (Url url, Symbol? start, Symbol? finish) -> String
+      def self.host_parse: (String input) -> host_parts
+      def self.host_parse_opaque: (String input) -> host_parts
+      def self.host_to_s: (host_parts parts) -> String
+      def self.host_cmp: (host_parts left, host_parts right) -> Integer
+      def self.origin_new_opaque: () -> origin_parts
+      def self.origin_ascii_serialization: (origin_parts parts) -> String
+      def self.origin_unicode_serialization: (origin_parts parts) -> String
+      def self.opaque_origin_eq: (OpaqueOrigin left, OpaqueOrigin right) -> bool
+      def self.opaque_origin_hash: (OpaqueOrigin origin) -> Integer
+      def self.opaque_origin_inspect: (OpaqueOrigin origin) -> String
+      def self.syntax_violation_description: (Symbol name) -> String
+      def self.form_check_suffix: (String target, Integer start_position) -> nil
+      def self.form_serialize: (String target, Integer start_position, operation operation, encodings? encodings) -> String
+      def self.form_parse: (String input) -> Array[[String, String]]
+      def self.form_byte_serialize: (String input) -> Array[String]
+      def self.quirks_domain_to_ascii: (String domain) -> String
+      def self.quirks_domain_to_unicode: (String domain) -> String
+      def self.quirks_get: (Url url, Symbol name) -> String
+      def self.quirks_set: (Url url, Symbol name, String value) -> nil
+      def self.quirks_internal_components: (Url url) -> components
+
+      class Url
+      end
+
+      class OpaqueOrigin
+      end
+    end
+  end
+end
