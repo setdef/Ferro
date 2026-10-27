@@ -531,7 +531,8 @@ impl Clipboard {
     /// The panic is caught inside the lock, so it never poisons it. A lock
     /// poisoned anyway is still used: arboard's clipboard holds no
     /// invariant a panic could break. `operation` sees only Rust values;
-    /// callers convert Ruby arguments before and results after.
+    /// callers convert Ruby arguments before and results after, once the
+    /// lock is released.
     fn with<T>(
         &self,
         ruby: &Ruby,
@@ -540,7 +541,11 @@ impl Clipboard {
     ) -> Result<T, Error> {
         if !blocking {
             if let Some(mut clipboard) = try_lock(&self.0) {
-                return settle(ruby, Ok(capture(|| operation(&mut clipboard))));
+                // Settle only once the lock is released: nothing of Ruby's
+                // happens under it.
+                let outcome = capture(|| operation(&mut clipboard));
+                drop(clipboard);
+                return settle(ruby, Ok(outcome));
             }
         }
         let outcome = gvl::without_gvl(ruby, |gvl| {
