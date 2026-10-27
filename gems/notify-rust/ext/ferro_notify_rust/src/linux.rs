@@ -163,10 +163,8 @@ impl Handle {
 
     /// A shared borrow: a clone of the handle's `Arc`.
     fn shared(&self, ruby: &Ruby) -> Result<Arc<notify_rust::NotificationHandle>, Error> {
-        self.slot()
-            .as_ref()
-            .map(Arc::clone)
-            .ok_or_else(|| error::base(ruby, MUTABLY_BORROWED))
+        let shared = self.slot().as_ref().map(Arc::clone);
+        shared.ok_or_else(|| error::base(ruby, MUTABLY_BORROWED))
     }
 
     /// Runs a short `operation` on the handle, mutably borrowed.

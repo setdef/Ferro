@@ -12,6 +12,10 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Fixed
+
+- Reading a field of a `Notification` shared between Ractors no longer hangs the process: Ruby values are made after the notification's lock is released, so a garbage collection never waits on a Ractor blocked in that lock.
+
 ## [0.1.0.pre.1] - 2026-10-26
 
 ### Added

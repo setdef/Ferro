@@ -122,13 +122,16 @@ impl Holds for Notification {
         operation: impl FnOnce(&mut notify_rust::Notification) -> R,
     ) -> Result<R, Error> {
         // A panic in a setter runs under `capture` before the lock is
-        // released, so the notification holds no broken invariant.
-        self.0
+        // released, so the notification holds no broken invariant. The
+        // error is built once the lock is released: nothing of Ruby's
+        // happens under it.
+        let outcome = self
+            .0
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .as_mut()
-            .map(operation)
-            .ok_or_else(|| crate::error::base(ruby, UNINITIALIZED))
+            .map(operation);
+        outcome.ok_or_else(|| crate::error::base(ruby, UNINITIALIZED))
     }
 
     fn with_ref<R>(
@@ -136,12 +139,13 @@ impl Holds for Notification {
         ruby: &Ruby,
         operation: impl FnOnce(&notify_rust::Notification) -> R,
     ) -> Result<R, Error> {
-        self.0
+        let outcome = self
+            .0
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .as_ref()
-            .map(operation)
-            .ok_or_else(|| crate::error::base(ruby, UNINITIALIZED))
+            .map(operation);
+        outcome.ok_or_else(|| crate::error::base(ruby, UNINITIALIZED))
     }
 }
 
@@ -281,32 +285,49 @@ pub fn field<T: Holds + TypedData>(
     name: Symbol,
 ) -> Result<Value, Error> {
     let name = name.name()?.into_owned();
-    rb_self.with_ref(ruby, |notification| -> Result<Value, Error> {
-        Ok(match name.as_str() {
-            "appname" => ruby.str_new(&notification.appname).as_value(),
-            "summary" => ruby.str_new(&notification.summary).as_value(),
-            "subtitle" => notification.subtitle.clone().into_value_with(ruby),
-            "body" => ruby.str_new(&notification.body).as_value(),
-            "icon" => ruby.str_new(&notification.icon).as_value(),
-            "actions" => notification.actions.clone().into_value_with(ruby),
-            "timeout" => values::timeout_to_ruby(ruby, notification.timeout),
+    // Copy the field out under the lock and make Ruby values after it:
+    // an allocation can start a garbage collection, which waits for every
+    // Ractor, and another Ractor may be waiting for this lock.
+    let copy = rb_self.with_ref(ruby, |notification| {
+        Some(match name.as_str() {
+            "appname" => Field::Text(notification.appname.clone()),
+            "summary" => Field::Text(notification.summary.clone()),
+            "subtitle" => Field::Subtitle(notification.subtitle.clone()),
+            "body" => Field::Text(notification.body.clone()),
+            "icon" => Field::Text(notification.icon.clone()),
+            "actions" => Field::Actions(notification.actions.clone()),
+            "timeout" => Field::Timeout(notification.timeout),
             #[cfg(all(unix, not(target_os = "macos")))]
-            "hints" => ruby
-                .ary_from_iter(
-                    notification
-                        .hints
-                        .iter()
-                        .map(|hint| values::hint_to_ruby(ruby, hint)),
-                )
-                .as_value(),
-            other => {
-                return Err(Error::new(
-                    ruby.exception_name_error(),
-                    format!("Notification has no field {other}"),
-                ))
-            }
+            "hints" => Field::Hints(notification.hints.iter().cloned().collect()),
+            _ => return None,
         })
-    })?
+    })?;
+    Ok(match copy {
+        Some(Field::Text(text)) => ruby.str_new(&text).as_value(),
+        Some(Field::Subtitle(subtitle)) => subtitle.into_value_with(ruby),
+        Some(Field::Actions(actions)) => actions.into_value_with(ruby),
+        Some(Field::Timeout(timeout)) => values::timeout_to_ruby(ruby, timeout),
+        #[cfg(all(unix, not(target_os = "macos")))]
+        Some(Field::Hints(hints)) => ruby
+            .ary_from_iter(hints.iter().map(|hint| values::hint_to_ruby(ruby, hint)))
+            .as_value(),
+        None => {
+            return Err(Error::new(
+                ruby.exception_name_error(),
+                format!("Notification has no field {name}"),
+            ))
+        }
+    })
+}
+
+/// A public field's value, copied out of the notification.
+enum Field {
+    Text(String),
+    Subtitle(Option<String>),
+    Actions(Vec<String>),
+    Timeout(notify_rust::Timeout),
+    #[cfg(all(unix, not(target_os = "macos")))]
+    Hints(Vec<notify_rust::Hint>),
 }
 
 /// Assigns the public field `name`, as Rust code may.

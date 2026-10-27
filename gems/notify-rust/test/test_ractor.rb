@@ -48,4 +48,23 @@ class TestRactor < Minitest::Test
 
     assert_equal ["Ferro::NotifyRust::Timeout::Never", 42], built
   end
+
+  # Ractors reading one shared notification contend for its lock. Ruby
+  # values are made only after the lock is released: an allocation under
+  # it could start a garbage collection that waits for a Ractor blocked in
+  # the lock, and the process would hang. A child that does not finish is
+  # killed and fails the test.
+  def test_ractors_reading_one_shared_notification_finish
+    result, = in_child(<<~RUBY)
+      shared = Ractor.make_shareable(Ferro::NotifyRust::Notification.new.summary("Shared").body("x" * 100).action("a", "A"))
+      4.times.map do
+        Ractor.new(shared) do |notification|
+          5_000.times { notification.summary; notification.body; notification.actions; notification.timeout }
+          notification.summary
+        end
+      end.map(&:value)
+    RUBY
+
+    assert_equal ["Shared"] * 4, result
+  end
 end
