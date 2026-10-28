@@ -235,7 +235,10 @@ module Ferro
         start(:save_file)
       end
 
-      # rfd's +Debug+ text for this dialog.
+      # rfd's +Debug+ text for this dialog. On macOS, with an
+      # AppKitWindowHandle parent, it looks the window up as the dialog
+      # would, and from another thread waits for the main thread's run
+      # loop, uninterruptibly (FileDialog#set_parent).
       #
       # === Example
       #

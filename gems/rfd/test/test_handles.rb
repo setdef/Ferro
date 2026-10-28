@@ -15,6 +15,22 @@ class TestHandles < Minitest::Test
   WIN32 = Ferro::Rfd::Win32WindowHandle.new(hwnd: 0x40A2C, hinstance: nil)
   XLIB = Ferro::Rfd::XlibWindowHandle.new(window: 0x3A00007, visual_id: 0)
   XCB = Ferro::Rfd::XcbWindowHandle.new(window: 0x3A00007, visual_id: 33)
+  APPKIT = Ferro::Rfd::AppKitWindowHandle.new(window_number: 4242)
+
+  # Handles from another gem, named for raw-window-handle's structs as
+  # Tokra's are (plan 008, decision 8).
+  module Elsewhere
+    Win32WindowHandle = Data.define(:hwnd, :hinstance)
+    XcbWindowHandle = Data.define(:window, :visual_id)
+    XlibDisplayHandle = Data.define(:display, :screen)
+    WindowsDisplayHandle = Data.define
+    AppKitWindowHandle = Data.define(:ns_view)
+    WaylandWindowHandle = Data.define(:surface)
+  end
+
+  # A subclass keeps its kind through its ancestor's name.
+  class MyWin32 < Ferro::Rfd::Win32WindowHandle
+  end
 
   # What rfd panics with for a handle it cannot use here
   # (src/backend/win_cid/file_dialog/dialog_ffi.rs:157,
@@ -38,6 +54,8 @@ class TestHandles < Minitest::Test
     assert_empty Ferro::Rfd::WindowsDisplayHandle.members
     assert_equal %i[display screen], Ferro::Rfd::XlibDisplayHandle.members
     assert_equal %i[connection screen], Ferro::Rfd::XcbDisplayHandle.members
+    assert_equal %i[window_number], Ferro::Rfd::AppKitWindowHandle.members
+    assert_empty Ferro::Rfd::AppKitDisplayHandle.members
     assert_predicate WIN32, :frozen?
   end
 
@@ -67,7 +85,7 @@ class TestHandles < Minitest::Test
     message = REFUSED[PLATFORM]
     skip "rfd's portal backend ignores a handle it cannot use" unless message
 
-    refused = (PLATFORM == :windows) ? [XLIB, XCB] : [WIN32, XLIB, XCB]
+    refused = (PLATFORM == :windows) ? [XLIB, XCB, APPKIT] : [WIN32, XLIB, XCB]
     refused.each do |handle|
       [
         Ferro::Rfd::FileDialog,
@@ -107,6 +125,64 @@ class TestHandles < Minitest::Test
   def test_a_value_that_is_no_handle_raises_type_error
     assert_raises(TypeError) { Ferro::Rfd::FileDialog.new.set_parent(Parent.new(0x40A2C, nil)) }
     assert_raises(TypeError) { Ferro::Rfd::FileDialog.new.set_parent(Parent.new(nil, WIN32)) }
+  end
+
+  # The portal ignores an AppKit window, so it is no parent there, and
+  # nothing looks it up (plan 008, decision 6).
+  def test_an_appkit_window_is_no_parent_on_linux
+    skip_unless_platform(:linux)
+    debug = Ferro::Rfd::FileDialog.new.set_parent(Parent.new(APPKIT, Ferro::Rfd::AppKitDisplayHandle.new)).inspect
+
+    assert_includes debug, "parent: None, parent_display: Some(AppKit(AppKitDisplayHandle))"
+  end
+
+  # On macOS rfd refuses these kinds, and the refusal names the kind the
+  # gem read: rfd's message, not a TypeError.
+  def test_handles_from_another_gem_are_read_by_kind
+    win32 = Parent.new(Elsewhere::Win32WindowHandle.new(hwnd: 7, hinstance: nil), Elsewhere::WindowsDisplayHandle.new)
+    subclass = Parent.new(MyWin32.new(hwnd: 8, hinstance: 9), nil)
+    xcb = Parent.new(Elsewhere::XcbWindowHandle.new(window: 5, visual_id: nil),
+      Elsewhere::XlibDisplayHandle.new(display: nil, screen: 2))
+
+    case PLATFORM
+    when :windows
+      assert_includes Ferro::Rfd::FileDialog.new.set_parent(win32).inspect,
+        "parent: Some(Win32(Win32WindowHandle { hwnd: 7, hinstance: None })), " \
+          "parent_display: Some(Windows(WindowsDisplayHandle))"
+      assert_includes Ferro::Rfd::FileDialog.new.set_parent(subclass).inspect,
+        "Win32WindowHandle { hwnd: 8, hinstance: Some(9) }"
+    when :macos
+      [win32, subclass, xcb].each do |parent|
+        error = assert_raises(ArgumentError) { Ferro::Rfd::FileDialog.new.set_parent(parent) }
+        assert_equal REFUSED[:macos], error.message
+      end
+    else
+      assert_includes Ferro::Rfd::FileDialog.new.set_parent(xcb).inspect,
+        "parent: Some(Xcb(XcbWindowHandle { window: 5, visual_id: None })), " \
+          "parent_display: Some(Xlib(XlibDisplayHandle { display: None, screen: 2 }))"
+      assert_includes Ferro::Rfd::FileDialog.new.set_parent(subclass).inspect,
+        "parent: Some(Win32(Win32WindowHandle { hwnd: 8, hinstance: Some(9) })), parent_display: None"
+    end
+  end
+
+  # Wayland is not bound (plan 008, decision 7), and a kind needs a name.
+  def test_a_handle_of_an_unbound_kind_or_no_name_raises_type_error
+    unnamed = Data.define(:hwnd, :hinstance).new(hwnd: 7, hinstance: nil)
+
+    [Elsewhere::WaylandWindowHandle.new(surface: 0x10), unnamed].each do |handle|
+      error = assert_raises(TypeError) { Ferro::Rfd::FileDialog.new.set_parent(Parent.new(handle, nil)) }
+      assert_equal "wrong argument type #{handle.class} (expected a window handle)", error.message
+    end
+    error = assert_raises(TypeError) { Ferro::Rfd::FileDialog.new.set_parent(Parent.new(nil, BasicObject.new)) }
+    assert_equal "wrong argument type BasicObject (expected a display handle)", error.message
+  end
+
+  # Tokra's AppKit value answers ns_view; ferro-rfd reads window_number.
+  def test_a_handle_missing_a_field_of_its_kind_raises_no_method_error
+    handle = Elsewhere::AppKitWindowHandle.new(ns_view: 0x10)
+
+    error = assert_raises(NoMethodError) { Ferro::Rfd::FileDialog.new.set_parent(Parent.new(handle, nil)) }
+    assert_equal :window_number, error.name
   end
 
   def test_a_parent_must_answer_both_handles

@@ -161,21 +161,48 @@ SPDX-License-Identifier: MIT-0
 SPDX-SnippetEnd
 ++
 
-A raw window handle is an Integer, so it crosses from any gem, and nothing
-checks that the window behind it exists. ferro-rfd binds only the handles
-rfd never follows as pointers, so a wrong one cannot crash your process:
+A handle value is a +Data+ of Integers, so it crosses from any gem. A
+value from your window library works as is when its class is named for the
+same raw-window-handle struct (+Win32WindowHandle+, +AppKitWindowHandle+,
+and so on) and answers that struct's fields. Nothing checks that an
+Integer names a live window, so ferro-rfd binds only handles that cannot
+crash your process when wrong:
 
 [Windows] Win32WindowHandle, an +HWND+, which Windows checks. A bad one
           makes the dialog fail, and rfd returns +nil+ or Cancel.
 [Linux] XlibWindowHandle and XcbWindowHandle, an X11 window ID, which the
         portal receives as text. Message dialogs take no parent here.
-[macOS] none. rfd follows AppKit's +NSView+ pointer, and an Integer could
-        point anywhere. Without a parent, rfd's async dialogs attach to
-        your app's main window anyway.
+[macOS] AppKitWindowHandle, a window number. rfd itself takes a pointer to
+        the window's content view, which an Integer could fake, so
+        ferro-rfd asks AppKit for the window with that number, on the main
+        thread, when the dialog runs, and hands rfd its content view. A
+        number that names none of your app's windows raises Error. From
+        another thread, the dialog and the lookup run on the main thread
+        through your running app, as rfd runs any dialog from another
+        thread. That waits for the main thread's run loop: if the main
+        thread is blocked in Ruby instead, say joining this thread, the
+        call never returns and cannot be interrupted, as with rfd's own
+        hop.
 
-Wayland handles are pointers too, and are not bound either. A handle rfd
-would panic on (on Windows anything but Win32, on macOS every one) raises
-+ArgumentError+ with rfd's message.
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  # my_window_number: what -[NSWindow windowNumber] answers for your window
+  parent = Parent.new(Ferro::Rfd::AppKitWindowHandle.new(window_number: my_window_number),
+    Ferro::Rfd::AppKitDisplayHandle.new)
+  Ferro::Rfd::FileDialog.new.set_parent(parent).pick_file
+
+--
+SPDX-SnippetEnd
+++
+
+Wayland handles are pointers rfd follows, and rfd 0.17.2 takes a Wayland
+parent no other way, so they are not bound and raise +TypeError+. A handle
+rfd would panic on (on Windows anything but Win32, on macOS anything but
+AppKit) raises +ArgumentError+ with rfd's message.
 
 == How it maps rfd
 

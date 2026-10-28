@@ -18,8 +18,8 @@ use rfd::{
 };
 
 use crate::future::{Future, Output};
-use crate::handles::{self, Parent};
-use crate::{capture, gvl, path_from_ruby, path_to_ruby, platform, rfd_error, settle, Panic};
+use crate::handles::{self, Parent, ParentSpec};
+use crate::{gvl, path_from_ruby, path_to_ruby, platform, rfd_error, settle, Panic};
 
 type ParentPair = (Option<RArray>, Option<RArray>);
 
@@ -53,7 +53,7 @@ struct FileSettings {
     directory: Option<PathBuf>,
     file_name: Option<String>,
     title: Option<String>,
-    parent: Option<Parent>,
+    parent: Option<ParentSpec>,
     can_create_directories: Option<bool>,
 }
 
@@ -80,9 +80,10 @@ fn file_settings(ruby: &Ruby, args: FileArgs) -> Result<FileSettings, Error> {
     })
 }
 
-/// rfd's `FileDialog` with these settings, set through rfd's own setters
+/// rfd's `FileDialog` with these settings and `parent`, the one
+/// `settings` describes, set through rfd's own setters
 /// (rfd `src/file_dialog.rs:35-111`).
-fn file_dialog_of(settings: &FileSettings) -> FileDialog {
+fn file_dialog_of(settings: &FileSettings, parent: Option<&Parent>) -> FileDialog {
     let mut dialog = FileDialog::new();
     for (name, extensions) in &settings.filters {
         dialog = dialog.add_filter(name, extensions);
@@ -96,7 +97,7 @@ fn file_dialog_of(settings: &FileSettings) -> FileDialog {
     if let Some(title) = &settings.title {
         dialog = dialog.set_title(title);
     }
-    if let Some(parent) = &settings.parent {
+    if let Some(parent) = parent {
         dialog = dialog.set_parent(parent);
     }
     if let Some(can) = settings.can_create_directories {
@@ -105,9 +106,9 @@ fn file_dialog_of(settings: &FileSettings) -> FileDialog {
     dialog
 }
 
-/// rfd's `AsyncFileDialog` with these settings (rfd
+/// rfd's `AsyncFileDialog` with these settings and `parent` (rfd
 /// `src/file_dialog.rs:187-255`).
-fn async_file_dialog_of(settings: &FileSettings) -> AsyncFileDialog {
+fn async_file_dialog_of(settings: &FileSettings, parent: Option<&Parent>) -> AsyncFileDialog {
     let mut dialog = AsyncFileDialog::new();
     for (name, extensions) in &settings.filters {
         dialog = dialog.add_filter(name, extensions);
@@ -121,7 +122,7 @@ fn async_file_dialog_of(settings: &FileSettings) -> AsyncFileDialog {
     if let Some(title) = &settings.title {
         dialog = dialog.set_title(title);
     }
-    if let Some(parent) = &settings.parent {
+    if let Some(parent) = parent {
         dialog = dialog.set_parent(parent);
     }
     if let Some(can) = settings.can_create_directories {
@@ -130,21 +131,45 @@ fn async_file_dialog_of(settings: &FileSettings) -> AsyncFileDialog {
     dialog
 }
 
+/// The value of a job `handles::with_parent` ran, or `Ferro::Rfd::Error`
+/// for its refusal or panic, made now that the job is done.
+fn finish<T>(ruby: &Ruby, outcome: Result<Result<T, String>, Panic>) -> Result<T, Error> {
+    settle(ruby, outcome)?.map_err(|message| rfd_error(ruby, message))
+}
+
+/// Runs `job` with `parent`, for `inspect`: with the GVL released only
+/// when the parent looks a window up, which may wait for the main thread
+/// (plan 008, decision 5).
+fn describe(
+    ruby: &Ruby,
+    parent: Option<ParentSpec>,
+    job: impl FnOnce(Option<&Parent>) -> String + Send,
+) -> Result<String, Error> {
+    let outcome = if parent.is_some_and(|parent| parent.needs_main_thread()) {
+        gvl::without_gvl(ruby, |_| handles::with_parent(parent, job))?
+            .unwrap_or_else(|payload| Err(crate::panic_of(&payload)))
+    } else {
+        handles::with_parent(parent, job)
+    };
+    finish(ruby, outcome)
+}
+
 /// `Native.file_dialog_debug`: rfd's `Debug` of the `FileDialog`
 /// (plan 002, decision 2).
 pub fn file_dialog_debug(ruby: &Ruby, args: FileArgs) -> Result<String, Error> {
     let settings = file_settings(ruby, args)?;
-    settle(ruby, capture(|| format!("{:?}", file_dialog_of(&settings))))
+    describe(ruby, settings.parent, move |parent| {
+        format!("{:?}", file_dialog_of(&settings, parent))
+    })
 }
 
 /// `Native.async_file_dialog_debug`: rfd's `Debug` of the
 /// `AsyncFileDialog`.
 pub fn async_file_dialog_debug(ruby: &Ruby, args: FileArgs) -> Result<String, Error> {
     let settings = file_settings(ruby, args)?;
-    settle(
-        ruby,
-        capture(|| format!("{:?}", async_file_dialog_of(&settings))),
-    )
+    describe(ruby, settings.parent, move |parent| {
+        format!("{:?}", async_file_dialog_of(&settings, parent))
+    })
 }
 
 /// A terminal call of a file dialog.
@@ -235,11 +260,16 @@ fn refuse(ruby: &Ruby, refusal: Option<&'static str>) -> Result<(), Error> {
     refusal.map_or(Ok(()), |message| Err(rfd_error(ruby, message)))
 }
 
-/// Runs a sync dialog with the GVL released (plan 002, decision 4).
-fn show<T>(ruby: &Ruby, dialog: impl FnOnce() -> T) -> Result<T, Error> {
+/// Runs a sync dialog with `parent`, with the GVL released (plan 002,
+/// decision 4).
+fn show<T: Send>(
+    ruby: &Ruby,
+    parent: Option<ParentSpec>,
+    dialog: impl FnOnce(Option<&Parent>) -> T + Send,
+) -> Result<T, Error> {
     refuse(ruby, platform::refuse_sync())?;
-    let outcome = gvl::without_gvl(ruby, |_| capture(dialog))?;
-    settle(
+    let outcome = gvl::without_gvl(ruby, |_| handles::with_parent(parent, dialog))?;
+    finish(
         ruby,
         outcome.unwrap_or_else(|payload| Err(crate::panic_of(&payload))),
     )
@@ -250,8 +280,11 @@ fn show<T>(ruby: &Ruby, dialog: impl FnOnce() -> T) -> Result<T, Error> {
 pub fn file_dialog(ruby: &Ruby, op: Symbol, args: FileArgs) -> Result<Value, Error> {
     let op = FileOp::parse(ruby, op)?;
     let settings = file_settings(ruby, args)?;
-    let dialog = file_dialog_of(&settings);
-    Ok(show(ruby, move || Picked::run(op, dialog))?.into_ruby(ruby))
+    let parent = settings.parent;
+    let picked = show(ruby, parent, move |parent| {
+        Picked::run(op, file_dialog_of(&settings, parent))
+    })?;
+    Ok(picked.into_ruby(ruby))
 }
 
 /// Starts rfd's future for `op` (rfd `src/file_dialog.rs:266-331`). The
@@ -271,18 +304,22 @@ fn start(op: FileOp, dialog: AsyncFileDialog) -> crate::future::Pending {
     }
 }
 
-/// Makes a future, with the GVL released where making it can block.
+/// Makes a future with `parent`, with the GVL released where making it
+/// can block. rfd is done with the parent once the future is made: on
+/// macOS it retains the window for the sheet (rfd
+/// `src/backend/macos/modal_future.rs:67-103`).
 fn make(
     ruby: &Ruby,
-    starter: impl FnOnce() -> crate::future::Pending,
+    parent: Option<ParentSpec>,
+    starter: impl FnOnce(Option<&Parent>) -> crate::future::Pending + Send,
 ) -> Result<crate::future::Pending, Error> {
-    let pending: Result<_, Panic> = if platform::CREATION_BLOCKS {
-        gvl::without_gvl(ruby, |_| capture(starter))?
+    let pending = if platform::CREATION_BLOCKS {
+        gvl::without_gvl(ruby, |_| handles::with_parent(parent, starter))?
             .unwrap_or_else(|payload| Err(crate::panic_of(&payload)))
     } else {
-        capture(starter)
+        handles::with_parent(parent, starter)
     };
-    settle(ruby, pending)
+    finish(ruby, pending)
 }
 
 /// `Native.async_file_dialog`: an async file dialog's terminal call,
@@ -290,9 +327,11 @@ fn make(
 pub fn async_file_dialog(ruby: &Ruby, op: Symbol, args: FileArgs) -> Result<Future, Error> {
     let op = FileOp::parse(ruby, op)?;
     let settings = file_settings(ruby, args)?;
-    let dialog = async_file_dialog_of(&settings);
     refuse(ruby, platform::refuse_async(true))?;
-    let pending = make(ruby, move || start(op, dialog))?;
+    let parent = settings.parent;
+    let pending = make(ruby, parent, move |parent| {
+        start(op, async_file_dialog_of(&settings, parent))
+    })?;
     Ok(Future::new(pending, platform::needs_main_loop(true)))
 }
 
@@ -302,7 +341,7 @@ struct MessageSettings {
     title: Option<String>,
     description: Option<String>,
     buttons: MessageButtons,
-    parent: Option<Parent>,
+    parent: Option<ParentSpec>,
 }
 
 fn level(ruby: &Ruby, name: Symbol) -> Result<MessageLevel, Error> {
@@ -352,9 +391,9 @@ fn message_settings(ruby: &Ruby, args: MessageArgs) -> Result<MessageSettings, E
     })
 }
 
-/// rfd's `MessageDialog` with these settings (rfd
+/// rfd's `MessageDialog` with these settings and `parent` (rfd
 /// `src/message_dialog.rs:28-80`).
-fn message_dialog_of(settings: &MessageSettings) -> MessageDialog {
+fn message_dialog_of(settings: &MessageSettings, parent: Option<&Parent>) -> MessageDialog {
     let mut dialog = MessageDialog::new()
         .set_level(settings.level)
         .set_buttons(settings.buttons.clone());
@@ -364,15 +403,18 @@ fn message_dialog_of(settings: &MessageSettings) -> MessageDialog {
     if let Some(description) = &settings.description {
         dialog = dialog.set_description(description);
     }
-    if let Some(parent) = &settings.parent {
+    if let Some(parent) = parent {
         dialog = dialog.set_parent(parent);
     }
     dialog
 }
 
-/// rfd's `AsyncMessageDialog` with these settings (rfd
+/// rfd's `AsyncMessageDialog` with these settings and `parent` (rfd
 /// `src/message_dialog.rs:95-145`).
-fn async_message_dialog_of(settings: &MessageSettings) -> AsyncMessageDialog {
+fn async_message_dialog_of(
+    settings: &MessageSettings,
+    parent: Option<&Parent>,
+) -> AsyncMessageDialog {
     let mut dialog = AsyncMessageDialog::new()
         .set_level(settings.level)
         .set_buttons(settings.buttons.clone());
@@ -382,7 +424,7 @@ fn async_message_dialog_of(settings: &MessageSettings) -> AsyncMessageDialog {
     if let Some(description) = &settings.description {
         dialog = dialog.set_description(description);
     }
-    if let Some(parent) = &settings.parent {
+    if let Some(parent) = parent {
         dialog = dialog.set_parent(parent);
     }
     dialog
@@ -391,20 +433,18 @@ fn async_message_dialog_of(settings: &MessageSettings) -> AsyncMessageDialog {
 /// `Native.message_dialog_debug`: rfd's `Debug` of the `MessageDialog`.
 pub fn message_dialog_debug(ruby: &Ruby, args: MessageArgs) -> Result<String, Error> {
     let settings = message_settings(ruby, args)?;
-    settle(
-        ruby,
-        capture(|| format!("{:?}", message_dialog_of(&settings))),
-    )
+    describe(ruby, settings.parent, move |parent| {
+        format!("{:?}", message_dialog_of(&settings, parent))
+    })
 }
 
 /// `Native.async_message_dialog_debug`: rfd's `Debug` of the
 /// `AsyncMessageDialog`.
 pub fn async_message_dialog_debug(ruby: &Ruby, args: MessageArgs) -> Result<String, Error> {
     let settings = message_settings(ruby, args)?;
-    settle(
-        ruby,
-        capture(|| format!("{:?}", async_message_dialog_of(&settings))),
-    )
+    describe(ruby, settings.parent, move |parent| {
+        format!("{:?}", async_message_dialog_of(&settings, parent))
+    })
 }
 
 /// A result as Ruby rebuilds it: `[:Yes]`, or `[:Custom, text]` (rfd
@@ -426,8 +466,10 @@ pub fn result_to_ruby(ruby: &Ruby, result: MessageDialogResult) -> RArray {
 /// button pressed (rfd `src/message_dialog.rs:81-84`).
 pub fn message_dialog(ruby: &Ruby, args: MessageArgs) -> Result<RArray, Error> {
     let settings = message_settings(ruby, args)?;
-    let dialog = message_dialog_of(&settings);
-    let result = show(ruby, move || dialog.show())?;
+    let parent = settings.parent;
+    let result = show(ruby, parent, move |parent| {
+        message_dialog_of(&settings, parent).show()
+    })?;
     Ok(result_to_ruby(ruby, result))
 }
 
@@ -438,9 +480,11 @@ pub fn message_dialog(ruby: &Ruby, args: MessageArgs) -> Result<RArray, Error> {
 pub fn async_message_dialog(ruby: &Ruby, args: MessageArgs) -> Result<Future, Error> {
     let settings = message_settings(ruby, args)?;
     let attaches = settings.parent.is_some();
-    let dialog = async_message_dialog_of(&settings);
     refuse(ruby, platform::refuse_async(attaches))?;
-    let pending = make(ruby, move || Output::result(dialog.show()))?;
+    let parent = settings.parent;
+    let pending = make(ruby, parent, move |parent| {
+        Output::result(async_message_dialog_of(&settings, parent).show())
+    })?;
     Ok(Future::new(pending, platform::needs_main_loop(attaches)))
 }
 

@@ -154,8 +154,9 @@ module Ferro
 
       # Keeps the dialog in front of +parent+'s window. Returns the dialog.
       # See FileDialog#set_parent for what +parent+ answers and which
-      # handles each platform takes. rfd uses it on Windows; on Linux,
-      # +zenity+ takes no parent.
+      # handles each platform takes. rfd uses it on Windows, and on macOS,
+      # where the alert opens as a sheet on the window; on Linux, +zenity+
+      # takes no parent.
       #
       # Mirrors rfd's <tt>MessageDialog::set_parent</tt>
       # (<tt>src/message_dialog.rs:67-79</tt>).
@@ -182,7 +183,10 @@ module Ferro
         MessageDialogResult.__send__(:from_native, Native.message_dialog(settings))
       end
 
-      # rfd's +Debug+ text for this dialog.
+      # rfd's +Debug+ text for this dialog. On macOS, with an
+      # AppKitWindowHandle parent, it looks the window up as the dialog
+      # would, and from another thread waits for the main thread's run
+      # loop, uninterruptibly (FileDialog#set_parent).
       #
       # === Example
       #

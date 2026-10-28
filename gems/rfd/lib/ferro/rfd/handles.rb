@@ -150,28 +150,137 @@ module Ferro
       # The X11 screen number, an Integer.
     end
 
+    # A macOS window, by its window number, for a dialog's +set_parent+.
+    #
+    # On macOS a dialog with a parent opens as a sheet on that window, or
+    # stays in front of it. rfd takes the window as raw-window-handle's
+    # +AppKitWindowHandle+, which holds a pointer to the window's content
+    # view. Ruby cannot prove an Integer points at a live view, and rfd
+    # retains whatever it points at, so a wrong one would crash your
+    # process.
+    #
+    # So this value names the window by its number instead, the Integer
+    # <tt>-[NSWindow windowNumber]</tt> answers, which points at nothing.
+    # When the dialog runs, ferro-rfd asks AppKit for the window with
+    # <tt>-[NSApplication windowWithWindowNumber:]</tt>, on the main
+    # thread, and hands rfd that window's content view: the same handle a
+    # Rust caller would pass. A number that names none of your app's
+    # windows raises Error instead of reaching rfd. From another thread,
+    # the lookup and the dialog run on the main thread through your running
+    # app, as rfd runs any dialog from another thread; FileDialog#set_parent
+    # says more.
+    #
+    # Translates raw-window-handle's +AppKitWindowHandle+
+    # (raw-window-handle 0.6.2, <tt>src/appkit.rs:46-110</tt>): the kind
+    # is the same, and the field is a number AppKit checks in place of the
+    # pointer (plan 008, decision 1).
+    #
+    # === Example
+    #
+    #   Ferro::Rfd::AppKitWindowHandle.new(window_number: 8213)
+    class AppKitWindowHandle < Data.define(:window_number)
+      ##
+      # :attr_reader: window_number
+      # The window's number in the window server, an Integer, as
+      # <tt>-[NSWindow windowNumber]</tt> answers it.
+    end
+
+    # The macOS display, for a parent's +display_handle+.
+    #
+    # raw-window-handle pairs every window with the display it lives on.
+    # macOS has one, and this value names it; it carries nothing. rfd keeps
+    # it but reads only the window.
+    #
+    # Mirrors raw-window-handle's +AppKitDisplayHandle+
+    # (raw-window-handle 0.6.2, <tt>src/appkit.rs:6-24</tt>).
+    #
+    # === Example
+    #
+    #   Ferro::Rfd::AppKitDisplayHandle.new
+    class AppKitDisplayHandle < Data.define
+    end
+
+    # The raw-window-handle structs whose values +set_parent+ reads, by
+    # name. A handle's kind is the name of its class, or of its nearest
+    # named ancestor, without the namespace, so a value from another gem
+    # named for the same struct works too (plan 008, decision 8).
+    HANDLE_KINDS = %w[
+      Win32WindowHandle
+      XlibWindowHandle
+      XcbWindowHandle
+      AppKitWindowHandle
+      WindowsDisplayHandle
+      XlibDisplayHandle
+      XcbDisplayHandle
+      AppKitDisplayHandle
+    ].freeze
+    private_constant :HANDLE_KINDS
+
+    # Kernel#class, unbound, for class_of.
+    KERNEL_CLASS = Kernel.instance_method(:class)
+    private_constant :KERNEL_CLASS
+
+    # +handle+'s class, asked through Kernel so a BasicObject answers too.
+    def self.class_of(handle) # :nodoc:
+      KERNEL_CLASS.bind_call(handle)
+    end
+    private_class_method :class_of
+
+    # The raw-window-handle struct +handle+ mirrors, or +nil+.
+    def self.handle_kind(handle) # :nodoc:
+      class_of(handle).ancestors.each do |ancestor|
+        kind = ancestor.name&.split("::")&.last
+        return kind if kind && HANDLE_KINDS.include?(kind)
+      end
+      nil
+    end
+    private_class_method :handle_kind
+
+    # The tagged Array the native layer takes for a window handle.
+    def self.native_window(handle) # :nodoc:
+      # @type var fields: _HandleFields
+      fields = _ = handle
+      case handle_kind(handle)
+      when "Win32WindowHandle" then [:Win32, fields.hwnd, fields.hinstance] #: native_window
+      when "XlibWindowHandle" then [:Xlib, fields.window, _ = fields.visual_id] #: native_window
+      when "XcbWindowHandle" then [:Xcb, fields.window, fields.visual_id] #: native_window
+      when "AppKitWindowHandle" then [:AppKit, fields.window_number] #: native_window
+      else raise TypeError, "wrong argument type #{class_of(handle)} (expected a window handle)"
+      end
+    end
+    private_class_method :native_window
+
+    # The tagged Array the native layer takes for a display handle.
+    def self.native_display(handle) # :nodoc:
+      # @type var fields: _HandleFields
+      fields = _ = handle
+      case handle_kind(handle)
+      when "WindowsDisplayHandle" then [:Windows] #: native_display
+      when "XlibDisplayHandle" then [:Xlib, fields.display, fields.screen] #: native_display
+      when "XcbDisplayHandle" then [:Xcb, fields.connection, fields.screen] #: native_display
+      when "AppKitDisplayHandle" then [:AppKit] #: native_display
+      else raise TypeError, "wrong argument type #{class_of(handle)} (expected a display handle)"
+      end
+    end
+    private_class_method :native_display
+
     # The <tt>[window, display]</tt> pair the native layer takes for a
     # parent: each a tagged Array, or +nil+ where the parent answered
     # +nil+. A parent that lacks +window_handle+ or +display_handle+ raises
     # +NoMethodError+, and one that returns anything but a handle or +nil+
     # raises +TypeError+, as Rust's trait bound would refuse it at compile
-    # time.
+    # time. A handle is read by its kind and raw-window-handle's field
+    # names, so one missing a field of its kind raises +NoMethodError+.
     def self.parent_pair(parent) # :nodoc:
-      # @type var window: native_window?
-      window = case (handle = parent.window_handle)
+      window_handle = parent.window_handle
+      display_handle = parent.display_handle
+      window = case window_handle
       when nil then nil
-      when Win32WindowHandle then [:Win32, handle.hwnd, handle.hinstance]
-      when XlibWindowHandle then [:Xlib, handle.window, handle.visual_id]
-      when XcbWindowHandle then [:Xcb, handle.window, handle.visual_id]
-      else raise TypeError, "wrong argument type #{handle.class} (expected a window handle)"
+      else native_window(window_handle)
       end
-      # @type var display: native_display?
-      display = case (handle = parent.display_handle)
+      display = case display_handle
       when nil then nil
-      when WindowsDisplayHandle then [:Windows]
-      when XlibDisplayHandle then [:Xlib, handle.display, handle.screen]
-      when XcbDisplayHandle then [:Xcb, handle.connection, handle.screen]
-      else raise TypeError, "wrong argument type #{handle.class} (expected a display handle)"
+      else native_display(display_handle)
       end
       # @type var pair: native_parent
       pair = [window, display]

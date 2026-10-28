@@ -140,7 +140,10 @@ module Ferro
         Future.__send__(:new, Native.async_message_dialog(@message_dialog.__send__(:settings)))
       end
 
-      # rfd's +Debug+ text for this dialog.
+      # rfd's +Debug+ text for this dialog. On macOS, with an
+      # AppKitWindowHandle parent, it looks the window up as the dialog
+      # would, and from another thread waits for the main thread's run
+      # loop, uninterruptibly (FileDialog#set_parent).
       #
       # === Example
       #

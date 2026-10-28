@@ -21,9 +21,12 @@ magnus = { version = "0.9.3", features = ["bytes"] }
 rb-sys = "0.9.130"
 
 # rfd's own Objective-C crate, to check the thread and NSApp before rfd
-# would panic (plan 002, decision 5).
+# would panic (plan 002, decision 5), and to look a parent window up by
+# its number (plan 008, decision 3). dispatch2 is rfd's own too, for the
+# same hop to the main thread rfd makes (plan 008, decision 9).
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.5"
+dispatch2 = "0.3.1"
 
 # Each crate states its lints itself instead of inheriting them with
 # `workspace = true`: an installed gem ships only its own workspace.

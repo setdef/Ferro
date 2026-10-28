@@ -27,6 +27,17 @@ module Ferro
                   | (window: Integer, visual_id: Integer?) -> instance
     end
 
+    class AppKitWindowHandle < Data
+      attr_reader window_number: Integer
+
+      def self.new: (Integer window_number) -> instance
+                  | (window_number: Integer) -> instance
+    end
+
+    class AppKitDisplayHandle < Data
+      def self.new: () -> instance
+    end
+
     class WindowsDisplayHandle < Data
       def self.new: () -> instance
     end

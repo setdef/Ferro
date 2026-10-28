@@ -12,6 +12,14 @@ own API. Releases are tagged `ferro-rfd/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `AppKitWindowHandle` (by `window_number`) and `AppKitDisplayHandle`, so `set_parent` takes a parent on macOS: the window is looked up on the main thread when the dialog runs, and an unknown number raises `Ferro::Rfd::Error`.
+
+### Changed
+
+- `set_parent` reads a handle by the name of its class and raw-window-handle's field names, so handle values from other gems work without copying.
+
 ## [0.1.0.pre.2] - 2026-10-26
 
 ### Added

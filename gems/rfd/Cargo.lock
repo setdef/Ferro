@@ -139,6 +139,7 @@ dependencies = [
 name = "ferro_rfd"
 version = "0.1.0-pre.2"
 dependencies = [
+ "dispatch2",
  "magnus",
  "objc2",
  "raw-window-handle",

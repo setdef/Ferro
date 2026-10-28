@@ -174,20 +174,37 @@ module Ferro
       # that is any object that answers +window_handle+ and
       # +display_handle+, each returning a handle value or +nil+ for one
       # it cannot give (rfd then has none). The handle values are
-      # Win32WindowHandle, XlibWindowHandle, and XcbWindowHandle for the
-      # window, and WindowsDisplayHandle, XlibDisplayHandle, and
-      # XcbDisplayHandle for the display. Both are read now, as rfd reads
-      # them.
+      # Win32WindowHandle, XlibWindowHandle, XcbWindowHandle, and
+      # AppKitWindowHandle for the window, and WindowsDisplayHandle,
+      # XlibDisplayHandle, XcbDisplayHandle, and AppKitDisplayHandle for
+      # the display. A value from another gem works too when its class is
+      # named for the same raw-window-handle struct and answers that
+      # struct's fields, so a window library's own handles cross as they
+      # are. Both are read now, as rfd reads them.
       #
-      # Supported on Windows and on Linux through the portal. ferro-rfd
-      # binds only handles rfd never dereferences, so a wrong one cannot
-      # crash the process: macOS's AppKit and Linux's Wayland handles are
-      # pointers rfd follows, and an Integer from Ruby could point anywhere,
-      # so they are not bound. A handle rfd cannot use here raises
-      # +ArgumentError+ with rfd's message: on Windows, any but
-      # Win32WindowHandle; on macOS, every one. On Linux, rfd ignores a
-      # handle it cannot use. Without a parent, rfd's macOS async dialogs
-      # attach to the app's main window anyway.
+      # ferro-rfd binds only handles that cannot crash your process when
+      # wrong. On Windows, Win32WindowHandle: an +HWND+, which Windows
+      # checks. On Linux, XlibWindowHandle and XcbWindowHandle: an X11
+      # window ID, which the portal receives as text. On macOS,
+      # AppKitWindowHandle: a window number, which AppKit looks up when the
+      # dialog runs. Wayland handles are pointers rfd follows, so they are
+      # not bound and raise +TypeError+. A handle rfd cannot use here
+      # raises +ArgumentError+ with rfd's message: on Windows, any but
+      # Win32WindowHandle; on macOS, any but AppKitWindowHandle. On Linux,
+      # rfd ignores a handle it cannot use. Without a parent, rfd's macOS
+      # async dialogs attach to the app's main window anyway.
+      #
+      # On macOS the window is looked up on the main thread, each time the
+      # dialog runs or #inspect describes it. On the main thread that
+      # happens at once. From another thread, the lookup and the dialog
+      # run on the main thread through your running app, as rfd runs any
+      # dialog from another thread, and wait for its run loop; with no
+      # running app, the call raises Error. The main thread has to be in
+      # its run loop for that wait to end: if it is blocked in Ruby
+      # instead, say joining this thread, the call never returns, and
+      # neither Ctrl-C nor Thread#kill reaches it, as with rfd's own hop. A number that names none of
+      # your app's windows, or a window without a content view, raises
+      # Error, where rfd would crash.
       #
       # The parent counts only while its window exists. Keep it open until
       # the dialog closes.
@@ -305,6 +322,11 @@ module Ferro
 
       # rfd's +Debug+ text for this dialog, which shows every option as rfd
       # holds it.
+      #
+      # On macOS, with an AppKitWindowHandle parent, it looks the window up
+      # as the dialog would, to show the content view rfd gets, and raises
+      # the Error the dialog would. From another thread it waits for the
+      # main thread's run loop, uninterruptibly, as #set_parent explains.
       #
       # === Example
       #

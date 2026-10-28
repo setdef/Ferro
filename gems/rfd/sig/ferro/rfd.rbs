@@ -5,8 +5,8 @@ module Ferro
   module Rfd
     VERSION: String
 
-    type window_handle = Win32WindowHandle | XlibWindowHandle | XcbWindowHandle
-    type display_handle = WindowsDisplayHandle | XlibDisplayHandle | XcbDisplayHandle
+    type window_handle = BasicObject
+    type display_handle = BasicObject
     type message_buttons = MessageButtons | MessageButtons::OkCustom | MessageButtons::OkCancelCustom
                          | MessageButtons::YesNoCancelCustom
 
@@ -15,8 +15,20 @@ module Ferro
       def display_handle: () -> display_handle?
     end
 
+    interface _HandleFields
+      def hwnd: () -> Integer
+      def hinstance: () -> Integer?
+      def window: () -> Integer
+      def visual_id: () -> Integer?
+      def window_number: () -> Integer
+      def display: () -> Integer?
+      def connection: () -> Integer?
+      def screen: () -> Integer
+    end
+
     type native_window = [:Win32, Integer, Integer?] | [:Xlib, Integer, Integer] | [:Xcb, Integer, Integer?]
-    type native_display = [:Windows] | [:Xlib, Integer?, Integer] | [:Xcb, Integer?, Integer]
+                       | [:AppKit, Integer]
+    type native_display = [:Windows] | [:Xlib, Integer?, Integer] | [:Xcb, Integer?, Integer] | [:AppKit]
     type native_parent = [native_window?, native_display?]
     type native_filter = [String, Array[String]]
     type native_file_settings = [Array[native_filter], String?, String?, String?, native_parent?, bool?]
@@ -28,6 +40,13 @@ module Ferro
     private def self.string: (Object value) -> String
     private def self.bytes: (Object value) -> String
     private def self.filter: (Object name, Object extensions) -> native_filter
+    HANDLE_KINDS: Array[String]
+    KERNEL_CLASS: UnboundMethod
+
+    private def self.class_of: (BasicObject handle) -> Class
+    private def self.handle_kind: (BasicObject handle) -> String?
+    private def self.native_window: (BasicObject handle) -> native_window
+    private def self.native_display: (BasicObject handle) -> native_display
     private def self.parent_pair: (_Parent parent) -> native_parent
 
     module Native
