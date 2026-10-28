@@ -25,7 +25,7 @@ PATH
 PATH
   remote: gems/rfd
   specs:
-    ferro-rfd (0.1.0.pre.2)
+    ferro-rfd (0.1.0.pre.3)
       rb_sys (~> 0.9.129)
 
 PATH
@@ -223,7 +223,7 @@ CHECKSUMS
   ferro-global-hotkey (0.1.0.pre.1)
   ferro-idna (0.1.0.pre.1)
   ferro-notify-rust (0.1.0.pre.3)
-  ferro-rfd (0.1.0.pre.2)
+  ferro-rfd (0.1.0.pre.3)
   ferro-time (0.1.0.pre.1)
   ferro-url (0.1.0.pre.1)
   ffi (1.17.4) sha256=bcd1642e06f0d16fc9e09ac6d49c3a7298b9789bcb58127302f934e437d60acf

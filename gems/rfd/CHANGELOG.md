@@ -12,6 +12,8 @@ own API. Releases are tagged `ferro-rfd/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0.pre.3] - 2026-10-27
+
 ### Added
 
 - `AppKitWindowHandle` (by `window_number`) and `AppKitDisplayHandle`, so `set_parent` takes a parent on macOS: the window is looked up on the main thread when the dialog runs, and an unknown number raises `Ferro::Rfd::Error`.
@@ -33,5 +35,6 @@ own API. Releases are tagged `ferro-rfd/vX.Y.Z`.
 - Dialogs release Ruby's global VM lock while open. Calls rfd would panic on raise `ArgumentError` or `Ferro::Rfd::Error` instead: a NUL byte in a filter, a window handle the platform cannot use, and on macOS a dialog off the main thread without a running app; any other panic inside rfd raises `Ferro::Rfd::Error`.
 - On Linux, rfd's XDG desktop portal backend (rfd's default); its GTK backend and Windows' `common-controls-v6` are not built.
 
-[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-rfd/v0.1.0.pre.2...HEAD
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-rfd/v0.1.0.pre.3...HEAD
+[0.1.0.pre.3]: https://github.com/setdef/Ferro/compare/ferro-rfd/v0.1.0.pre.2...ferro-rfd/v0.1.0.pre.3
 [0.1.0.pre.2]: https://github.com/setdef/Ferro/releases/tag/ferro-rfd/v0.1.0.pre.2
