@@ -59,13 +59,26 @@ class TestAppkitParent < Minitest::Test
         !Fiddle::Pointer.new(KIT["NSApp"]).ptr.null?
       end
 
-      # Keeps the main queue busy for +microseconds+, from any thread:
-      # dispatch_async_f(dispatch_get_main_queue(), microseconds, usleep).
-      def self.block_main_queue(microseconds)
-        system = Fiddle.dlopen(nil)
-        async = Fiddle::Function.new(system["dispatch_async_f"],
-          [Fiddle::TYPE_VOIDP, Fiddle::TYPE_VOIDP, Fiddle::TYPE_VOIDP], Fiddle::TYPE_VOID)
-        async.call(system["_dispatch_main_q"], microseconds, system["usleep"])
+      LIBC = Fiddle.dlopen(nil)
+      MUTEX_INIT = Fiddle::Function.new(LIBC["pthread_mutex_init"], [Fiddle::TYPE_VOIDP, Fiddle::TYPE_VOIDP], Fiddle::TYPE_INT)
+      MUTEX_LOCK = Fiddle::Function.new(LIBC["pthread_mutex_lock"], [Fiddle::TYPE_VOIDP], Fiddle::TYPE_INT)
+      MUTEX_UNLOCK = Fiddle::Function.new(LIBC["pthread_mutex_unlock"], [Fiddle::TYPE_VOIDP], Fiddle::TYPE_INT)
+      DISPATCH_ASYNC = Fiddle::Function.new(LIBC["dispatch_async_f"],
+        [Fiddle::TYPE_VOIDP, Fiddle::TYPE_VOIDP, Fiddle::TYPE_VOIDP], Fiddle::TYPE_VOID)
+
+      # A pthread mutex, for holding the main queue: 64 bytes is
+      # pthread_mutex_t on macOS.
+      def self.mutex
+        mutex = Fiddle::Pointer.malloc(64)
+        MUTEX_INIT.call(mutex, nil)
+        mutex
+      end
+
+      # Keeps the main queue busy until +mutex+, which this thread holds,
+      # is unlocked: dispatch_async_f(dispatch_get_main_queue(), mutex,
+      # pthread_mutex_lock).
+      def self.block_main_queue_on(mutex)
+        DISPATCH_ASYNC.call(LIBC["_dispatch_main_q"], mutex, LIBC["pthread_mutex_lock"])
       end
 
       def self.running?
@@ -131,35 +144,47 @@ class TestAppkitParent < Minitest::Test
     assert_includes debug, "AppKitWindowHandle { ns_view: 0x#{view.to_s(16)} }"
   end
 
-  # While inspect waits for a busy main queue, it holds no GVL, so another
-  # Ruby thread keeps running (plan 008, decision 3). A wait that held the
-  # GVL would stop the counter for the whole half second.
+  # While inspect waits for the main queue, it holds no GVL, so another
+  # Ruby thread runs (plan 008, decision 3). The proof is by order, not
+  # by rate: the main queue stays blocked until a second Ruby thread
+  # unlocks a mutex, and that thread waits to do so until inspect has
+  # started. inspect can finish only if that thread ran meanwhile; a wait
+  # that held the GVL would never end, and the child would be killed.
   def test_waiting_for_the_main_thread_releases_the_gvl
-    (waited, ticks), = in_child(<<~RUBY)
+    (order, debug, view), = in_child(<<~RUBY)
       #{APPKIT}
       app = AppKit.app
       window = AppKit.window
       Thread.new do
         sleep 0.1 until AppKit.running?
-        ticks = 0
-        counter = Thread.new { loop { sleep 0.01; ticks += 1 } }
-        sleep 0.05
-        AppKit.block_main_queue(500_000)
-        before = ticks
-        started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-        Ferro::Rfd::FileDialog.new.set_parent(appkit_parent(AppKit.number(window))).inspect
-        waited = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
-        counted = ticks - before
-        counter.kill
-        $stdout.binmode.write(Marshal.dump([waited, counted]))
+        order = Queue.new
+        mutex = AppKit.mutex
+        locked = Queue.new
+        inspecting = Queue.new
+        releaser = Thread.new do
+          AppKit::MUTEX_LOCK.call(mutex)
+          locked << true
+          inspecting.pop
+          sleep 0.1
+          order << :released
+          AppKit::MUTEX_UNLOCK.call(mutex)
+        end
+        locked.pop
+        AppKit.block_main_queue_on(mutex)
+        inspecting << true
+        debug = Ferro::Rfd::FileDialog.new.set_parent(appkit_parent(AppKit.number(window))).inspect
+        order << :inspected
+        releaser.join
+        result = [[order.pop, order.pop], debug, AppKit.content_view(window)]
+        $stdout.binmode.write(Marshal.dump(result))
         $stdout.flush
         exit!(0)
       end
       AppKit.send(app, "run")
     RUBY
 
-    assert_operator waited, :>=, 0.3
-    assert_operator ticks, :>=, 10
+    assert_equal %i[released inspected], order
+    assert_includes debug, "AppKitWindowHandle { ns_view: 0x#{view.to_s(16)} }"
   end
 
   def test_a_number_that_names_no_window_is_refused_before_any_dialog

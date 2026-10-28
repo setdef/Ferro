@@ -234,15 +234,7 @@ mod apple {
     pub const fn app_running() -> bool {
         true
     }
-
-    /// Off macOS no parent looks a window up, so this never waits.
-    pub fn on_main<R: Send>(work: impl FnOnce() -> R + Send) -> Result<R, &'static str> {
-        Ok(work())
-    }
 }
-
-#[cfg(not(target_os = "macos"))]
-pub use apple::on_main;
 
 #[cfg(test)]
 pub use apple::is_main_thread;

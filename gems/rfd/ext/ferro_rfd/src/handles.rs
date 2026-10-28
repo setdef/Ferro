@@ -184,26 +184,31 @@ impl DisplaySpec {
 }
 
 impl Parent {
-    /// The parent `spec` describes. On macOS an `AppKit` window is looked
-    /// up here, which only the main thread may do; off macOS it is no
-    /// parent, as the portal ignores it (plan 008, decision 6). The error
-    /// is the message `Ferro::Rfd::Error` carries.
-    fn build(spec: ParentSpec) -> Result<Self, String> {
-        let display = spec.display.map(DisplaySpec::raw);
-        #[cfg(target_os = "macos")]
-        if let Some(WindowSpec::AppKit { window_number }) = spec.window {
-            let looked_up = platform::look_up(window_number)?;
-            return Ok(Self {
-                window: Some(looked_up.raw()),
-                display,
-                _looked_up: Some(looked_up),
-            });
-        }
-        Ok(Self {
+    /// The parent `spec` describes with no lookup: every kind but an
+    /// `AppKit` window, which the portal ignores off macOS (plan 008,
+    /// decision 6).
+    fn without_lookup(spec: ParentSpec) -> Self {
+        Self {
             window: spec.window.and_then(WindowSpec::raw),
-            display,
+            display: spec.display.map(DisplaySpec::raw),
             #[cfg(target_os = "macos")]
             _looked_up: None,
+        }
+    }
+
+    /// The parent `spec` describes, looking an `AppKit` window up, which
+    /// only the main thread may do. The error is the message
+    /// `Ferro::Rfd::Error` carries.
+    #[cfg(target_os = "macos")]
+    fn build(spec: ParentSpec) -> Result<Self, String> {
+        let Some(WindowSpec::AppKit { window_number }) = spec.window else {
+            return Ok(Self::without_lookup(spec));
+        };
+        let looked_up = platform::look_up(window_number)?;
+        Ok(Self {
+            window: Some(looked_up.raw()),
+            display: spec.display.map(DisplaySpec::raw),
+            _looked_up: Some(looked_up),
         })
     }
 }
@@ -223,15 +228,19 @@ pub fn with_parent<T: Send>(
 ) -> Result<Result<T, String>, Panic> {
     let work = move || {
         capture(move || {
+            #[cfg(target_os = "macos")]
             let parent = spec.map(Parent::build).transpose()?;
+            // Off macOS nothing is looked up, so building cannot fail.
+            #[cfg(not(target_os = "macos"))]
+            let parent = spec.map(Parent::without_lookup);
             Ok(job(parent.as_ref()))
         })
     };
+    #[cfg(target_os = "macos")]
     if spec.is_some_and(|spec| spec.needs_main_thread()) {
-        platform::on_main(work).unwrap_or_else(|refusal| Ok(Err(refusal.to_owned())))
-    } else {
-        work()
+        return platform::on_main(work).unwrap_or_else(|refusal| Ok(Err(refusal.to_owned())));
     }
+    work()
 }
 
 /// The `RangeError` for a zero where raw-window-handle holds a `NonZero`
