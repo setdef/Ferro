@@ -687,11 +687,15 @@ class TestPortParsing < Minitest::Test
     end
   end
 
-  # <tt>parsing.rs:1265</tt>, +year_default_modifier_by_version_runtime+:
-  # its version 3 half; version 2 is deferred (plan 007, decision 1).
+  # <tt>parsing.rs:1265</tt>, +year_default_modifier_by_version_runtime+.
+  # Its version 2 half reads +10000 through the extended range, which
+  # needs +large-dates+; without it, version 2's <tt>[year]</tt> is the
+  # standard range too (plan 009), and refuses the year.
   def test_year_default_modifier_by_version_runtime
     input = "+10000-01-01"
+    fd_v2 = T::FormatDescription.parse_borrowed(2, "[year]-[month]-[day]")
     fd_v3 = T::FormatDescription.parse_borrowed(3, "[year]-[month]-[day]")
+    assert_raises(T::Error::Parse::ParseFromDescription) { T::Date.parse(input, fd_v2) }
     assert_raises(T::Error::Parse::ParseFromDescription::InvalidLiteral) { T::Date.parse(input, fd_v3) }
   end
 
@@ -755,6 +759,302 @@ class TestPortParsing < Minitest::Test
     ].each do |input, description|
       assert_raises(T::Error::Parse::ParseFromDescription::InvalidLiteral) { T::Time.parse(input, description) }
     end
+  end
+
+  # The ports below need the format-item tree and Parsed (plan 009).
+
+  # A version 1 description, as time's <tt>format_description!</tt> makes
+  # by default.
+  private def fd1(text)
+    T::FormatDescription.parse_borrowed(1, text)
+  end
+
+  # A version 2 description, as <tt>format_description!(version = 2, ...)</tt>
+  # makes.
+  private def fd2(text)
+    T::FormatDescription.parse_owned(2, text)
+  end
+
+  # A Parsed built with +with_+ builders, each of which must succeed.
+  private def defaults(**values)
+    values.reduce(T::Parsing::Parsed.new) { |parsed, (name, value)| parsed.public_send(:"with_#{name}", value) || flunk("#{name} #{value}") }
+  end
+
+  # <tt>parsing.rs:455</tt>, <tt>:584</tt>, <tt>:671</tt>, <tt>:714</tt>,
+  # <tt>:751</tt>, <tt>:810</tt>: the six
+  # <tt>*_insufficient_information_standalone</tt> tests.
+  def test_parse_insufficient_information_standalone
+    [T::Time, T::Date, T::UtcOffset, T::PlainDateTime, T::OffsetDateTime, T::UtcDateTime].each do |type|
+      assert_raises(T::Error::TryFromParsed::InsufficientInformation, type.name) { type.try_from(T::Parsing::Parsed.new) }
+    end
+  end
+
+  # <tt>parsing.rs:1188</tt>, +parse_component+.
+  def test_parse_component
+    c = T::FormatDescription::Component
+    m = T::FormatDescription::Modifier
+    zero = m::Padding::Zero
+    [
+      [c::CalendarYearFullExtendedRange.new(m::CalendarYearFullExtendedRange.default.with_padding(zero).with_sign_is_mandatory(false)), "2021", :year, 2021],
+      [c::CalendarYearCenturyExtendedRange.new(m::CalendarYearCenturyExtendedRange.default.with_padding(zero).with_sign_is_mandatory(false)), "20", :year_century, 20],
+      [c::CalendarYearCenturyExtendedRange.new(m::CalendarYearCenturyExtendedRange.default.with_padding(zero).with_sign_is_mandatory(false)), "20", :year_century_is_negative, false],
+      [c::CalendarYearLastTwo.new(m::CalendarYearLastTwo.default.with_padding(zero)), "21", :year_last_two, 21],
+      [c::IsoYearFullExtendedRange.new(m::IsoYearFullExtendedRange.default.with_padding(zero).with_sign_is_mandatory(false)), "2021", :iso_year, 2021],
+      [c::IsoYearCenturyExtendedRange.new(m::IsoYearCenturyExtendedRange.default.with_padding(zero).with_sign_is_mandatory(false)), "20", :iso_year_century, 20],
+      [c::IsoYearCenturyExtendedRange.new(m::IsoYearCenturyExtendedRange.default.with_padding(zero).with_sign_is_mandatory(false)), "20", :iso_year_century_is_negative, false],
+      [c::IsoYearLastTwo.new(m::IsoYearLastTwo.default.with_padding(zero)), "21", :iso_year_last_two, 21],
+      [c::MonthNumerical.new(m::MonthNumerical.default.with_padding(m::Padding::Space)), " 1", :month, Month::January],
+      [c::MonthShort.new(m::MonthShort.default.with_case_sensitive(true)), "Jan", :month, Month::January],
+      [c::MonthShort.new(m::MonthShort.default.with_case_sensitive(false)), "jAn", :month, Month::January],
+      [c::MonthLong.new(m::MonthLong.default.with_case_sensitive(true)), "January", :month, Month::January],
+      [c::MonthLong.new(m::MonthLong.default.with_case_sensitive(false)), "jAnUaRy", :month, Month::January],
+      [c::Ordinal.new(m::Ordinal.default.with_padding(zero)), "012", :ordinal, 12],
+      [c::WeekdayShort.new(m::WeekdayShort.default.with_case_sensitive(true)), "Sun", :weekday, Weekday::Sunday],
+      [c::WeekdayShort.new(m::WeekdayShort.default.with_case_sensitive(false)), "sUn", :weekday, Weekday::Sunday],
+      [c::WeekdayLong.new(m::WeekdayLong.default.with_case_sensitive(true)), "Sunday", :weekday, Weekday::Sunday],
+      [c::WeekdayLong.new(m::WeekdayLong.default.with_case_sensitive(false)), "sUnDaY", :weekday, Weekday::Sunday],
+      [c::WeekdaySunday.new(m::WeekdaySunday.default.with_one_indexed(false)), "0", :weekday, Weekday::Sunday],
+      [c::WeekdaySunday.new(m::WeekdaySunday.default.with_one_indexed(true)), "1", :weekday, Weekday::Sunday],
+      [c::WeekdayMonday.new(m::WeekdayMonday.default.with_one_indexed(false)), "6", :weekday, Weekday::Sunday],
+      [c::WeekdayMonday.new(m::WeekdayMonday.default.with_one_indexed(true)), "7", :weekday, Weekday::Sunday],
+      [c::WeekNumberSunday.new(m::WeekNumberSunday.default.with_padding(m::Padding::None)), "2", :sunday_week_number, 2],
+      [c::WeekNumberMonday.new(m::WeekNumberMonday.default.with_padding(m::Padding::None)), "2", :monday_week_number, 2],
+      [c::WeekNumberIso.new(m::WeekNumberIso.default.with_padding(m::Padding::None)), "2", :iso_week_number, 2],
+      *[
+        [:One, "1", 100_000_000],
+        [:Two, "12", 120_000_000],
+        [:Three, "123", 123_000_000],
+        [:Four, "1234", 123_400_000],
+        [:Five, "12345", 123_450_000],
+        [:Six, "123456", 123_456_000],
+        [:Seven, "1234567", 123_456_700],
+        [:Eight, "12345678", 123_456_780],
+        [:Nine, "123456789", 123_456_789],
+        [:OneOrMore, "123456789", 123_456_789],
+      ].map { |digits, input, value| [c::Subsecond.new(m::Subsecond.default.with_digits(m::SubsecondDigits.const_get(digits))), input, :subsecond, value] },
+      [c::Period.new(m::Period.default.with_is_uppercase(false).with_case_sensitive(true)), "am", :hour_12_is_pm, false],
+      [c::Period.new(m::Period.default.with_is_uppercase(false).with_case_sensitive(false)), "aM", :hour_12_is_pm, false],
+      [c::UnixTimestampSecond.new(m::UnixTimestampSecond.default.with_sign_is_mandatory(false)), "1234567890", :unix_timestamp_nanos, 1_234_567_890_000_000_000],
+      [c::UnixTimestampMillisecond.new(m::UnixTimestampMillisecond.default.with_sign_is_mandatory(false)), "1234567890123", :unix_timestamp_nanos, 1_234_567_890_123_000_000],
+      [c::UnixTimestampMicrosecond.new(m::UnixTimestampMicrosecond.default.with_sign_is_mandatory(false)), "1234567890123456", :unix_timestamp_nanos, 1_234_567_890_123_456_000],
+      [c::UnixTimestampNanosecond.new(m::UnixTimestampNanosecond.default.with_sign_is_mandatory(false)), "1234567890123456789", :unix_timestamp_nanos, 1_234_567_890_123_456_789],
+      [c::UnixTimestampNanosecond.new(m::UnixTimestampNanosecond.default.with_sign_is_mandatory(false)), "-1234567890123456789", :unix_timestamp_nanos, -1_234_567_890_123_456_789],
+    ].each do |component, input, accessor, value|
+      parsed = T::Parsing::Parsed.new
+      parsed.parse_component(input, component)
+      assert_equal value, parsed.public_send(accessor), "#{component.inspect} #{input}"
+    end
+  end
+
+  private def ignore(count)
+    c = T::FormatDescription::Component
+    c::Ignore.new(T::FormatDescription::Modifier::Ignore.count(count))
+  end
+
+  # <tt>parsing.rs:1205</tt>, +parse_ignore_component+.
+  def test_parse_ignore_component
+    assert_equal "def".b, T::Parsing::Parsed.new.parse_component("abcdef", ignore(3))
+  end
+
+  # <tt>parsing.rs:1216</tt>, +parse_ignore_component_too_short+.
+  def test_parse_ignore_component_too_short
+    error = assert_raises(T::Error::ParseFromDescription::InvalidComponent) { T::Parsing::Parsed.new.parse_component("abcdef", ignore(7)) }
+    assert_equal "ignore", error.name
+  end
+
+  # <tt>parsing.rs:1255</tt>, +parse_ignore_component_v2_not_utf8_boundary+:
+  # Ignore consumes bytes, splitting a character as it may.
+  def test_parse_ignore_component_v2_not_utf8_boundary
+    [["£", 1], ["€", 1], ["€", 2], ["🦀", 1], ["🦀", 2], ["🦀", 3]].each do |input, count|
+      rest = T::Parsing::Parsed.new.parse_component(input, ignore(count))
+      assert_equal input.b.byteslice(count..), rest
+      assert_equal Encoding::BINARY, rest.encoding
+    end
+  end
+
+  # <tt>parsing.rs:1318</tt>, +parse_optional+.
+  def test_parse_optional
+    description = fd2("[optional [[year]-[month]-[day]]]")
+    [
+      ["2021-01-02", "", [2021, Month::January, 2]],
+      ["2021-01", "2021-01", [nil, nil, nil]],
+    ].each do |input, remaining, (year, month, day)|
+      parsed = T::Parsing::Parsed.new
+      assert_equal remaining.b, parsed.parse_items(input, [description])
+      assert_case year, parsed.year
+      assert_case month, parsed.month
+      assert_case day, parsed.day
+    end
+  end
+
+  # <tt>parsing.rs:1352</tt>, +parse_first_item+.
+  def test_parse_first_item
+    [
+      ["2021-01-02", fd2("[first [[year]-[month]-[day]]]"), "", [2021, Month::January, 2]],
+      ["2021-01-02", fd2("[first []]"), "2021-01-02", [nil, nil, nil]],
+      ["2021-01-02", fd2("[first [[period]][x][[year]-[month]-[day]]]"), "", [2021, Month::January, 2]],
+    ].each do |input, description, remaining, (year, month, day)|
+      parsed = T::Parsing::Parsed.new
+      assert_equal remaining.b, parsed.parse_items(input, [description])
+      assert_case year, parsed.year
+      assert_case month, parsed.month
+      assert_case day, parsed.day
+    end
+  end
+
+  # <tt>parsing.rs:1374</tt>, +parse_first_item_err+.
+  def test_parse_first_item_err
+    parsed = T::Parsing::Parsed.new
+    error = assert_raises(T::Error::ParseFromDescription::InvalidComponent) { parsed.parse_items("2021-01-02", [fd2("[first [[period]][x]]")]) }
+    assert_equal "period", error.name
+  end
+
+  # <tt>parsing.rs:1508</tt>, +parse_with_defaults_date_success+.
+  def test_parse_with_defaults_date_success
+    [
+      [fd1("[month]-[day]"), "01-15", defaults(year: 2020), date(2020, 1, 15)],
+      [fd1("[year]-[month]-[day]"), "2020-01-15", defaults(year: 1999), date(2020, 1, 15)],
+    ].each do |format, input, defaults, expected|
+      assert_equal expected, T::Date.parse_with_defaults(input, format, defaults)
+    end
+  end
+
+  # <tt>parsing.rs:1522</tt>, +parse_with_defaults_date_insufficient_information+.
+  def test_parse_with_defaults_date_insufficient_information
+    assert_raises(T::Error::Parse::TryFromParsed::InsufficientInformation) do
+      T::Date.parse_with_defaults("01", fd1("[month]"), T::Parsing::Parsed.new)
+    end
+  end
+
+  # <tt>parsing.rs:1542</tt>, +parse_with_defaults_date_invalid_component+.
+  def test_parse_with_defaults_date_invalid_component
+    error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) do
+      T::Date.parse_with_defaults("Ja-15", fd1("[month]-[day]"), defaults(year: 2020))
+    end
+    assert_equal "month", error.name
+  end
+
+  # <tt>parsing.rs:1563</tt>, +parse_with_defaults_date_component_range+.
+  def test_parse_with_defaults_date_component_range
+    error = assert_raises(T::Error::Parse::TryFromParsed::ComponentRange) do
+      T::Date.parse_with_defaults("02-30", fd1("[month]-[day]"), defaults(year: 2020))
+    end
+    assert_equal "day", error.name
+  end
+
+  # <tt>parsing.rs:1590</tt>, +parse_with_defaults_time_success+.
+  def test_parse_with_defaults_time_success
+    [
+      [fd1("[hour]"), "12", defaults(minute: 30), clock(12, 30)],
+      [fd1("[hour]:[minute]"), "12:30", defaults(minute: 0), clock(12, 30)],
+    ].each do |format, input, defaults, expected|
+      assert_equal expected, T::Time.parse_with_defaults(input, format, defaults)
+    end
+  end
+
+  # <tt>parsing.rs:1604</tt>, +parse_with_defaults_time_insufficient_information+.
+  def test_parse_with_defaults_time_insufficient_information
+    assert_raises(T::Error::Parse::TryFromParsed::InsufficientInformation) do
+      T::Time.parse_with_defaults("", fd1(""), T::Parsing::Parsed.new)
+    end
+  end
+
+  # <tt>parsing.rs:1619</tt>, +parse_with_defaults_time_invalid_component+.
+  def test_parse_with_defaults_time_invalid_component
+    error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) do
+      T::Time.parse_with_defaults("a", fd1("[hour]"), defaults(minute: 30))
+    end
+    assert_equal "hour", error.name
+  end
+
+  # <tt>parsing.rs:1646</tt>, +parse_with_defaults_utc_offset_success+.
+  def test_parse_with_defaults_utc_offset_success
+    [
+      [fd1("[offset_hour sign:mandatory]"), "+05", defaults(offset_minute_signed: 30)],
+      [fd1("[offset_hour sign:mandatory]:[offset_minute]"), "+05:30", defaults(offset_minute_signed: 0)],
+    ].each do |format, input, defaults|
+      assert_equal T::UtcOffset.from_hms(5, 30, 0), T::UtcOffset.parse_with_defaults(input, format, defaults)
+    end
+  end
+
+  # <tt>parsing.rs:1660</tt>, +parse_with_defaults_utc_offset_insufficient_information+.
+  def test_parse_with_defaults_utc_offset_insufficient_information
+    assert_raises(T::Error::Parse::TryFromParsed::InsufficientInformation) do
+      T::UtcOffset.parse_with_defaults("", fd1(""), T::Parsing::Parsed.new)
+    end
+  end
+
+  # <tt>parsing.rs:1680</tt>, +parse_with_defaults_utc_offset_invalid_component+.
+  def test_parse_with_defaults_utc_offset_invalid_component
+    error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) do
+      T::UtcOffset.parse_with_defaults("*05", fd1("[offset_hour sign:mandatory]"), defaults(offset_minute_signed: 30))
+    end
+    assert_equal "offset hour", error.name
+  end
+
+  # <tt>parsing.rs:1707</tt>, <tt>:1768</tt>, +parse_with_defaults_plain_date_time_success+
+  # and +parse_with_defaults_utc_date_time_success+.
+  def test_parse_with_defaults_plain_date_time_success
+    [
+      [fd1("[year]-[month]-[day]"), "2020-01-02", defaults(hour_24: 12)],
+      [fd1("[year]-[month]-[day] [hour]"), "2020-01-02 12", defaults(hour_24: 0)],
+    ].each do |format, input, defaults|
+      assert_equal datetime(2020, 1, 2, 12), T::PlainDateTime.parse_with_defaults(input, format, defaults)
+      assert_equal utc(2020, 1, 2, 12), T::UtcDateTime.parse_with_defaults(input, format, defaults)
+    end
+  end
+
+  # <tt>parsing.rs:1721</tt>, <tt>:1782</tt>, the two
+  # +parse_with_defaults_*_date_time_insufficient_information+ tests.
+  def test_parse_with_defaults_plain_date_time_insufficient_information
+    [T::PlainDateTime, T::UtcDateTime].each do |type|
+      assert_raises(T::Error::Parse::TryFromParsed::InsufficientInformation) do
+        type.parse_with_defaults("01-15", fd1("[month]-[day]"), T::Parsing::Parsed.new)
+      end
+    end
+  end
+
+  # <tt>parsing.rs:1741</tt>, <tt>:1802</tt>, the two
+  # +parse_with_defaults_*_date_time_invalid_component+ tests.
+  def test_parse_with_defaults_plain_date_time_invalid_component
+    [T::PlainDateTime, T::UtcDateTime].each do |type|
+      error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) do
+        type.parse_with_defaults("2020-01-02 Ja", fd1("[year]-[month]-[day] [hour]"), defaults(hour_24: 12))
+      end
+      assert_equal "hour", error.name
+    end
+  end
+
+  # <tt>parsing.rs:1832</tt>, +parse_with_defaults_offset_date_time_success+.
+  def test_parse_with_defaults_offset_date_time_success
+    plain = fd1("[year]-[month]-[day] [hour]:[minute]")
+    offset = fd1("[year]-[month]-[day] [hour]:[minute][offset_hour sign:mandatory]:[offset_minute]")
+    utc = datetime(2020, 1, 2, 3, 4).assume_offset(T::UtcOffset::UTC)
+    east = datetime(2020, 1, 2, 3, 4).assume_offset(T::UtcOffset.from_hms(5, 30, 0))
+    [
+      [plain, "2020-01-02 03:04", defaults(offset_hour: 0, offset_minute_signed: 0), utc],
+      [offset, "2020-01-02 03:04+05:30", defaults(offset_hour: 0), east],
+    ].each do |format, input, defaults, expected|
+      actual = T::OffsetDateTime.parse_with_defaults(input, format, defaults)
+      assert_equal expected, actual
+      assert_equal expected.offset, actual.offset
+    end
+  end
+
+  # <tt>parsing.rs:1846</tt>, +parse_with_defaults_offset_date_time_insufficient_information+.
+  def test_parse_with_defaults_offset_date_time_insufficient_information
+    assert_raises(T::Error::Parse::TryFromParsed::InsufficientInformation) do
+      T::OffsetDateTime.parse_with_defaults("2020-01-02 03:04", fd1("[year]-[month]-[day] [hour]:[minute]"), T::Parsing::Parsed.new)
+    end
+  end
+
+  # <tt>parsing.rs:1869</tt>, +parse_with_defaults_offset_date_time_invalid_component+.
+  def test_parse_with_defaults_offset_date_time_invalid_component
+    error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) do
+      T::OffsetDateTime.parse_with_defaults("2020-01-a 03:04", fd1("[year]-[month]-[day] [hour]:[minute]"),
+        defaults(offset_hour: 0, offset_minute_signed: 0))
+    end
+    assert_equal "day", error.name
   end
 end
 

@@ -20,9 +20,13 @@ require_relative "time/utc_date_time"
 require_relative "time/offset_date_time"
 require_relative "time/format_description"
 require_relative "time/format_description/format_description_v3"
+require_relative "time/format_description/modifier"
+require_relative "time/format_description/component"
+require_relative "time/format_description/format_item"
 require_relative "time/format_description/well_known"
 require_relative "time/format_description/well_known/iso8601/config"
 require_relative "time/format_description/well_known/iso8601"
+require_relative "time/parsing"
 require_relative "time/util"
 
 # Gems that bind Rust crates to Ruby one to one.
@@ -50,8 +54,9 @@ module Ferro
   # This module binds time (https://github.com/time-rs/time), Rust's
   # date and time library, one to one: Date, Time, PlainDateTime,
   # UtcDateTime, OffsetDateTime, UtcOffset, SignedDuration, Month,
-  # Weekday, the format descriptions and well-known formats, every error,
-  # and Util. time's +large-dates+ feature is off, as Tauri builds it, so
+  # Weekday, the format descriptions in every version with the format
+  # items they parse into, the well-known formats, Parsing::Parsed, every
+  # error, and Util. time's +large-dates+ feature is off, as Tauri builds it, so
   # years run from -9999 to 9999.
   #
   # Ferro::Time::Time and Ferro::Time::Date are time's types, not Ruby's.

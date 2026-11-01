@@ -136,6 +136,29 @@ module Ferro
         def parse(input, description)
           Native.utc_parse(input, Arguments.description(description))
         end
+
+        # Parses a UtcDateTime from +input+ with +description+, as parse does, but
+        # starting from +defaults+ rather than from nothing: a component the
+        # input lacks keeps the value +defaults+ gives it. +defaults+ is not
+        # changed. Mirrors time's <tt>UtcDateTime::parse_with_defaults</tt>
+        # (<tt>src/utc_date_time.rs:1237-1243</tt>).
+        #
+        # [input] String, read as bytes, as Rust's <tt>&[u8]</tt>.
+        # [description] A format description.
+        # [defaults] Parsing::Parsed.
+        def parse_with_defaults(input, description, defaults)
+          Native.utc_parse_with_defaults(input, Arguments.description(description), Arguments.parsed(defaults))
+        end
+
+        # The UtcDateTime that +parsed+ describes, raising an Error::TryFromParsed
+        # variant when it lacks a component the UtcDateTime needs or holds one out
+        # of range. Mirrors time's <tt>TryFrom<Parsed> for UtcDateTime</tt>
+        # (<tt>src/parsing/parsed.rs:1308-1350</tt>).
+        #
+        # [parsed] Parsing::Parsed.
+        def try_from(parsed)
+          Native.utc_try_from_parsed(Arguments.parsed(parsed))
+        end
       end
 
       # Midnight, January 1, 1970. Mirrors time's

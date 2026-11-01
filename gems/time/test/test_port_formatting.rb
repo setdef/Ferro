@@ -385,11 +385,57 @@ class TestPortFormatting < Minitest::Test
     end
   end
 
-  # <tt>formatting.rs:580</tt>, +insufficient_type_information+. Its
-  # second half formats a +First+ item, which the gem defers with the
-  # format-item tree (plan 007, decision 1).
+  # <tt>formatting.rs:580</tt>, +insufficient_type_information+.
   def test_insufficient_type_information
+    fd = T::FormatDescription
     assert_raises(T::Error::Format::InsufficientTypeInformation) { T::Time::MIDNIGHT.format(fd("[year]")) }
+    first = fd::BorrowedFormatItem::First.new([fd::BorrowedFormatItem::Compound.new(fd.parse_borrowed(1, "[year]"))])
+    assert_raises(T::Error::Format::InsufficientTypeInformation) { T::Time::MIDNIGHT.format(first) }
+  end
+
+  # <tt>formatting.rs:507</tt>, +format_odt+, with time's
+  # <tt>io::sink()</tt> as a String.
+  def test_format_odt
+    fd = T::FormatDescription
+    text = "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:1+] [offset_hour sign:mandatory]:[offset_minute]:[offset_second]"
+    [
+      [T::PlainDateTime.new(date(1970, 1, 1), T::Time::MIDNIGHT).assume_utc, "1970-01-01 00:00:00.0 +00:00:00"],
+    ].each do |odt, expected|
+      description = fd.parse_borrowed(2, text)
+      assert_equal expected, odt.format(description)
+      odt.format_into(+"", description)
+      assert_equal expected, odt.format(fd::OwnedFormatItem.from(description))
+      odt.format_into(+"", fd::OwnedFormatItem.from(description))
+
+      v3 = fd.parse_borrowed(3, text)
+      assert_equal expected, odt.format(v3)
+      odt.format_into(+"", v3)
+      v3 = v3.to_owned
+      assert_equal expected, odt.format(v3)
+      odt.format_into(+"", v3)
+    end
+  end
+
+  # <tt>formatting.rs:741</tt>, +first_borrowed+.
+  def test_first_borrowed
+    b = T::FormatDescription::BorrowedFormatItem
+    [
+      [b::First.new([]), ""],
+      [b::First.new([b::Compound.new(T::FormatDescription.parse_borrowed(1, "[hour]"))]), "00"],
+    ].each do |description, expected|
+      assert_equal expected, T::Time::MIDNIGHT.format(description)
+    end
+  end
+
+  # <tt>formatting.rs:753</tt>, +first_owned+.
+  def test_first_owned
+    fd = T::FormatDescription
+    [
+      [fd::OwnedFormatItem::First.new([]), ""],
+      [fd::OwnedFormatItem.from(fd::BorrowedFormatItem::First.new([fd::BorrowedFormatItem::Compound.new(fd.parse_borrowed(1, "[hour]"))])), "00"],
+    ].each do |description, expected|
+      assert_equal expected, T::Time::MIDNIGHT.format(description)
+    end
   end
 
   # <tt>formatting.rs:759</tt>, +ignore+.

@@ -29,11 +29,14 @@ mod duration;
 mod failure;
 mod format;
 mod iso8601;
+mod items;
 mod offset;
+mod parsed;
 mod system_time;
 mod values;
 
 use std::any::Any;
+use std::cell::Cell;
 use std::panic::{self, AssertUnwindSafe};
 
 use magnus::{prelude::*, typed_data::Obj, Error, RModule, Ruby, TypedData, Value};
@@ -62,6 +65,35 @@ fn panic_message(payload: &(dyn Any + Send)) -> String {
         .map(|message| (*message).to_owned())
         .or_else(|| payload.downcast_ref::<String>().cloned())
         .unwrap_or_else(|| "Box<dyn Any>".to_owned())
+}
+
+thread_local! {
+    /// Whether a panic on this thread is expected and caught, so the hook
+    /// stays silent (`quietly`).
+    static QUIET: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Runs `operation`, catching a panic without printing it: the one panic
+/// the gem cannot refuse beforehand (plan 009, decision 19), which it
+/// turns into the refusal time's message names. The hook `init` installs
+/// prints every other panic as Rust's default hook would. Each extension
+/// links its own copy of std, so the hook governs this gem's panics only.
+pub(crate) fn quietly<T>(operation: impl FnOnce() -> T) -> Result<T, Panic> {
+    QUIET.with(|quiet| quiet.set(true));
+    let result = capture(operation);
+    QUIET.with(|quiet| quiet.set(false));
+    result
+}
+
+/// Installs a panic hook that defers to the previous one unless the
+/// panic happens inside `quietly`.
+fn install_quiet_hook() {
+    let previous = panic::take_hook();
+    panic::set_hook(Box::new(move |info| {
+        if !QUIET.with(Cell::get) {
+            previous(info);
+        }
+    }));
 }
 
 /// Runs `operation` under `catch_unwind` and turns its failure, or a
@@ -119,6 +151,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         rb_sys::rb_ext_ractor_safe(true);
     }
 
+    install_quiet_hook();
     let time = ruby.define_module("Ferro")?.define_module("Time")?;
     let native = time.define_module("Native")?;
     values::define(ruby, time)?;
@@ -129,6 +162,8 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     clock::define(native)?;
     datetime::define(native)?;
     format::define(ruby, time, native)?;
+    items::define(native)?;
+    parsed::define(ruby, time, native)?;
     system_time::define(native)?;
     Ok(())
 }

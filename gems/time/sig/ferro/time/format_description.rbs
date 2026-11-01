@@ -6,9 +6,13 @@ module Ferro
     module FormatDescription
       type description = FormatDescriptionV3 | singleton(WellKnown::Rfc2822) | singleton(WellKnown::Rfc3339)
                        | WellKnown::Iso8601 | singleton(WellKnown::Iso8601)
+                       | BorrowedFormatItem | OwnedFormatItem | Array[BorrowedFormatItem] | Array[OwnedFormatItem]
 
-      def self.parse_borrowed: (Integer version, String input) -> FormatDescriptionV3
-      def self.parse_owned: (Integer version, String input) -> FormatDescriptionV3
+      def self.parse_borrowed: (Integer version, String input) -> (FormatDescriptionV3 | Array[BorrowedFormatItem])
+      def self.parse_owned: (Integer version, String input) -> (FormatDescriptionV3 | OwnedFormatItem)
+      def self.parse: (String input) -> (FormatDescriptionV3 | Array[BorrowedFormatItem])
+      def self.parse_strftime_borrowed: (String input) -> Array[BorrowedFormatItem]
+      def self.parse_strftime_owned: (String input) -> OwnedFormatItem
     end
   end
 end

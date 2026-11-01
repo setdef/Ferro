@@ -11,6 +11,8 @@ module Ferro
 
       def self.new: (Date date, Time time) -> PlainDateTime
       def self.parse: (String input, FormatDescription::description description) -> PlainDateTime
+      def self.parse_with_defaults: (String input, FormatDescription::description description, Parsing::Parsed defaults) -> PlainDateTime
+      def self.try_from: (Parsing::Parsed parsed) -> PlainDateTime
 
       def date: () -> Date
       def time: () -> Time

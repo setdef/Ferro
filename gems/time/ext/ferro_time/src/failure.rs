@@ -30,6 +30,10 @@ pub enum Failure {
     Parse(error::Parse),
     /// time's `InvalidFormatDescription`.
     InvalidFormatDescription(error::InvalidFormatDescription),
+    /// time's `ParseFromDescription`, alone, as `Parsed`'s methods fail.
+    ParseFromDescription(error::ParseFromDescription),
+    /// time's `TryFromParsed`, alone, as `TryFrom<Parsed>` fails.
+    TryFromParsed(error::TryFromParsed),
     /// Ruby's `RangeError`: an input time would panic on (decision 7).
     Range(String),
     /// Ruby's `TypeError`: what Rust's compiler would refuse (decision 11).
@@ -104,44 +108,62 @@ fn format_target(failure: &error::Format) -> Target {
 
 /// The Ruby class and arguments of time's `TryFromParsed` under `Parse`
 /// (`src/error/try_from_parsed.rs:8-17`).
-fn try_from_parsed_target(failure: error::TryFromParsed) -> Target {
-    match failure {
-        error::TryFromParsed::InsufficientInformation => Target::Time(
+fn try_from_parsed_target(failure: error::TryFromParsed, nested: bool) -> Target {
+    let [insufficient, range_class, base] = if nested {
+        [
             "Error::Parse::TryFromParsed::InsufficientInformation",
-            vec![],
-        ),
-        error::TryFromParsed::ComponentRange(range) => Target::Time(
             "Error::Parse::TryFromParsed::ComponentRange",
-            range_args(range),
-        ),
-        other => text("Error::Parse::TryFromParsed", &other),
+            "Error::Parse::TryFromParsed",
+        ]
+    } else {
+        [
+            "Error::TryFromParsed::InsufficientInformation",
+            "Error::TryFromParsed::ComponentRange",
+            "Error::TryFromParsed",
+        ]
+    };
+    match failure {
+        error::TryFromParsed::InsufficientInformation => Target::Time(insufficient, vec![]),
+        error::TryFromParsed::ComponentRange(range) => Target::Time(range_class, range_args(range)),
+        other => text(base, &other),
     }
 }
 
 /// The Ruby class and arguments of time's `ParseFromDescription` under
 /// `Parse` (`src/error/parse_from_description.rs:7-19`).
-fn parse_from_description_target(failure: error::ParseFromDescription) -> Target {
-    match failure {
-        error::ParseFromDescription::InvalidLiteral { .. } => {
-            Target::Time("Error::Parse::ParseFromDescription::InvalidLiteral", vec![])
-        }
-        error::ParseFromDescription::InvalidComponent(name) => Target::Time(
+fn parse_from_description_target(failure: error::ParseFromDescription, nested: bool) -> Target {
+    let [literal, component, trailing, base] = if nested {
+        [
+            "Error::Parse::ParseFromDescription::InvalidLiteral",
             "Error::Parse::ParseFromDescription::InvalidComponent",
-            vec![Arg::Str(name.to_owned())],
-        ),
-        error::ParseFromDescription::UnexpectedTrailingCharacters { .. } => Target::Time(
             "Error::Parse::ParseFromDescription::UnexpectedTrailingCharacters",
-            vec![],
-        ),
-        other => text("Error::Parse::ParseFromDescription", &other),
+            "Error::Parse::ParseFromDescription",
+        ]
+    } else {
+        [
+            "Error::ParseFromDescription::InvalidLiteral",
+            "Error::ParseFromDescription::InvalidComponent",
+            "Error::ParseFromDescription::UnexpectedTrailingCharacters",
+            "Error::ParseFromDescription",
+        ]
+    };
+    match failure {
+        error::ParseFromDescription::InvalidLiteral { .. } => Target::Time(literal, vec![]),
+        error::ParseFromDescription::InvalidComponent(name) => {
+            Target::Time(component, vec![Arg::Str(name.to_owned())])
+        }
+        error::ParseFromDescription::UnexpectedTrailingCharacters { .. } => {
+            Target::Time(trailing, vec![])
+        }
+        other => text(base, &other),
     }
 }
 
 /// The Ruby class and arguments of time's `Parse` (`src/error/parse.rs:9-27`).
 fn parse_target(failure: error::Parse) -> Target {
     match failure {
-        error::Parse::TryFromParsed(inner) => try_from_parsed_target(inner),
-        error::Parse::ParseFromDescription(inner) => parse_from_description_target(inner),
+        error::Parse::TryFromParsed(inner) => try_from_parsed_target(inner, true),
+        error::Parse::ParseFromDescription(inner) => parse_from_description_target(inner, true),
         other => text("Error::Parse", &other),
     }
 }
@@ -214,6 +236,8 @@ impl Failure {
             Self::InvalidVariant => Target::Time("Error::InvalidVariant", vec![]),
             Self::Format(failure) => format_target(failure),
             Self::Parse(failure) => parse_target(*failure),
+            Self::ParseFromDescription(failure) => parse_from_description_target(*failure, false),
+            Self::TryFromParsed(failure) => try_from_parsed_target(*failure, false),
             Self::InvalidFormatDescription(failure) => invalid_format_description_target(failure),
             Self::Range(message) => Target::Range(message.clone()),
             Self::Type(message) => Target::Type(message.clone()),
@@ -286,6 +310,18 @@ impl From<error::Parse> for Failure {
     }
 }
 
+impl From<error::ParseFromDescription> for Failure {
+    fn from(failure: error::ParseFromDescription) -> Self {
+        Self::ParseFromDescription(failure)
+    }
+}
+
+impl From<error::TryFromParsed> for Failure {
+    fn from(failure: error::TryFromParsed) -> Self {
+        Self::TryFromParsed(failure)
+    }
+}
+
 impl From<error::InvalidFormatDescription> for Failure {
     fn from(failure: error::InvalidFormatDescription) -> Self {
         Self::InvalidFormatDescription(failure)
@@ -313,6 +349,32 @@ mod tests {
 
     fn component_range() -> error::ComponentRange {
         Date::from_calendar_date(2019, Month::February, 29).unwrap_err()
+    }
+
+    #[test]
+    fn standalone_parser_errors_raise_the_top_level_classes() {
+        assert_eq!(
+            Failure::ParseFromDescription(error::ParseFromDescription::InvalidComponent("day"))
+                .target(),
+            Target::Time(
+                "Error::ParseFromDescription::InvalidComponent",
+                vec![Arg::Str("day".to_owned())]
+            )
+        );
+        assert_eq!(
+            Failure::TryFromParsed(error::TryFromParsed::InsufficientInformation).target(),
+            Target::Time("Error::TryFromParsed::InsufficientInformation", vec![])
+        );
+        assert_eq!(
+            Failure::Parse(error::Parse::TryFromParsed(
+                error::TryFromParsed::InsufficientInformation
+            ))
+            .target(),
+            Target::Time(
+                "Error::Parse::TryFromParsed::InsufficientInformation",
+                vec![]
+            )
+        );
     }
 
     fn invalid_literal() -> error::Parse {

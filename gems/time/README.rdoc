@@ -120,15 +120,27 @@ The API is time's, translated where Rust has no Ruby meaning:
   reflexive impl through SignedDuration#coerce, and no other operator
   takes a number on the left, as in Rust.
 * A description is a FormatDescriptionV3, the classes Rfc2822 and
-  Rfc3339, or an Iso8601 with any Config. +format_into+ appends to a
-  String.
+  Rfc3339, an Iso8601 with any Config, or format items: a
+  BorrowedFormatItem, an OwnedFormatItem, or an Array of either, as
+  FormatDescription.parse_borrowed and parse_owned return for versions 1
+  and 2, and parse_strftime_borrowed and parse_strftime_owned for
+  +strftime+. +format_into+ appends to a String.
+* Format items, components, and modifiers are frozen +Data+ values you
+  can read and build: <tt>Component::Day.new(Modifier::Day.default)</tt>.
+  A modifier comes only from its +default+ (or Modifier::Ignore.count)
+  and its +with_+ builders, as in Rust. Naming a type or variant time
+  deprecates warns in Ruby's +:deprecated+ category.
+* Parsing::Parsed is time's parser state: mutable, with time's getters,
+  setters (+true+ or +nil+), and +with_+ builders. Each date and time type
+  has +try_from+ a Parsed and +parse_with_defaults+.
 * time's macros check their input when Rust compiles; their run-time
   equivalents are bound. <tt>date!(2020-01-02)</tt> is
   <tt>Date.from_calendar_date(2020, Month::January, 2)</tt>; +time!+,
   +offset!+, +datetime!+, and +utc_datetime!+ are Time.from_hms,
   UtcOffset.from_hms, PlainDateTime.new with #assume_offset, and
   UtcDateTime.new; and <tt>format_description!(version = 3, "...")</tt> is
-  <tt>FormatDescription.parse_owned(3, "...")</tt>.
+  <tt>FormatDescription.parse_owned(3, "...")</tt>, while the macro's
+  default version 1 is <tt>FormatDescription.parse_borrowed(1, "...")</tt>.
 
 What differs from calling time from Rust:
 
@@ -140,16 +152,21 @@ What differs from calling time from Rust:
 * Formatting a type with a well-known format that needs more than the type
   holds, such as RFC 3339 for a Date, is a compile-time error in Rust. The
   gem raises +TypeError+ with time's assertion.
+* A borrowed format item holds its own frozen copy in Ruby, so it differs
+  from an owned one only by class; time never compares the two, and
+  neither does the gem. A tree of items nested more than 255 levels deep,
+  deeper than time's own parser goes, raises +ArgumentError+ rather than
+  risk overflowing the native stack.
 * Each ISO 8601 configuration is its own compiled type in Rust. The gem
   formats any configuration by formatting the date, time, and offset parts
   with time's formatters and joining them as time does; a test checks the
   result against time's own formatter.
 
-Not bound yet, each for a later release: +Timestamp+, +Parsed+ and
-+parse_with_defaults+, the +iter+ module, version 1 and 2 and +strftime+
-format descriptions with their format items, the +unit+ module, and every
-impl with std's unsigned +Duration+. ferro-time's plan 007 says why for
-each. time's +serde+ and +macros+ features are built and add no Ruby API.
+Not bound yet, each for a later release: +Timestamp+ (with its
++parse_with_defaults+ and <tt>TryFrom<Parsed></tt>), the +iter+ module,
+the +unit+ module, every impl with std's unsigned +Duration+, and
+SignedDuration's +Display+ with a precision. ferro-time's plans 007 and
+009 say why for each. time's +serde+ and +macros+ features are built and add no Ruby API.
 
 time's +large-dates+ feature is off, as Tauri and its plugins build time,
 so years run from -9999 to 9999. The +rand+, +quickcheck+, and

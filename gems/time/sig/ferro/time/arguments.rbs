@@ -12,6 +12,26 @@ module Ferro
       def self.calendar_date: ([Integer, Integer, Integer] parts) -> [Integer, Month, Integer]
       def self.iso_week_date: ([Integer, Integer, Integer] parts) -> [Integer, Integer, Weekday]
       def self.description: (FormatDescription::description description) -> native_description
+      def self.items_description: (FormatDescription::item | Array[FormatDescription::item] description) -> [Symbol, Object]
+      def self.item_fields: (FormatDescription::item item, Hash[Symbol, Object] fields) -> Hash[Symbol, Object]
+      def self.item_of: (Module family, Object | FormatDescription::item item) -> FormatDescription::item
+      def self.items_of: (Module family, Object items) -> Array[FormatDescription::item]
+      def self.any_item: (Object item) -> FormatDescription::item
+      def self.flag: (bool value) -> bool
+      def self.parsed: (Parsing::Parsed parsed) -> Parsing::Parsed
+      def self.modifier_field: (FormatDescription::Modifier::kind kind, Object value) -> void
+      def self.nonzero_u16: (Object value) -> void
+      def self.encode_field: (FormatDescription::Modifier::field value) -> (Integer | bool)
+      def self.component_modifier: (Module component_class, Object modifier) -> void
+      def self.component: (Object | FormatDescription::Component component) -> FormatDescription::Component
+      def self.bytes: (Object string) -> String
+      def self.text: (Object string) -> String
+      def self.encode_item: (FormatDescription::item item) -> encoded_item
+      def self.decode_borrowed: (Object encoded) -> FormatDescription::BorrowedFormatItem
+      def self.decode_owned: (Object encoded) -> FormatDescription::OwnedFormatItem
+      def self.decode_component: (Object encoded) -> FormatDescription::Component
+      def self.owned_item: (FormatDescription::item item) -> FormatDescription::OwnedFormatItem
+      def self.owned_items: (Array[FormatDescription::BorrowedFormatItem] | Array[FormatDescription::OwnedFormatItem] items) -> Array[FormatDescription::OwnedFormatItem]
       def self.sink: (String output) -> void
       def self.system_time: (::Time time) -> [Integer, Integer]
       def self.ruby_time: ([Integer, Integer] parts) -> ::Time

@@ -1,0 +1,93 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    module Parsing
+      class Parsed
+        def self.default: () -> Parsed
+        def self.parse_literal: (String input, String literal) -> String
+
+        def parse_item: (String input, FormatDescription::item item) -> String
+        def parse_items: (String input, Array[FormatDescription::BorrowedFormatItem] | Array[FormatDescription::OwnedFormatItem] items) -> String
+        def parse_component: (String input, FormatDescription::Component component) -> String
+        def inspect: () -> String
+        def year: () -> Integer?
+        def year_last_two: () -> Integer?
+        def iso_year: () -> Integer?
+        def iso_year_last_two: () -> Integer?
+        def month: () -> Month?
+        def sunday_week_number: () -> Integer?
+        def monday_week_number: () -> Integer?
+        def iso_week_number: () -> Integer?
+        def weekday: () -> Weekday?
+        def ordinal: () -> Integer?
+        def day: () -> Integer?
+        def hour_24: () -> Integer?
+        def hour_12: () -> Integer?
+        def hour_12_is_pm: () -> bool?
+        def minute: () -> Integer?
+        def second: () -> Integer?
+        def subsecond: () -> Integer?
+        def offset_hour: () -> Integer?
+        def offset_minute_signed: () -> Integer?
+        def offset_second_signed: () -> Integer?
+        def unix_timestamp_nanos: () -> Integer?
+        def year_century: () -> Integer?
+        def year_century_is_negative: () -> bool?
+        def iso_year_century: () -> Integer?
+        def iso_year_century_is_negative: () -> bool?
+        def set_year: (Integer value) -> true?
+        def set_year_last_two: (Integer value) -> true?
+        def set_iso_year: (Integer value) -> true?
+        def set_iso_year_last_two: (Integer value) -> true?
+        def set_month: (Month value) -> true?
+        def set_sunday_week_number: (Integer value) -> true?
+        def set_monday_week_number: (Integer value) -> true?
+        def set_iso_week_number: (Integer value) -> true?
+        def set_weekday: (Weekday value) -> true?
+        def set_ordinal: (Integer value) -> true?
+        def set_day: (Integer value) -> true?
+        def set_hour_24: (Integer value) -> true?
+        def set_hour_12: (Integer value) -> true?
+        def set_hour_12_is_pm: (bool value) -> true?
+        def set_minute: (Integer value) -> true?
+        def set_second: (Integer value) -> true?
+        def set_subsecond: (Integer value) -> true?
+        def set_offset_hour: (Integer value) -> true?
+        def set_offset_minute_signed: (Integer value) -> true?
+        def set_offset_second_signed: (Integer value) -> true?
+        def set_unix_timestamp_nanos: (Integer value) -> true?
+        def set_year_century: (Integer value, bool is_negative) -> true?
+        def set_iso_year_century: (Integer value, bool is_negative) -> true?
+        def with_year: (Integer value) -> Parsed?
+        def with_year_last_two: (Integer value) -> Parsed?
+        def with_iso_year: (Integer value) -> Parsed?
+        def with_iso_year_last_two: (Integer value) -> Parsed?
+        def with_month: (Month value) -> Parsed?
+        def with_sunday_week_number: (Integer value) -> Parsed?
+        def with_monday_week_number: (Integer value) -> Parsed?
+        def with_iso_week_number: (Integer value) -> Parsed?
+        def with_weekday: (Weekday value) -> Parsed?
+        def with_ordinal: (Integer value) -> Parsed?
+        def with_day: (Integer value) -> Parsed?
+        def with_hour_24: (Integer value) -> Parsed?
+        def with_hour_12: (Integer value) -> Parsed?
+        def with_hour_12_is_pm: (bool value) -> Parsed?
+        def with_minute: (Integer value) -> Parsed?
+        def with_second: (Integer value) -> Parsed?
+        def with_subsecond: (Integer value) -> Parsed?
+        def with_offset_hour: (Integer value) -> Parsed?
+        def with_offset_minute_signed: (Integer value) -> Parsed?
+        def with_offset_second_signed: (Integer value) -> Parsed?
+        def with_unix_timestamp_nanos: (Integer value) -> Parsed?
+        def with_year_century: (Integer value, bool is_negative) -> Parsed?
+        def with_iso_year_century: (Integer value, bool is_negative) -> Parsed?
+
+        private
+
+        def check_frozen: () -> void
+      end
+    end
+  end
+end

@@ -75,6 +75,29 @@ module Ferro
         def parse(input, description)
           Native.plain_parse(input, Arguments.description(description))
         end
+
+        # Parses a PlainDateTime from +input+ with +description+, as parse does, but
+        # starting from +defaults+ rather than from nothing: a component the
+        # input lacks keeps the value +defaults+ gives it. +defaults+ is not
+        # changed. Mirrors time's <tt>PlainDateTime::parse_with_defaults</tt>
+        # (<tt>src/plain_date_time.rs:1117-1123</tt>).
+        #
+        # [input] String, read as bytes, as Rust's <tt>&[u8]</tt>.
+        # [description] A format description.
+        # [defaults] Parsing::Parsed.
+        def parse_with_defaults(input, description, defaults)
+          Native.plain_parse_with_defaults(input, Arguments.description(description), Arguments.parsed(defaults))
+        end
+
+        # The PlainDateTime that +parsed+ describes, raising an Error::TryFromParsed
+        # variant when it lacks a component the PlainDateTime needs or holds one out
+        # of range. Mirrors time's <tt>TryFrom<Parsed> for PlainDateTime</tt>
+        # (<tt>src/parsing/parsed.rs:1299-1306</tt>).
+        #
+        # [parsed] Parsing::Parsed.
+        def try_from(parsed)
+          Native.plain_try_from_parsed(Arguments.parsed(parsed))
+        end
       end
 
       # The smallest value that can be represented by PlainDateTime: midnight

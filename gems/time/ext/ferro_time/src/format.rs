@@ -5,16 +5,21 @@
 //! type (time 0.3.55 `src/format_description`, `src/formatting`,
 //! `src/parsing`; plan 007, decision 11).
 //!
-//! A description crosses from Ruby as one of three things: a wrapped
-//! `FormatDescriptionV3`, the Symbol `:rfc2822` or `:rfc3339`, or an
-//! `Iso8601` configuration's seven settings in an Array.
+//! A description crosses from Ruby as one of four things: a wrapped
+//! `FormatDescriptionV3`, the Symbol `:rfc2822` or `:rfc3339`, an
+//! `Iso8601` configuration's seven settings in an Array, or format items
+//! (`items::Items`, plan 009).
 
 use magnus::{function, prelude::*, Error, Exception, RModule, RString, Ruby, Symbol, Value};
 use time::format_description::well_known::{Rfc2822, Rfc3339};
-use time::format_description::{self, FormatDescriptionV3};
+use time::format_description::{self, FormatDescriptionV3, OwnedFormatItem};
+use time::formatting::Formattable;
+use time::parsing::Parsed;
 use time::{error, Date, OffsetDateTime, PlainDateTime, Time, UtcDateTime, UtcOffset};
 
 use crate::iso8601::{self, Parts};
+use crate::items::Items;
+use crate::parsed::Checked;
 use crate::values::{NDate, NOffsetDateTime, NPlain, NTime, NUtc, NUtcOffset, Wrapped};
 use crate::{frozen, guarded, Failure};
 
@@ -38,12 +43,16 @@ pub enum Description {
     Rfc3339,
     /// `Iso8601` with these settings.
     Iso8601(Parts),
+    /// An `OwnedFormatItem`.
+    Item(OwnedFormatItem),
+    /// A slice of them, `[OwnedFormatItem]`.
+    Items(Vec<OwnedFormatItem>),
 }
 
 impl Description {
     /// The description `value` holds; the Ruby side has already refused
     /// anything else with `TypeError`.
-    fn from_value(value: Value) -> Result<Self, Error> {
+    pub fn from_value(value: Value) -> Result<Self, Error> {
         if let Ok(v3) = <&NFormat>::try_convert(value) {
             return Ok(Self::V3(v3.0.clone()));
         }
@@ -57,6 +66,11 @@ impl Description {
                     format!("no well-known format {other}"),
                 )),
             };
+        }
+        match Items::from_value(&Ruby::get_with(value), value)? {
+            Some(Items::One(item)) => return Ok(Self::Item(item)),
+            Some(Items::Many(items)) => return Ok(Self::Items(items)),
+            None => {}
         }
         let settings = <(u8, bool, bool, u8, u8, u8, u8)>::try_convert(value)?;
         Parts::new(settings)
@@ -85,10 +99,10 @@ pub const RFC3339_NEEDS: &str =
 pub trait Formatted: Sized + Copy {
     /// The date, time, and offset the value holds, for ISO 8601.
     fn parts(self) -> (Option<Date>, Option<Time>, Option<UtcOffset>);
-    /// `format_into` with a version 3 description.
-    fn v3(
+    /// `format_into` with a version 3 description or format items.
+    fn with<D: Formattable + ?Sized>(
         self,
-        description: &FormatDescriptionV3<'static>,
+        description: &D,
         out: &mut Vec<u8>,
     ) -> Result<usize, error::Format>;
     /// `format_into` with RFC 2822, or time's assertion for a type that
@@ -98,6 +112,12 @@ pub trait Formatted: Sized + Copy {
     fn rfc3339(self, out: &mut Vec<u8>) -> Result<usize, Failure>;
     /// `parse` with each description.
     fn parse(input: &str, description: &Description) -> Result<Self, error::Parse>;
+    /// `parse_with_defaults` with each description.
+    fn parse_with_defaults(
+        input: &[u8],
+        description: &Description,
+        defaults: Parsed,
+    ) -> Result<Self, error::Parse>;
 }
 
 macro_rules! formatted {
@@ -108,7 +128,7 @@ macro_rules! formatted {
                 $parts
             }
 
-            fn v3(self, description: &FormatDescriptionV3<'static>, out: &mut Vec<u8>) -> Result<usize, error::Format> {
+            fn with<D: Formattable + ?Sized>(self, description: &D, out: &mut Vec<u8>) -> Result<usize, error::Format> {
                 self.format_into(out, description)
             }
 
@@ -120,6 +140,19 @@ macro_rules! formatted {
                     Description::Rfc2822 => Self::parse(input, &Rfc2822),
                     Description::Rfc3339 => Self::parse(input, &Rfc3339),
                     Description::Iso8601(_) => Self::parse(input, &iso8601::PARSER),
+                    Description::Item(item) => Self::parse(input, item),
+                    Description::Items(items) => Self::parse(input, items.as_slice()),
+                }
+            }
+
+            fn parse_with_defaults(input: &[u8], description: &Description, defaults: Parsed) -> Result<Self, error::Parse> {
+                match description {
+                    Description::V3(description) => Self::parse_with_defaults(input, description, defaults),
+                    Description::Rfc2822 => Self::parse_with_defaults(input, &Rfc2822, defaults),
+                    Description::Rfc3339 => Self::parse_with_defaults(input, &Rfc3339, defaults),
+                    Description::Iso8601(_) => Self::parse_with_defaults(input, &iso8601::PARSER, defaults),
+                    Description::Item(item) => Self::parse_with_defaults(input, item, defaults),
+                    Description::Items(items) => Self::parse_with_defaults(input, items.as_slice(), defaults),
                 }
             }
         }
@@ -159,7 +192,9 @@ fn write<T: Formatted>(
     out: &mut Vec<u8>,
 ) -> Result<usize, Failure> {
     match description {
-        Description::V3(description) => Ok(value.v3(description, out)?),
+        Description::V3(description) => Ok(value.with(description, out)?),
+        Description::Item(item) => Ok(value.with(item, out)?),
+        Description::Items(items) => Ok(value.with(items.as_slice(), out)?),
         Description::Rfc2822 => value.rfc2822(out),
         Description::Rfc3339 => value.rfc3339(out),
         Description::Iso8601(parts) => {
@@ -169,7 +204,9 @@ fn write<T: Formatted>(
     }
 }
 
-/// `format` (`src/date.rs:1484-1489` and each type's): UTF-8 text.
+/// `format` (`src/date.rs:1484-1489` and each type's): UTF-8 text, with
+/// a deprecated `Literal`'s bytes that are not UTF-8 replaced, as time's
+/// `format` replaces them (`src/formatting/formattable.rs:291-313`).
 fn format<W: Wrapped>(ruby: &Ruby, value: &W, description: Value) -> Result<String, Error>
 where
     W::Inner: Formatted,
@@ -179,7 +216,7 @@ where
     guarded(ruby, || {
         let mut out = Vec::new();
         write(value, &description, &mut out)?;
-        String::from_utf8(out).map_err(|error| Failure::Panic(error.to_string()))
+        Ok(String::from_utf8_lossy(&out).into_owned())
     })
 }
 
@@ -212,10 +249,10 @@ where
 /// `parse` (`src/date.rs:1491-1509` and each type's).
 fn parse<W: Wrapped>(ruby: &Ruby, input: String, description: Value) -> Result<Value, Error>
 where
-    W::Inner: Formatted,
+    W::Inner: Checked,
 {
     let description = Description::from_value(description)?;
-    let parsed = guarded(ruby, move || Ok(W::Inner::parse(&input, &description)?))?;
+    let parsed = guarded(ruby, move || W::Inner::checked_parse(&input, &description))?;
     Ok(frozen(ruby, W::new(parsed)).as_value())
 }
 
@@ -226,10 +263,10 @@ where
 //   description parser (src/format_description/parse/mod.rs:17-23)
 
 /// `parse_borrowed::<VERSION>` or `parse_owned::<VERSION>`
-/// (`src/format_description/parse/mod.rs:116-187`). Versions 1 and 2
-/// return the format-item tree, which this gem defers (plan 007,
-/// decision 1); any other version fails time's `assert_version!`, which
-/// Rust's compiler would refuse.
+/// (`src/format_description/parse/mod.rs:116-187`) for any version but 1
+/// and 2, whose items `items.rs` parses (plan 009, decision 9). Version 3
+/// returns a `FormatDescriptionV3`; any other fails time's
+/// `assert_version!`, which Rust's compiler would refuse.
 fn format_description_parse(
     ruby: &Ruby,
     version: u8,
@@ -239,10 +276,6 @@ fn format_description_parse(
     let description = guarded(ruby, move || match version {
         3 if owned => Ok(format_description::parse_owned::<3>(&input)?),
         3 => Ok(format_description::parse_borrowed::<3>(&input)?.to_owned()),
-        1 | 2 => Err(Failure::Argument(format!(
-            "format description version {version} returns format items, which ferro-time does \
-             not bind yet (plan 007, decision 1); use version 3"
-        ))),
         _ => Err(Failure::Type("invalid version provided".to_owned())),
     })?;
     Ok(frozen(ruby, NFormat(description)).as_value())
@@ -336,6 +369,20 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(out, theirs);
         assert_eq!(String::from_utf8(out).unwrap(), "2020-03-");
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn a_literal_that_is_not_utf8_formats_as_time_formats_it() {
+        use time::format_description::OwnedFormatItem;
+        let item = OwnedFormatItem::Literal(Box::new(*b"a\xFFb"));
+        let mut out = Vec::new();
+        write(Date::MIN, &Description::Item(item.clone()), &mut out).unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&out),
+            Date::MIN.format(&item).unwrap()
+        );
+        assert_eq!(Date::MIN.format(&item).unwrap(), "a\u{FFFD}b");
     }
 
     #[test]

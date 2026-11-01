@@ -8,7 +8,10 @@ module Ferro
     Duration: singleton(SignedDuration)
 
     type settings = [Integer, bool, bool, Integer, Integer, Integer, Integer]
+    type encoded_component = Array[Object]
+    type encoded_item = Array[Object]
     type native_description = FormatDescription::FormatDescriptionV3 | :rfc2822 | :rfc3339 | settings
+                            | [Symbol, Object]
 
     module Native
       def self.date_eq: (Date left, Date right) -> bool
@@ -207,6 +210,98 @@ module Ferro
 
       def self.format_description_parse: (Integer version, bool owned, String input) -> FormatDescription::FormatDescriptionV3
       def self.format_description_debug: (FormatDescription::FormatDescriptionV3 description) -> String
+      def self.format_description_items: (Integer version, String input) -> Array[encoded_item]
+      def self.format_description_item: (Integer version, String input) -> encoded_item
+      def self.format_description_strftime_items: (String input) -> Array[encoded_item]
+      def self.format_description_strftime_item: (String input) -> encoded_item
+      def self.parsed_year: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_year: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_year: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_year_last_two: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_year_last_two: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_year_last_two: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_iso_year: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_iso_year: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_iso_year: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_iso_year_last_two: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_iso_year_last_two: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_iso_year_last_two: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_month: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_month: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_month: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_sunday_week_number: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_sunday_week_number: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_sunday_week_number: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_monday_week_number: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_monday_week_number: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_monday_week_number: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_iso_week_number: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_iso_week_number: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_iso_week_number: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_weekday: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_weekday: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_weekday: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_ordinal: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_ordinal: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_ordinal: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_day: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_day: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_day: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_hour_24: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_hour_24: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_hour_24: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_hour_12: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_hour_12: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_hour_12: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_hour_12_is_pm: (Parsing::Parsed parsed) -> bool?
+      def self.parsed_set_hour_12_is_pm: (Parsing::Parsed parsed, bool value) -> true?
+      def self.parsed_with_hour_12_is_pm: (Parsing::Parsed parsed, bool value) -> Parsing::Parsed?
+      def self.parsed_minute: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_minute: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_minute: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_second: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_second: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_second: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_subsecond: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_subsecond: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_subsecond: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_offset_hour: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_offset_hour: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_offset_hour: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_offset_minute_signed: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_offset_minute_signed: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_offset_minute_signed: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_offset_second_signed: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_offset_second_signed: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_offset_second_signed: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_unix_timestamp_nanos: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_set_unix_timestamp_nanos: (Parsing::Parsed parsed, Integer value) -> true?
+      def self.parsed_with_unix_timestamp_nanos: (Parsing::Parsed parsed, Integer value) -> Parsing::Parsed?
+      def self.parsed_year_century: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_year_century_is_negative: (Parsing::Parsed parsed) -> bool?
+      def self.parsed_set_year_century: (Parsing::Parsed parsed, Integer value, bool is_negative) -> true?
+      def self.parsed_with_year_century: (Parsing::Parsed parsed, Integer value, bool is_negative) -> Parsing::Parsed?
+      def self.parsed_iso_year_century: (Parsing::Parsed parsed) -> Integer?
+      def self.parsed_iso_year_century_is_negative: (Parsing::Parsed parsed) -> bool?
+      def self.parsed_set_iso_year_century: (Parsing::Parsed parsed, Integer value, bool is_negative) -> true?
+      def self.parsed_with_iso_year_century: (Parsing::Parsed parsed, Integer value, bool is_negative) -> Parsing::Parsed?
+      def self.parsed_parse_items: (Parsing::Parsed parsed, String input, [Symbol, Object] items) -> String
+      def self.parsed_parse_literal: (String input, String literal) -> String
+      def self.parsed_parse_component: (Parsing::Parsed parsed, String input, [Symbol, Object] item) -> String
+      def self.parsed_debug: (Parsing::Parsed parsed) -> String
+      def self.date_try_from_parsed: (Parsing::Parsed parsed) -> Date
+      def self.date_parse_with_defaults: (String input, native_description description, Parsing::Parsed defaults) -> Date
+      def self.time_try_from_parsed: (Parsing::Parsed parsed) -> Time
+      def self.time_parse_with_defaults: (String input, native_description description, Parsing::Parsed defaults) -> Time
+      def self.plain_try_from_parsed: (Parsing::Parsed parsed) -> PlainDateTime
+      def self.plain_parse_with_defaults: (String input, native_description description, Parsing::Parsed defaults) -> PlainDateTime
+      def self.utc_try_from_parsed: (Parsing::Parsed parsed) -> UtcDateTime
+      def self.utc_parse_with_defaults: (String input, native_description description, Parsing::Parsed defaults) -> UtcDateTime
+      def self.offset_date_time_try_from_parsed: (Parsing::Parsed parsed) -> OffsetDateTime
+      def self.offset_date_time_parse_with_defaults: (String input, native_description description, Parsing::Parsed defaults) -> OffsetDateTime
+      def self.utc_offset_try_from_parsed: (Parsing::Parsed parsed) -> UtcOffset
+      def self.utc_offset_parse_with_defaults: (String input, native_description description, Parsing::Parsed defaults) -> UtcOffset
+      def self.format_item_debug: (Integer kind, encoded_item | encoded_component encoded) -> String
       def self.iso8601_debug: (settings settings) -> String
       def self.iso8601_encode: (settings settings) -> Integer
       def self.iso8601_config_debug: (settings settings) -> String

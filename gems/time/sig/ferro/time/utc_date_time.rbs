@@ -16,6 +16,8 @@ module Ferro
       def self.from_unix_timestamp_nanos: (Integer timestamp) -> UtcDateTime
       def self.from: (OffsetDateTime | ::Time value) -> UtcDateTime
       def self.parse: (String input, FormatDescription::description description) -> UtcDateTime
+      def self.parse_with_defaults: (String input, FormatDescription::description description, Parsing::Parsed defaults) -> UtcDateTime
+      def self.try_from: (Parsing::Parsed parsed) -> UtcDateTime
 
       def date: () -> Date
       def time: () -> Time

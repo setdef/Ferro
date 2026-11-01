@@ -1,0 +1,410 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    module FormatDescription
+      module Component
+        def self.try_from: (BorrowedFormatItem | OwnedFormatItem item) -> Component
+
+        def initialize: (modifier: Data) -> void
+        def ==: (Object other) -> bool
+        def inspect: () -> String
+
+        private
+
+        def encode: () -> Array[String | Modifier::field]
+
+
+        class Day < Data
+          include Component
+
+          attr_reader modifier: Modifier::Day
+
+          def self.new: (modifier: Modifier::Day) -> instance
+                      | (Modifier::Day modifier) -> instance
+        end
+
+        class MonthShort < Data
+          include Component
+
+          attr_reader modifier: Modifier::MonthShort
+
+          def self.new: (modifier: Modifier::MonthShort) -> instance
+                      | (Modifier::MonthShort modifier) -> instance
+        end
+
+        class MonthLong < Data
+          include Component
+
+          attr_reader modifier: Modifier::MonthLong
+
+          def self.new: (modifier: Modifier::MonthLong) -> instance
+                      | (Modifier::MonthLong modifier) -> instance
+        end
+
+        class MonthNumerical < Data
+          include Component
+
+          attr_reader modifier: Modifier::MonthNumerical
+
+          def self.new: (modifier: Modifier::MonthNumerical) -> instance
+                      | (Modifier::MonthNumerical modifier) -> instance
+        end
+
+        class Ordinal < Data
+          include Component
+
+          attr_reader modifier: Modifier::Ordinal
+
+          def self.new: (modifier: Modifier::Ordinal) -> instance
+                      | (Modifier::Ordinal modifier) -> instance
+        end
+
+        class WeekdayShort < Data
+          include Component
+
+          attr_reader modifier: Modifier::WeekdayShort
+
+          def self.new: (modifier: Modifier::WeekdayShort) -> instance
+                      | (Modifier::WeekdayShort modifier) -> instance
+        end
+
+        class WeekdayLong < Data
+          include Component
+
+          attr_reader modifier: Modifier::WeekdayLong
+
+          def self.new: (modifier: Modifier::WeekdayLong) -> instance
+                      | (Modifier::WeekdayLong modifier) -> instance
+        end
+
+        class WeekdaySunday < Data
+          include Component
+
+          attr_reader modifier: Modifier::WeekdaySunday
+
+          def self.new: (modifier: Modifier::WeekdaySunday) -> instance
+                      | (Modifier::WeekdaySunday modifier) -> instance
+        end
+
+        class WeekdayMonday < Data
+          include Component
+
+          attr_reader modifier: Modifier::WeekdayMonday
+
+          def self.new: (modifier: Modifier::WeekdayMonday) -> instance
+                      | (Modifier::WeekdayMonday modifier) -> instance
+        end
+
+        class WeekNumberIso < Data
+          include Component
+
+          attr_reader modifier: Modifier::WeekNumberIso
+
+          def self.new: (modifier: Modifier::WeekNumberIso) -> instance
+                      | (Modifier::WeekNumberIso modifier) -> instance
+        end
+
+        class WeekNumberSunday < Data
+          include Component
+
+          attr_reader modifier: Modifier::WeekNumberSunday
+
+          def self.new: (modifier: Modifier::WeekNumberSunday) -> instance
+                      | (Modifier::WeekNumberSunday modifier) -> instance
+        end
+
+        class WeekNumberMonday < Data
+          include Component
+
+          attr_reader modifier: Modifier::WeekNumberMonday
+
+          def self.new: (modifier: Modifier::WeekNumberMonday) -> instance
+                      | (Modifier::WeekNumberMonday modifier) -> instance
+        end
+
+        class CalendarYearFullExtendedRange < Data
+          include Component
+
+          attr_reader modifier: Modifier::CalendarYearFullExtendedRange
+
+          def self.new: (modifier: Modifier::CalendarYearFullExtendedRange) -> instance
+                      | (Modifier::CalendarYearFullExtendedRange modifier) -> instance
+        end
+
+        class CalendarYearFullStandardRange < Data
+          include Component
+
+          attr_reader modifier: Modifier::CalendarYearFullStandardRange
+
+          def self.new: (modifier: Modifier::CalendarYearFullStandardRange) -> instance
+                      | (Modifier::CalendarYearFullStandardRange modifier) -> instance
+        end
+
+        class IsoYearFullExtendedRange < Data
+          include Component
+
+          attr_reader modifier: Modifier::IsoYearFullExtendedRange
+
+          def self.new: (modifier: Modifier::IsoYearFullExtendedRange) -> instance
+                      | (Modifier::IsoYearFullExtendedRange modifier) -> instance
+        end
+
+        class IsoYearFullStandardRange < Data
+          include Component
+
+          attr_reader modifier: Modifier::IsoYearFullStandardRange
+
+          def self.new: (modifier: Modifier::IsoYearFullStandardRange) -> instance
+                      | (Modifier::IsoYearFullStandardRange modifier) -> instance
+        end
+
+        class CalendarYearCenturyExtendedRange < Data
+          include Component
+
+          attr_reader modifier: Modifier::CalendarYearCenturyExtendedRange
+
+          def self.new: (modifier: Modifier::CalendarYearCenturyExtendedRange) -> instance
+                      | (Modifier::CalendarYearCenturyExtendedRange modifier) -> instance
+        end
+
+        class CalendarYearCenturyStandardRange < Data
+          include Component
+
+          attr_reader modifier: Modifier::CalendarYearCenturyStandardRange
+
+          def self.new: (modifier: Modifier::CalendarYearCenturyStandardRange) -> instance
+                      | (Modifier::CalendarYearCenturyStandardRange modifier) -> instance
+        end
+
+        class IsoYearCenturyExtendedRange < Data
+          include Component
+
+          attr_reader modifier: Modifier::IsoYearCenturyExtendedRange
+
+          def self.new: (modifier: Modifier::IsoYearCenturyExtendedRange) -> instance
+                      | (Modifier::IsoYearCenturyExtendedRange modifier) -> instance
+        end
+
+        class IsoYearCenturyStandardRange < Data
+          include Component
+
+          attr_reader modifier: Modifier::IsoYearCenturyStandardRange
+
+          def self.new: (modifier: Modifier::IsoYearCenturyStandardRange) -> instance
+                      | (Modifier::IsoYearCenturyStandardRange modifier) -> instance
+        end
+
+        class CalendarYearLastTwo < Data
+          include Component
+
+          attr_reader modifier: Modifier::CalendarYearLastTwo
+
+          def self.new: (modifier: Modifier::CalendarYearLastTwo) -> instance
+                      | (Modifier::CalendarYearLastTwo modifier) -> instance
+        end
+
+        class IsoYearLastTwo < Data
+          include Component
+
+          attr_reader modifier: Modifier::IsoYearLastTwo
+
+          def self.new: (modifier: Modifier::IsoYearLastTwo) -> instance
+                      | (Modifier::IsoYearLastTwo modifier) -> instance
+        end
+
+        class Hour12 < Data
+          include Component
+
+          attr_reader modifier: Modifier::Hour12
+
+          def self.new: (modifier: Modifier::Hour12) -> instance
+                      | (Modifier::Hour12 modifier) -> instance
+        end
+
+        class Hour24 < Data
+          include Component
+
+          attr_reader modifier: Modifier::Hour24
+
+          def self.new: (modifier: Modifier::Hour24) -> instance
+                      | (Modifier::Hour24 modifier) -> instance
+        end
+
+        class Minute < Data
+          include Component
+
+          attr_reader modifier: Modifier::Minute
+
+          def self.new: (modifier: Modifier::Minute) -> instance
+                      | (Modifier::Minute modifier) -> instance
+        end
+
+        class Period < Data
+          include Component
+
+          attr_reader modifier: Modifier::Period
+
+          def self.new: (modifier: Modifier::Period) -> instance
+                      | (Modifier::Period modifier) -> instance
+        end
+
+        class Second < Data
+          include Component
+
+          attr_reader modifier: Modifier::Second
+
+          def self.new: (modifier: Modifier::Second) -> instance
+                      | (Modifier::Second modifier) -> instance
+        end
+
+        class Subsecond < Data
+          include Component
+
+          attr_reader modifier: Modifier::Subsecond
+
+          def self.new: (modifier: Modifier::Subsecond) -> instance
+                      | (Modifier::Subsecond modifier) -> instance
+        end
+
+        class OffsetHour < Data
+          include Component
+
+          attr_reader modifier: Modifier::OffsetHour
+
+          def self.new: (modifier: Modifier::OffsetHour) -> instance
+                      | (Modifier::OffsetHour modifier) -> instance
+        end
+
+        class OffsetMinute < Data
+          include Component
+
+          attr_reader modifier: Modifier::OffsetMinute
+
+          def self.new: (modifier: Modifier::OffsetMinute) -> instance
+                      | (Modifier::OffsetMinute modifier) -> instance
+        end
+
+        class OffsetSecond < Data
+          include Component
+
+          attr_reader modifier: Modifier::OffsetSecond
+
+          def self.new: (modifier: Modifier::OffsetSecond) -> instance
+                      | (Modifier::OffsetSecond modifier) -> instance
+        end
+
+        class Ignore < Data
+          include Component
+
+          attr_reader modifier: Modifier::Ignore
+
+          def self.new: (modifier: Modifier::Ignore) -> instance
+                      | (Modifier::Ignore modifier) -> instance
+        end
+
+        class UnixTimestampSecond < Data
+          include Component
+
+          attr_reader modifier: Modifier::UnixTimestampSecond
+
+          def self.new: (modifier: Modifier::UnixTimestampSecond) -> instance
+                      | (Modifier::UnixTimestampSecond modifier) -> instance
+        end
+
+        class UnixTimestampMillisecond < Data
+          include Component
+
+          attr_reader modifier: Modifier::UnixTimestampMillisecond
+
+          def self.new: (modifier: Modifier::UnixTimestampMillisecond) -> instance
+                      | (Modifier::UnixTimestampMillisecond modifier) -> instance
+        end
+
+        class UnixTimestampMicrosecond < Data
+          include Component
+
+          attr_reader modifier: Modifier::UnixTimestampMicrosecond
+
+          def self.new: (modifier: Modifier::UnixTimestampMicrosecond) -> instance
+                      | (Modifier::UnixTimestampMicrosecond modifier) -> instance
+        end
+
+        class UnixTimestampNanosecond < Data
+          include Component
+
+          attr_reader modifier: Modifier::UnixTimestampNanosecond
+
+          def self.new: (modifier: Modifier::UnixTimestampNanosecond) -> instance
+                      | (Modifier::UnixTimestampNanosecond modifier) -> instance
+        end
+
+        class End < Data
+          include Component
+
+          attr_reader modifier: Modifier::End
+
+          def self.new: (modifier: Modifier::End) -> instance
+                      | (Modifier::End modifier) -> instance
+        end
+
+        class Month < Data
+          include Component
+
+          attr_reader modifier: Modifier::Month
+
+          def self.new: (modifier: Modifier::Month) -> instance
+                      | (Modifier::Month modifier) -> instance
+        end
+
+        class Weekday < Data
+          include Component
+
+          attr_reader modifier: Modifier::Weekday
+
+          def self.new: (modifier: Modifier::Weekday) -> instance
+                      | (Modifier::Weekday modifier) -> instance
+        end
+
+        class WeekNumber < Data
+          include Component
+
+          attr_reader modifier: Modifier::WeekNumber
+
+          def self.new: (modifier: Modifier::WeekNumber) -> instance
+                      | (Modifier::WeekNumber modifier) -> instance
+        end
+
+        class Hour < Data
+          include Component
+
+          attr_reader modifier: Modifier::Hour
+
+          def self.new: (modifier: Modifier::Hour) -> instance
+                      | (Modifier::Hour modifier) -> instance
+        end
+
+        class UnixTimestamp < Data
+          include Component
+
+          attr_reader modifier: Modifier::UnixTimestamp
+
+          def self.new: (modifier: Modifier::UnixTimestamp) -> instance
+                      | (Modifier::UnixTimestamp modifier) -> instance
+        end
+
+        class Year < Data
+          include Component
+
+          attr_reader modifier: Modifier::Year
+
+          def self.new: (modifier: Modifier::Year) -> instance
+                      | (Modifier::Year modifier) -> instance
+        end
+
+        CLASSES: Hash[Symbol, Class]
+      end
+    end
+  end
+end

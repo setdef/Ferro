@@ -197,10 +197,11 @@ class TestErrors < Minitest::Test
   end
 
   def test_a_wrong_version_is_refused
-    error = assert_raises(ArgumentError) { T::FormatDescription.parse_owned(1, "[year]") }
-    assert_includes error.message, "plan 007"
-    assert_raises(ArgumentError) { T::FormatDescription.parse_borrowed(2, "[year]") }
-    error = assert_raises(TypeError) { T::FormatDescription.parse_owned(4, "[year]") }
-    assert_equal "invalid version provided", error.message
+    [0, 4].each do |version|
+      error = assert_raises(TypeError) { T::FormatDescription.parse_owned(version, "[year]") }
+      assert_equal "invalid version provided", error.message
+      error = assert_raises(TypeError) { T::FormatDescription.parse_borrowed(version, "[year]") }
+      assert_equal "invalid version provided", error.message
+    end
   end
 end

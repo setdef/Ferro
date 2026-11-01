@@ -12,6 +12,22 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `FormatDescription.parse_borrowed` and `parse_owned` with versions 1 and 2, `parse_strftime_borrowed`, `parse_strftime_owned`, and the deprecated `parse`, returning time's format items.
+- `FormatDescription::BorrowedFormatItem` and `OwnedFormatItem` with their variants, `Component` with its 43 variants, and `Modifier` with its modifiers and enums, as frozen values with time's builders, conversions, equality, and `Debug`; time's deprecated items warn.
+- `format`, `format_into`, and `parse` take a format item or an Array of them.
+- `Parsing::Parsed` with time's getters, setters, builders, `parse_item`, `parse_items`, `parse_literal`, and `parse_component`.
+- `try_from(parsed)` and `parse_with_defaults` on `Date`, `Time`, `UtcOffset`, `PlainDateTime`, `UtcDateTime`, and `OffsetDateTime`.
+
+### Fixed
+
+- `UtcDateTime.parse` of a local date and time whose UTC instant leaves the year range raises `RangeError` with time's "local datetime out of valid range" instead of `Error` with "time panicked".
+
+### Changed
+
+- `FormatDescription.parse_borrowed` and `parse_owned` raise `TypeError` with time's "invalid version provided" only for versions other than 1, 2, and 3; versions 1 and 2 no longer raise `ArgumentError`.
+
 ## [0.1.0.pre.1] - 2026-10-27
 
 ### Added

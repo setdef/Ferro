@@ -127,6 +127,42 @@ module Ferro
         def parse(input, description)
           Native.date_parse(input, Arguments.description(description))
         end
+
+        # Parses a Date from +input+ with +description+, as parse does, but
+        # starting from +defaults+ rather than from nothing: a component the
+        # input lacks keeps the value +defaults+ gives it. +defaults+ is not
+        # changed. Mirrors time's <tt>Date::parse_with_defaults</tt>
+        # (<tt>src/date.rs:1527-1533</tt>).
+        #
+        # [input] String, read as bytes, as Rust's <tt>&[u8]</tt>.
+        # [description] A format description.
+        # [defaults] Parsing::Parsed.
+        #
+        # === Example
+        #
+        #   defaults = Ferro::Time::Parsing::Parsed.new.with_year(2020)
+        #   description = Ferro::Time::FormatDescription.parse_borrowed(2, "[month]-[day]")
+        #   Ferro::Time::Date.parse_with_defaults("01-15", description, defaults).to_s # => "2020-01-15"
+        def parse_with_defaults(input, description, defaults)
+          Native.date_parse_with_defaults(input, Arguments.description(description), Arguments.parsed(defaults))
+        end
+
+        # The Date that +parsed+ describes, raising an Error::TryFromParsed
+        # variant when it lacks a component the Date needs or holds one out
+        # of range. Mirrors time's <tt>TryFrom<Parsed> for Date</tt>
+        # (<tt>src/parsing/parsed.rs:1139-1228</tt>).
+        #
+        # [parsed] Parsing::Parsed.
+        #
+        # === Example
+        #
+        #   parsed = Ferro::Time::Parsing::Parsed.new.with_year(2020).with_ordinal(60)
+        #   Ferro::Time::Date.try_from(parsed).to_s # => "2020-02-29"
+        #   Ferro::Time::Date.try_from(Ferro::Time::Parsing::Parsed.new)
+        #   # raises Ferro::Time::Error::TryFromParsed::InsufficientInformation
+        def try_from(parsed)
+          Native.date_try_from_parsed(Arguments.parsed(parsed))
+        end
       end
 
       # The minimum valid Date, January 1 of -9999. Mirrors time's

@@ -118,6 +118,29 @@ module Ferro
         def parse(input, description)
           Native.utc_offset_parse(input, Arguments.description(description))
         end
+
+        # Parses a UtcOffset from +input+ with +description+, as parse does, but
+        # starting from +defaults+ rather than from nothing: a component the
+        # input lacks keeps the value +defaults+ gives it. +defaults+ is not
+        # changed. Mirrors time's <tt>UtcOffset::parse_with_defaults</tt>
+        # (<tt>src/utc_offset.rs:535-541</tt>).
+        #
+        # [input] String, read as bytes, as Rust's <tt>&[u8]</tt>.
+        # [description] A format description.
+        # [defaults] Parsing::Parsed.
+        def parse_with_defaults(input, description, defaults)
+          Native.utc_offset_parse_with_defaults(input, Arguments.description(description), Arguments.parsed(defaults))
+        end
+
+        # The UtcOffset that +parsed+ describes, raising an Error::TryFromParsed
+        # variant when it lacks a component the UtcOffset needs or holds one out
+        # of range. Mirrors time's <tt>TryFrom<Parsed> for UtcOffset</tt>
+        # (<tt>src/parsing/parsed.rs:1290-1297</tt>).
+        #
+        # [parsed] Parsing::Parsed.
+        def try_from(parsed)
+          Native.utc_offset_try_from_parsed(Arguments.parsed(parsed))
+        end
       end
 
       # A UtcOffset that is UTC. Mirrors time's <tt>UtcOffset::UTC</tt>

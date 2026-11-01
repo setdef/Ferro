@@ -1,0 +1,161 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    module FormatDescription
+      type item = BorrowedFormatItem | OwnedFormatItem
+
+      module Item : Object
+        def initialize: (**Object fields) -> void
+        def inspect: () -> String
+      end
+
+      module BorrowedFormatItem : Object
+        include Item
+
+        LITERALS: Hash[Symbol, singleton(Literal)]
+
+        def self.from: (FormatDescription::Component | Array[BorrowedFormatItem] value) -> (Component | Compound)
+
+        class Literal < Data
+          include BorrowedFormatItem
+
+          attr_reader literal: String
+
+          def self.new: (literal: String) -> instance
+                      | (String literal) -> instance
+
+          def ==: (Object other) -> bool
+        end
+
+        class StringLiteral < Data
+          include BorrowedFormatItem
+
+          attr_reader literal: String
+
+          def self.new: (literal: String) -> instance
+                      | (String literal) -> instance
+
+          def ==: (Object other) -> bool
+        end
+
+        class Component < Data
+          include BorrowedFormatItem
+
+          attr_reader component: FormatDescription::Component
+
+          def self.new: (component: FormatDescription::Component) -> instance
+                      | (FormatDescription::Component component) -> instance
+
+          def ==: (Object other) -> bool
+        end
+
+        class Compound < Data
+          include BorrowedFormatItem
+
+          attr_reader compound: Array[BorrowedFormatItem]
+
+          def self.new: (compound: Array[BorrowedFormatItem]) -> instance
+                      | (Array[BorrowedFormatItem] compound) -> instance
+
+          def ==: (Object other) -> bool
+        end
+
+        class Optional < Data
+          include BorrowedFormatItem
+
+          attr_reader item: BorrowedFormatItem
+
+          def self.new: (item: BorrowedFormatItem) -> instance
+                      | (BorrowedFormatItem item) -> instance
+
+        end
+
+        class First < Data
+          include BorrowedFormatItem
+
+          attr_reader items: Array[BorrowedFormatItem]
+
+          def self.new: (items: Array[BorrowedFormatItem]) -> instance
+                      | (Array[BorrowedFormatItem] items) -> instance
+
+        end
+      end
+
+      module OwnedFormatItem : Object
+        include Item
+
+        LITERALS: Hash[Symbol, singleton(Literal)]
+
+        def self.from: (FormatDescription::Component | BorrowedFormatItem | Array[BorrowedFormatItem] | Array[OwnedFormatItem] value) -> OwnedFormatItem
+
+        class Literal < Data
+          include OwnedFormatItem
+
+          attr_reader literal: String
+
+          def self.new: (literal: String) -> instance
+                      | (String literal) -> instance
+
+          def ==: (Object other) -> bool
+        end
+
+        class StringLiteral < Data
+          include OwnedFormatItem
+
+          attr_reader literal: String
+
+          def self.new: (literal: String) -> instance
+                      | (String literal) -> instance
+
+          def ==: (Object other) -> bool
+        end
+
+        class Component < Data
+          include OwnedFormatItem
+
+          attr_reader component: FormatDescription::Component
+
+          def self.new: (component: FormatDescription::Component) -> instance
+                      | (FormatDescription::Component component) -> instance
+
+          def ==: (Object other) -> bool
+        end
+
+        class Compound < Data
+          include OwnedFormatItem
+
+          attr_reader compound: Array[OwnedFormatItem]
+
+          def self.new: (compound: Array[OwnedFormatItem]) -> instance
+                      | (Array[OwnedFormatItem] compound) -> instance
+
+          def ==: (Object other) -> bool
+        end
+
+        class Optional < Data
+          include OwnedFormatItem
+
+          attr_reader item: OwnedFormatItem
+
+          def self.new: (item: OwnedFormatItem) -> instance
+                      | (OwnedFormatItem item) -> instance
+
+        end
+
+        class First < Data
+          include OwnedFormatItem
+
+          attr_reader items: Array[OwnedFormatItem]
+
+          def self.new: (items: Array[OwnedFormatItem]) -> instance
+                      | (Array[OwnedFormatItem] items) -> instance
+
+        end
+      end
+
+      FormatItem: singleton(BorrowedFormatItem)
+    end
+  end
+end

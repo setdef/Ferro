@@ -121,6 +121,29 @@ module Ferro
         def parse(input, description)
           Native.time_parse(input, Arguments.description(description))
         end
+
+        # Parses a Time from +input+ with +description+, as parse does, but
+        # starting from +defaults+ rather than from nothing: a component the
+        # input lacks keeps the value +defaults+ gives it. +defaults+ is not
+        # changed. Mirrors time's <tt>Time::parse_with_defaults</tt>
+        # (<tt>src/time.rs:960-966</tt>).
+        #
+        # [input] String, read as bytes, as Rust's <tt>&[u8]</tt>.
+        # [description] A format description.
+        # [defaults] Parsing::Parsed.
+        def parse_with_defaults(input, description, defaults)
+          Native.time_parse_with_defaults(input, Arguments.description(description), Arguments.parsed(defaults))
+        end
+
+        # The Time that +parsed+ describes, raising an Error::TryFromParsed
+        # variant when it lacks a component the Time needs or holds one out
+        # of range. Mirrors time's <tt>TryFrom<Parsed> for Time</tt>
+        # (<tt>src/parsing/parsed.rs:1230-1288</tt>).
+        #
+        # [parsed] Parsing::Parsed.
+        def try_from(parsed)
+          Native.time_try_from_parsed(Arguments.parsed(parsed))
+        end
       end
 
       # The Time that is exactly midnight, 0:00. Mirrors time's

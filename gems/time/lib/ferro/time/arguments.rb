@@ -61,11 +61,12 @@ module Ferro
         end
 
         # The native form of a description: a version 3 description itself,
-        # a well-known format's name, or an ISO 8601 configuration's
-        # settings (plan 007, decision 11).
+        # a well-known format's name, an ISO 8601 configuration's settings
+        # (plan 007, decision 11), or format items (plan 009, decision 10).
         def description(description)
           wk = FormatDescription::WellKnown
           case description
+          when FormatDescription::BorrowedFormatItem, FormatDescription::OwnedFormatItem, Array then items_description(description)
           when FormatDescription::FormatDescriptionV3 then description
           when wk::Iso8601 then description.__send__(:config).__send__(:settings)
           else
@@ -75,6 +76,216 @@ module Ferro
 
             raise TypeError, "no implicit conversion of #{description.inspect} into a format description"
           end
+        end
+
+        # The native form of an item, or an Array of items of one family,
+        # used as a description (plan 009, decision 10).
+        def items_description(description)
+          fd = FormatDescription
+          return [:item, encode_item(description)] unless description.is_a?(Array)
+
+          family = description.first.is_a?(fd::BorrowedFormatItem) ? fd::BorrowedFormatItem : fd::OwnedFormatItem
+          [:items, items_of(family, description).map { |item| encode_item(item) }]
+        end
+
+        # +item+, refusing anything but an item of +family+ as Rust's type
+        # checker would.
+        def item_of(family, item)
+          raise TypeError, "no implicit conversion of #{item.class} into #{family.name}" unless item.is_a?(family)
+
+          _ = item
+        end
+
+        # A frozen copy of +items+, refusing anything but an Array of items
+        # of +family+.
+        def items_of(family, items)
+          raise TypeError, "no implicit conversion of #{items.class} into Array" unless items.is_a?(Array)
+
+          items.map { |item| item_of(family, item) }.freeze
+        end
+
+        # The fields a format item's +new+ keeps, each checked as Rust's
+        # type checker would and frozen.
+        def item_fields(item, fields)
+          family = item.is_a?(FormatDescription::BorrowedFormatItem) ? FormatDescription::BorrowedFormatItem : FormatDescription::OwnedFormatItem
+          # @type var checked: Hash[Symbol, Object]
+          checked = {}
+          fields.each do |name, value|
+            checked[name] = _ = case name
+              when :literal then item.is_a?(family.const_get(:LITERALS).fetch(:Literal)) ? bytes(value) : text(value)
+              when :component then component(value)
+              when :item then item_of(family, value)
+              else items_of(family, value)
+            end
+          end
+          checked
+        end
+
+        # +item+, refusing anything but a BorrowedFormatItem or an
+        # OwnedFormatItem.
+        def any_item(item)
+          return _ = item if item.is_a?(FormatDescription::BorrowedFormatItem) || item.is_a?(FormatDescription::OwnedFormatItem)
+
+          raise TypeError, "no implicit conversion of #{item.class} into a format item"
+        end
+
+        # +value+, refusing anything but +true+ or +false+, as Rust's +bool+.
+        def flag(value)
+          modifier_field(:bool, value)
+          value
+        end
+
+        # +parsed+, refusing anything but a Parsing::Parsed.
+        def parsed(parsed)
+          raise TypeError, "no implicit conversion of #{parsed.class} into Ferro::Time::Parsing::Parsed" unless parsed.is_a?(Parsing::Parsed)
+
+          parsed
+        end
+
+        # Checks +value+ against the type time gives a modifier's field:
+        # one of the modifier enums, +bool+, or <tt>NonZero<u16></tt>.
+        def modifier_field(kind, value)
+          case kind
+          when :bool
+            raise TypeError, "no implicit conversion of #{value.class} into true or false" unless value == true || value == false
+          when :count then nonzero_u16(value)
+          else
+            raise TypeError, "no implicit conversion of #{value.class} into #{kind.name}" unless value.instance_of?(kind)
+          end
+        end
+
+        # Checks that +value+ is an Integer from 1 to 65,535, Rust's
+        # <tt>NonZero<u16></tt>, in the words magnus uses for an Integer
+        # out of a Rust type's range.
+        def nonzero_u16(value)
+          raise TypeError, "no implicit conversion of #{value.class} into Integer" unless value.is_a?(Integer)
+          raise RangeError, "integer #{value} too small to convert into `NonZero<u16>`" if value < 1
+          raise RangeError, "integer #{value} too big to convert into `NonZero<u16>`" if value > 65_535
+        end
+
+        # A modifier field as the native layer reads it: an enum as its
+        # place in time's enum, anything else as is.
+        def encode_field(value)
+          case value
+          when true, false, Integer then value
+          else value.__send__(:index)
+          end
+        end
+
+        # Checks that +modifier+ is the modifier of the component variant
+        # +component_class+, which shares its name.
+        def component_modifier(component_class, modifier)
+          expected = FormatDescription::Modifier.const_get(:CLASSES).fetch(component_class.name.to_s.split("::").last.to_s.to_sym)
+          return if modifier.instance_of?(expected)
+
+          raise TypeError, "no implicit conversion of #{modifier.class} into #{expected.name}"
+        end
+
+        # +component+, refusing anything but a FormatDescription::Component.
+        def component(component)
+          unless component.is_a?(FormatDescription::Component)
+            raise TypeError, "no implicit conversion of #{component.class} into Ferro::Time::FormatDescription::Component"
+          end
+
+          _ = component
+        end
+
+        # A frozen binary copy of the bytes of +string+.
+        def bytes(string)
+          raise TypeError, "no implicit conversion of #{string.class} into String" unless string.is_a?(String)
+
+          string.b.freeze
+        end
+
+        # A frozen UTF-8 copy of +string+, refusing one that is not valid
+        # UTF-8 as Rust's +str+ would.
+        def text(string)
+          raise TypeError, "no implicit conversion of #{string.class} into String" unless string.is_a?(String)
+
+          utf8 = string.dup.force_encoding(Encoding::UTF_8)
+          raise EncodingError, "invalid byte sequence in UTF-8" unless utf8.valid_encoding?
+
+          utf8.freeze
+        end
+
+        # The native form of a format item: its variant's place in time's
+        # enum and its contents.
+        def encode_item(item)
+          b = FormatDescription::BorrowedFormatItem
+          o = FormatDescription::OwnedFormatItem
+          case item
+          when b::StringLiteral, o::StringLiteral then [1, item.literal]
+          when b::Component, o::Component then [2, (_ = item.component).__send__(:encode)]
+          when b::Compound, o::Compound then [3, item.compound.map { |inner| encode_item(inner) }]
+          when b::Optional, o::Optional then [4, encode_item(item.item)]
+          when b::First, o::First then [5, item.items.map { |inner| encode_item(inner) }]
+          else [0, (_ = item).literal]
+          end
+        end
+
+        # The BorrowedFormatItem the native encoding +encoded+ describes.
+        def decode_borrowed(encoded)
+          b = FormatDescription::BorrowedFormatItem
+          raise TypeError, "malformed format item" unless encoded.is_a?(Array)
+
+          tag, value = encoded
+          case tag
+          when 0 then b.const_get(:LITERALS).fetch(:Literal).new(value)
+          when 1 then b::StringLiteral.new(value)
+          when 2 then b::Component.new(decode_component(value))
+          when 3 then b::Compound.new(value.map { |inner| decode_borrowed(inner) })
+          when 4 then b::Optional.new(decode_borrowed(value))
+          else b::First.new(value.map { |inner| decode_borrowed(inner) })
+          end
+        end
+
+        # The OwnedFormatItem the native encoding +encoded+ describes.
+        def decode_owned(encoded)
+          o = FormatDescription::OwnedFormatItem
+          raise TypeError, "malformed format item" unless encoded.is_a?(Array)
+
+          tag, value = encoded
+          case tag
+          when 0 then o.const_get(:LITERALS).fetch(:Literal).new(value)
+          when 1 then o::StringLiteral.new(value)
+          when 2 then o::Component.new(decode_component(value))
+          when 3 then o::Compound.new(value.map { |inner| decode_owned(inner) })
+          when 4 then o::Optional.new(decode_owned(value))
+          else o::First.new(value.map { |inner| decode_owned(inner) })
+          end
+        end
+
+        # The component the native encoding +encoded+ describes: its
+        # variant's name, then its modifier's fields in time's order.
+        def decode_component(encoded)
+          raise TypeError, "malformed component" unless encoded.is_a?(Array)
+
+          name, *values = encoded
+          modifier = FormatDescription::Modifier.const_get(:CLASSES).fetch(name.to_s.to_sym)
+          kinds = modifier.const_get(:KINDS)
+          # @type var fields: Hash[Symbol, Object]
+          fields = {}
+          kinds.each_with_index do |(field, kind), index|
+            value = values.fetch(index)
+            fields[field] = kind.is_a?(Class) ? kind.const_get(:ALL).fetch(value) : value
+          end
+          FormatDescription::Component.const_get(:CLASSES).fetch(name.to_s.to_sym).new(modifier.__send__(:new, **fields))
+        end
+
+        # The OwnedFormatItem time's <tt>From<&BorrowedFormatItem></tt>
+        # makes of +item+ (<tt>src/format_description/owned_format_item.rs:85-107</tt>).
+        def owned_item(item)
+          decode_owned(encode_item(item))
+        end
+
+        # The owned items of an Array of borrowed or of owned items, as
+        # time's <tt>From<Vec<_>></tt> impls for +OwnedFormatItem+ take
+        # them.
+        def owned_items(items)
+          fd = FormatDescription
+          return _ = items_of(fd::OwnedFormatItem, items) if items.all?(fd::OwnedFormatItem)
+
+          items_of(fd::BorrowedFormatItem, items).map { |item| owned_item(item) }
         end
 
         # Refuses an +output+ that is not a String, or is frozen, before

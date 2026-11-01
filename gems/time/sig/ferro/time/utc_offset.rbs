@@ -13,6 +13,8 @@ module Ferro
       def self.local_offset_at: (OffsetDateTime datetime) -> UtcOffset
       def self.current_local_offset: () -> UtcOffset
       def self.parse: (String input, FormatDescription::description description) -> UtcOffset
+      def self.parse_with_defaults: (String input, FormatDescription::description description, Parsing::Parsed defaults) -> UtcOffset
+      def self.try_from: (Parsing::Parsed parsed) -> UtcOffset
 
       def as_hms: () -> [Integer, Integer, Integer]
       def whole_hours: () -> Integer

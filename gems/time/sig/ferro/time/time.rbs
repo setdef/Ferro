@@ -14,6 +14,8 @@ module Ferro
       def self.from_hms_micro: (Integer hour, Integer minute, Integer second, Integer microsecond) -> Time
       def self.from_hms_nano: (Integer hour, Integer minute, Integer second, Integer nanosecond) -> Time
       def self.parse: (String input, FormatDescription::description description) -> Time
+      def self.parse_with_defaults: (String input, FormatDescription::description description, Parsing::Parsed defaults) -> Time
+      def self.try_from: (Parsing::Parsed parsed) -> Time
 
       def hour: () -> Integer
       def minute: () -> Integer

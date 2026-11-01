@@ -1,0 +1,871 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    module FormatDescription
+      module Modifier
+        type kind = singleton(Enum) | :bool | :count
+        type field = Enum | bool | Integer
+
+        module Value : Data
+          def initialize: (**field fields) -> void
+          def inspect: () -> String
+
+          private
+
+          def encode: () -> encoded_component
+        end
+
+        class Enum
+          @index: Integer
+          @name: Symbol
+
+          private def self.new: (Integer index, Symbol name) -> instance
+
+          def initialize: (Integer index, Symbol name) -> void
+          def inspect: () -> String
+
+          private
+
+          attr_reader index: Integer
+        end
+
+
+        class MonthRepr < Enum
+          Numerical: MonthRepr
+          Long: MonthRepr
+          Short: MonthRepr
+
+          ALL: Array[MonthRepr]
+
+          def self.default: () -> MonthRepr
+        end
+
+        class WeekdayRepr < Enum
+          Short: WeekdayRepr
+          Long: WeekdayRepr
+          Sunday: WeekdayRepr
+          Monday: WeekdayRepr
+
+          ALL: Array[WeekdayRepr]
+
+          def self.default: () -> WeekdayRepr
+        end
+
+        class WeekNumberRepr < Enum
+          Iso: WeekNumberRepr
+          Sunday: WeekNumberRepr
+          Monday: WeekNumberRepr
+
+          ALL: Array[WeekNumberRepr]
+
+          def self.default: () -> WeekNumberRepr
+        end
+
+        class YearRepr < Enum
+          Full: YearRepr
+          Century: YearRepr
+          LastTwo: YearRepr
+
+          ALL: Array[YearRepr]
+
+          def self.default: () -> YearRepr
+        end
+
+        class YearRange < Enum
+          Standard: YearRange
+          Extended: YearRange
+
+          ALL: Array[YearRange]
+
+          def self.default: () -> YearRange
+        end
+
+        class SubsecondDigits < Enum
+          One: SubsecondDigits
+          Two: SubsecondDigits
+          Three: SubsecondDigits
+          Four: SubsecondDigits
+          Five: SubsecondDigits
+          Six: SubsecondDigits
+          Seven: SubsecondDigits
+          Eight: SubsecondDigits
+          Nine: SubsecondDigits
+          OneOrMore: SubsecondDigits
+
+          ALL: Array[SubsecondDigits]
+
+          def self.default: () -> SubsecondDigits
+        end
+
+        class Padding < Enum
+          Space: Padding
+          Zero: Padding
+          None: Padding
+
+          ALL: Array[Padding]
+
+          def self.default: () -> Padding
+        end
+
+        class UnixTimestampPrecision < Enum
+          Second: UnixTimestampPrecision
+          Millisecond: UnixTimestampPrecision
+          Microsecond: UnixTimestampPrecision
+          Nanosecond: UnixTimestampPrecision
+
+          ALL: Array[UnixTimestampPrecision]
+
+          def self.default: () -> UnixTimestampPrecision
+        end
+
+        class TrailingInput < Enum
+          Prohibit: TrailingInput
+          Discard: TrailingInput
+
+          ALL: Array[TrailingInput]
+
+          def self.default: () -> TrailingInput
+        end
+
+        class Day < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: Day
+
+          attr_reader padding: Padding
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> Day
+          def with_padding: (Padding padding) -> Day
+        end
+
+        class MonthShort < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: MonthShort
+
+          private def self.new: (case_sensitive: bool) -> instance
+                              | (bool case_sensitive) -> instance
+
+          def self.default: () -> MonthShort
+          def with_case_sensitive: (bool case_sensitive) -> MonthShort
+
+          private
+
+          attr_reader case_sensitive: bool
+        end
+
+        class MonthLong < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: MonthLong
+
+          private def self.new: (case_sensitive: bool) -> instance
+                              | (bool case_sensitive) -> instance
+
+          def self.default: () -> MonthLong
+          def with_case_sensitive: (bool case_sensitive) -> MonthLong
+
+          private
+
+          attr_reader case_sensitive: bool
+        end
+
+        class MonthNumerical < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: MonthNumerical
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> MonthNumerical
+          def with_padding: (Padding padding) -> MonthNumerical
+
+          private
+
+          attr_reader padding: Padding
+        end
+
+        class Month < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: Month
+
+          attr_reader padding: Padding
+          attr_reader repr: MonthRepr
+          attr_reader case_sensitive: bool
+
+          private def self.new: (padding: Padding, repr: MonthRepr, case_sensitive: bool) -> instance
+                              | (Padding padding, MonthRepr repr, bool case_sensitive) -> instance
+
+          def self.default: () -> Month
+          def with_padding: (Padding padding) -> Month
+          def with_repr: (MonthRepr repr) -> Month
+          def with_case_sensitive: (bool case_sensitive) -> Month
+        end
+
+        class Ordinal < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: Ordinal
+
+          attr_reader padding: Padding
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> Ordinal
+          def with_padding: (Padding padding) -> Ordinal
+        end
+
+        class WeekdayShort < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: WeekdayShort
+
+          private def self.new: (case_sensitive: bool) -> instance
+                              | (bool case_sensitive) -> instance
+
+          def self.default: () -> WeekdayShort
+          def with_case_sensitive: (bool case_sensitive) -> WeekdayShort
+
+          private
+
+          attr_reader case_sensitive: bool
+        end
+
+        class WeekdayLong < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: WeekdayLong
+
+          private def self.new: (case_sensitive: bool) -> instance
+                              | (bool case_sensitive) -> instance
+
+          def self.default: () -> WeekdayLong
+          def with_case_sensitive: (bool case_sensitive) -> WeekdayLong
+
+          private
+
+          attr_reader case_sensitive: bool
+        end
+
+        class WeekdaySunday < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: WeekdaySunday
+
+          private def self.new: (one_indexed: bool) -> instance
+                              | (bool one_indexed) -> instance
+
+          def self.default: () -> WeekdaySunday
+          def with_one_indexed: (bool one_indexed) -> WeekdaySunday
+
+          private
+
+          attr_reader one_indexed: bool
+        end
+
+        class WeekdayMonday < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: WeekdayMonday
+
+          private def self.new: (one_indexed: bool) -> instance
+                              | (bool one_indexed) -> instance
+
+          def self.default: () -> WeekdayMonday
+          def with_one_indexed: (bool one_indexed) -> WeekdayMonday
+
+          private
+
+          attr_reader one_indexed: bool
+        end
+
+        class Weekday < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: Weekday
+
+          attr_reader repr: WeekdayRepr
+          attr_reader one_indexed: bool
+          attr_reader case_sensitive: bool
+
+          private def self.new: (repr: WeekdayRepr, one_indexed: bool, case_sensitive: bool) -> instance
+                              | (WeekdayRepr repr, bool one_indexed, bool case_sensitive) -> instance
+
+          def self.default: () -> Weekday
+          def with_repr: (WeekdayRepr repr) -> Weekday
+          def with_one_indexed: (bool one_indexed) -> Weekday
+          def with_case_sensitive: (bool case_sensitive) -> Weekday
+        end
+
+        class WeekNumberIso < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: WeekNumberIso
+
+          attr_reader padding: Padding
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> WeekNumberIso
+          def with_padding: (Padding padding) -> WeekNumberIso
+        end
+
+        class WeekNumberSunday < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: WeekNumberSunday
+
+          attr_reader padding: Padding
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> WeekNumberSunday
+          def with_padding: (Padding padding) -> WeekNumberSunday
+        end
+
+        class WeekNumberMonday < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: WeekNumberMonday
+
+          attr_reader padding: Padding
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> WeekNumberMonday
+          def with_padding: (Padding padding) -> WeekNumberMonday
+        end
+
+        class WeekNumber < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: WeekNumber
+
+          attr_reader padding: Padding
+          attr_reader repr: WeekNumberRepr
+
+          private def self.new: (padding: Padding, repr: WeekNumberRepr) -> instance
+                              | (Padding padding, WeekNumberRepr repr) -> instance
+
+          def self.default: () -> WeekNumber
+          def with_padding: (Padding padding) -> WeekNumber
+          def with_repr: (WeekNumberRepr repr) -> WeekNumber
+        end
+
+        class CalendarYearFullExtendedRange < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: CalendarYearFullExtendedRange
+
+          private def self.new: (padding: Padding, sign_is_mandatory: bool) -> instance
+                              | (Padding padding, bool sign_is_mandatory) -> instance
+
+          def self.default: () -> CalendarYearFullExtendedRange
+          def with_padding: (Padding padding) -> CalendarYearFullExtendedRange
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> CalendarYearFullExtendedRange
+
+          private
+
+          attr_reader padding: Padding
+          attr_reader sign_is_mandatory: bool
+        end
+
+        class CalendarYearFullStandardRange < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: CalendarYearFullStandardRange
+
+          private def self.new: (padding: Padding, sign_is_mandatory: bool) -> instance
+                              | (Padding padding, bool sign_is_mandatory) -> instance
+
+          def self.default: () -> CalendarYearFullStandardRange
+          def with_padding: (Padding padding) -> CalendarYearFullStandardRange
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> CalendarYearFullStandardRange
+
+          private
+
+          attr_reader padding: Padding
+          attr_reader sign_is_mandatory: bool
+        end
+
+        class IsoYearFullExtendedRange < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: IsoYearFullExtendedRange
+
+          private def self.new: (padding: Padding, sign_is_mandatory: bool) -> instance
+                              | (Padding padding, bool sign_is_mandatory) -> instance
+
+          def self.default: () -> IsoYearFullExtendedRange
+          def with_padding: (Padding padding) -> IsoYearFullExtendedRange
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> IsoYearFullExtendedRange
+
+          private
+
+          attr_reader padding: Padding
+          attr_reader sign_is_mandatory: bool
+        end
+
+        class IsoYearFullStandardRange < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: IsoYearFullStandardRange
+
+          private def self.new: (padding: Padding, sign_is_mandatory: bool) -> instance
+                              | (Padding padding, bool sign_is_mandatory) -> instance
+
+          def self.default: () -> IsoYearFullStandardRange
+          def with_padding: (Padding padding) -> IsoYearFullStandardRange
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> IsoYearFullStandardRange
+
+          private
+
+          attr_reader padding: Padding
+          attr_reader sign_is_mandatory: bool
+        end
+
+        class CalendarYearCenturyExtendedRange < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: CalendarYearCenturyExtendedRange
+
+          private def self.new: (padding: Padding, sign_is_mandatory: bool) -> instance
+                              | (Padding padding, bool sign_is_mandatory) -> instance
+
+          def self.default: () -> CalendarYearCenturyExtendedRange
+          def with_padding: (Padding padding) -> CalendarYearCenturyExtendedRange
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> CalendarYearCenturyExtendedRange
+
+          private
+
+          attr_reader padding: Padding
+          attr_reader sign_is_mandatory: bool
+        end
+
+        class CalendarYearCenturyStandardRange < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: CalendarYearCenturyStandardRange
+
+          private def self.new: (padding: Padding, sign_is_mandatory: bool) -> instance
+                              | (Padding padding, bool sign_is_mandatory) -> instance
+
+          def self.default: () -> CalendarYearCenturyStandardRange
+          def with_padding: (Padding padding) -> CalendarYearCenturyStandardRange
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> CalendarYearCenturyStandardRange
+
+          private
+
+          attr_reader padding: Padding
+          attr_reader sign_is_mandatory: bool
+        end
+
+        class IsoYearCenturyExtendedRange < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: IsoYearCenturyExtendedRange
+
+          private def self.new: (padding: Padding, sign_is_mandatory: bool) -> instance
+                              | (Padding padding, bool sign_is_mandatory) -> instance
+
+          def self.default: () -> IsoYearCenturyExtendedRange
+          def with_padding: (Padding padding) -> IsoYearCenturyExtendedRange
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> IsoYearCenturyExtendedRange
+
+          private
+
+          attr_reader padding: Padding
+          attr_reader sign_is_mandatory: bool
+        end
+
+        class IsoYearCenturyStandardRange < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: IsoYearCenturyStandardRange
+
+          private def self.new: (padding: Padding, sign_is_mandatory: bool) -> instance
+                              | (Padding padding, bool sign_is_mandatory) -> instance
+
+          def self.default: () -> IsoYearCenturyStandardRange
+          def with_padding: (Padding padding) -> IsoYearCenturyStandardRange
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> IsoYearCenturyStandardRange
+
+          private
+
+          attr_reader padding: Padding
+          attr_reader sign_is_mandatory: bool
+        end
+
+        class CalendarYearLastTwo < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: CalendarYearLastTwo
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> CalendarYearLastTwo
+          def with_padding: (Padding padding) -> CalendarYearLastTwo
+
+          private
+
+          attr_reader padding: Padding
+        end
+
+        class IsoYearLastTwo < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: IsoYearLastTwo
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> IsoYearLastTwo
+          def with_padding: (Padding padding) -> IsoYearLastTwo
+
+          private
+
+          attr_reader padding: Padding
+        end
+
+        class Year < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: Year
+
+          attr_reader padding: Padding
+          attr_reader repr: YearRepr
+          attr_reader range: YearRange
+          attr_reader iso_week_based: bool
+          attr_reader sign_is_mandatory: bool
+
+          private def self.new: (padding: Padding, repr: YearRepr, range: YearRange, iso_week_based: bool, sign_is_mandatory: bool) -> instance
+                              | (Padding padding, YearRepr repr, YearRange range, bool iso_week_based, bool sign_is_mandatory) -> instance
+
+          def self.default: () -> Year
+          def with_padding: (Padding padding) -> Year
+          def with_repr: (YearRepr repr) -> Year
+          def with_range: (YearRange range) -> Year
+          def with_iso_week_based: (bool iso_week_based) -> Year
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> Year
+        end
+
+        class Hour12 < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: Hour12
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> Hour12
+          def with_padding: (Padding padding) -> Hour12
+
+          private
+
+          attr_reader padding: Padding
+        end
+
+        class Hour24 < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: Hour24
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> Hour24
+          def with_padding: (Padding padding) -> Hour24
+
+          private
+
+          attr_reader padding: Padding
+        end
+
+        class Hour < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: Hour
+
+          attr_reader padding: Padding
+          attr_reader is_12_hour_clock: bool
+
+          private def self.new: (padding: Padding, is_12_hour_clock: bool) -> instance
+                              | (Padding padding, bool is_12_hour_clock) -> instance
+
+          def self.default: () -> Hour
+          def with_padding: (Padding padding) -> Hour
+          def with_is_12_hour_clock: (bool is_12_hour_clock) -> Hour
+        end
+
+        class Minute < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: Minute
+
+          attr_reader padding: Padding
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> Minute
+          def with_padding: (Padding padding) -> Minute
+        end
+
+        class Period < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: Period
+
+          attr_reader is_uppercase: bool
+          attr_reader case_sensitive: bool
+
+          private def self.new: (is_uppercase: bool, case_sensitive: bool) -> instance
+                              | (bool is_uppercase, bool case_sensitive) -> instance
+
+          def self.default: () -> Period
+          def with_is_uppercase: (bool is_uppercase) -> Period
+          def with_case_sensitive: (bool case_sensitive) -> Period
+        end
+
+        class Second < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: Second
+
+          attr_reader padding: Padding
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> Second
+          def with_padding: (Padding padding) -> Second
+        end
+
+        class Subsecond < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: Subsecond
+
+          attr_reader digits: SubsecondDigits
+
+          private def self.new: (digits: SubsecondDigits) -> instance
+                              | (SubsecondDigits digits) -> instance
+
+          def self.default: () -> Subsecond
+          def with_digits: (SubsecondDigits digits) -> Subsecond
+        end
+
+        class OffsetHour < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: OffsetHour
+
+          attr_reader sign_is_mandatory: bool
+          attr_reader padding: Padding
+
+          private def self.new: (sign_is_mandatory: bool, padding: Padding) -> instance
+                              | (bool sign_is_mandatory, Padding padding) -> instance
+
+          def self.default: () -> OffsetHour
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> OffsetHour
+          def with_padding: (Padding padding) -> OffsetHour
+        end
+
+        class OffsetMinute < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: OffsetMinute
+
+          attr_reader padding: Padding
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> OffsetMinute
+          def with_padding: (Padding padding) -> OffsetMinute
+        end
+
+        class OffsetSecond < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: OffsetSecond
+
+          attr_reader padding: Padding
+
+          private def self.new: (padding: Padding) -> instance
+                              | (Padding padding) -> instance
+
+          def self.default: () -> OffsetSecond
+          def with_padding: (Padding padding) -> OffsetSecond
+        end
+
+        class Ignore < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+
+          attr_reader count: Integer
+
+          private def self.new: (count: Integer) -> instance
+                              | (Integer count) -> instance
+
+          def self.count: (Integer count) -> Ignore
+          def with_count: (Integer count) -> Ignore
+        end
+
+        class UnixTimestampSecond < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: UnixTimestampSecond
+
+          private def self.new: (sign_is_mandatory: bool) -> instance
+                              | (bool sign_is_mandatory) -> instance
+
+          def self.default: () -> UnixTimestampSecond
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> UnixTimestampSecond
+
+          private
+
+          attr_reader sign_is_mandatory: bool
+        end
+
+        class UnixTimestampMillisecond < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: UnixTimestampMillisecond
+
+          private def self.new: (sign_is_mandatory: bool) -> instance
+                              | (bool sign_is_mandatory) -> instance
+
+          def self.default: () -> UnixTimestampMillisecond
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> UnixTimestampMillisecond
+
+          private
+
+          attr_reader sign_is_mandatory: bool
+        end
+
+        class UnixTimestampMicrosecond < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: UnixTimestampMicrosecond
+
+          private def self.new: (sign_is_mandatory: bool) -> instance
+                              | (bool sign_is_mandatory) -> instance
+
+          def self.default: () -> UnixTimestampMicrosecond
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> UnixTimestampMicrosecond
+
+          private
+
+          attr_reader sign_is_mandatory: bool
+        end
+
+        class UnixTimestampNanosecond < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: UnixTimestampNanosecond
+
+          private def self.new: (sign_is_mandatory: bool) -> instance
+                              | (bool sign_is_mandatory) -> instance
+
+          def self.default: () -> UnixTimestampNanosecond
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> UnixTimestampNanosecond
+
+          private
+
+          attr_reader sign_is_mandatory: bool
+        end
+
+        class UnixTimestamp < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: UnixTimestamp
+
+          attr_reader precision: UnixTimestampPrecision
+          attr_reader sign_is_mandatory: bool
+
+          private def self.new: (precision: UnixTimestampPrecision, sign_is_mandatory: bool) -> instance
+                              | (UnixTimestampPrecision precision, bool sign_is_mandatory) -> instance
+
+          def self.default: () -> UnixTimestamp
+          def with_precision: (UnixTimestampPrecision precision) -> UnixTimestamp
+          def with_sign_is_mandatory: (bool sign_is_mandatory) -> UnixTimestamp
+        end
+
+        class End < Data
+          include Value
+
+          KINDS: Hash[Symbol, kind]
+          DEFAULT: End
+
+          private def self.new: (trailing_input: TrailingInput) -> instance
+                              | (TrailingInput trailing_input) -> instance
+
+          def self.default: () -> End
+          def with_trailing_input: (TrailingInput trailing_input) -> End
+
+          private
+
+          attr_reader trailing_input: TrailingInput
+        end
+
+        CLASSES: Hash[Symbol, Class]
+        ENUMS: Hash[Symbol, singleton(Enum)]
+      end
+    end
+  end
+end
