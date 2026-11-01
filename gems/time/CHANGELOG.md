@@ -12,6 +12,8 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0.pre.2] - 2026-11-01
+
 ### Added
 
 - `FormatDescription.parse_borrowed` and `parse_owned` with versions 1 and 2, `parse_strftime_borrowed`, `parse_strftime_owned`, and the deprecated `parse`, returning time's format items.
@@ -39,5 +41,6 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 - `UtcOffset.current_local_offset`, `.local_offset_at`, `OffsetDateTime.now_local`, and `Util` with `refresh_tz`.
 - `Error` with a class for each of time's error types and variants, and time's messages. Inputs time panics on raise `RangeError` with time's message instead of ending the process.
 
-[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.1...HEAD
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.2...HEAD
+[0.1.0.pre.2]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.1...ferro-time/v0.1.0.pre.2
 [0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-time/v0.1.0.pre.1
