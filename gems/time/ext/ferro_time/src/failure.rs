@@ -273,6 +273,9 @@ impl Failure {
     }
 }
 
+/// The most arguments any error's `new` takes.
+const MOST_ARGS: usize = 3;
+
 /// `Ferro::Time::<path>.new(*args)`.
 fn instance(ruby: &Ruby, path: &str, args: &[Arg]) -> Result<Exception, Error> {
     let found = path
@@ -281,15 +284,26 @@ fn instance(ruby: &Ruby, path: &str, args: &[Arg]) -> Result<Exception, Error> {
             module.funcall::<_, _, Value>("const_get", (name, false))
         })?;
     let class = ExceptionClass::try_convert(found)?;
-    let values: Vec<Value> = args
-        .iter()
-        .map(|arg| match arg {
+    // `new` allocates the exception before it reads its arguments, and
+    // Ruby's collector scans the machine stack conservatively but not
+    // Rust's heap (magnus 0.9.3 `src/into_value.rs:154-158`), so the
+    // arguments stay in an array on the stack. A `Vec<Value>` let a
+    // collection free them. Registering each with the collector instead
+    // (`BoxValue`) edits a VM-wide list without a lock on Ruby 4.0.9
+    // (`gc.c:3444-3488`) and crashes under parallel Ractors.
+    assert!(
+        args.len() <= MOST_ARGS,
+        "an error takes at most {MOST_ARGS} arguments"
+    );
+    let mut values = [ruby.qnil().as_value(); MOST_ARGS];
+    for (slot, arg) in values.iter_mut().zip(args) {
+        *slot = match arg {
             Arg::Str(value) => value.as_str().into_value_with(ruby),
             Arg::Bool(value) => value.into_value_with(ruby),
             Arg::Index(value) => value.into_value_with(ruby),
-        })
-        .collect();
-    class.funcall("new", values.as_slice())
+        };
+    }
+    class.funcall("new", &values[..args.len()])
 }
 
 impl From<error::ComponentRange> for Failure {

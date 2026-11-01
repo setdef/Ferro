@@ -204,4 +204,25 @@ class TestErrors < Minitest::Test
       assert_equal "invalid version provided", error.message
     end
   end
+
+  # The arguments of an error live on Rust's heap while Ruby allocates the
+  # exception that reads them, so a collection in between freed them and
+  # the exception's message read a freed String. GC.stress collects at
+  # every allocation, which makes that certain; the child would crash
+  # without the arguments registered with the collector.
+  def test_an_error_keeps_its_arguments_through_a_collection
+    names = in_child(<<~RUBY)
+      t = Ferro::Time
+      GC.stress = true
+      names = 50.times.map do
+        t::Timestamp.from_seconds(2**62)
+      rescue t::Error::ComponentRange => e
+        e.name
+      end
+      GC.stress = false
+      names.uniq
+    RUBY
+
+    assert_equal ["seconds"], names
+  end
 end

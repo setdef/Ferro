@@ -14,7 +14,7 @@ module Ferro
       def self.new: (Date date, Time time) -> UtcDateTime
       def self.from_unix_timestamp: (Integer timestamp) -> UtcDateTime
       def self.from_unix_timestamp_nanos: (Integer timestamp) -> UtcDateTime
-      def self.from: (OffsetDateTime | ::Time value) -> UtcDateTime
+      def self.from: (OffsetDateTime | Timestamp | ::Time value) -> UtcDateTime
       def self.parse: (String input, FormatDescription::description description) -> UtcDateTime
       def self.parse_with_defaults: (String input, FormatDescription::description description, Parsing::Parsed defaults) -> UtcDateTime
       def self.try_from: (Parsing::Parsed parsed) -> UtcDateTime
@@ -70,11 +70,11 @@ module Ferro
       def truncate_to_second: () -> UtcDateTime
       def truncate_to_millisecond: () -> UtcDateTime
       def truncate_to_microsecond: () -> UtcDateTime
-      def -: (SignedDuration other) -> UtcDateTime | (UtcDateTime | OffsetDateTime | ::Time other) -> SignedDuration
+      def -: (SignedDuration other) -> UtcDateTime | (UtcDateTime | OffsetDateTime | Timestamp | ::Time other) -> SignedDuration
       def ==: (Object other) -> bool
       def eql?: (Object other) -> bool
       def hash: () -> Integer
-      def <=>: (UtcDateTime | OffsetDateTime | ::Time other) -> Integer | (Object other) -> Integer?
+      def <=>: (UtcDateTime | OffsetDateTime | Timestamp | ::Time other) -> Integer | (Object other) -> Integer?
       def to_time: () -> ::Time
       def format: (FormatDescription::description description) -> String
       def format_into: (String output, FormatDescription::description description) -> Integer

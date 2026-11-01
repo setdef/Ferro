@@ -34,6 +34,11 @@ module Ferro
       def self.utc_display: (UtcDateTime value) -> String
       def self.utc_debug: (UtcDateTime value) -> String
       def self.utc_cmp: (UtcDateTime left, UtcDateTime right) -> Integer
+      def self.timestamp_eq: (Timestamp left, Timestamp right) -> bool
+      def self.timestamp_hash: (Timestamp value) -> Integer
+      def self.timestamp_display: (Timestamp value) -> String
+      def self.timestamp_debug: (Timestamp value) -> String
+      def self.timestamp_cmp: (Timestamp left, Timestamp right) -> Integer
       def self.offset_date_time_eq: (OffsetDateTime left, OffsetDateTime right) -> bool
       def self.offset_date_time_hash: (OffsetDateTime value) -> Integer
       def self.offset_date_time_display: (OffsetDateTime value) -> String
@@ -331,6 +336,50 @@ module Ferro
       def self.offset_date_time_with_system_time: (OffsetDateTime value, :== operator, Integer seconds, Integer nanoseconds) -> bool
                                                 | (OffsetDateTime value, :<=> operator, Integer seconds, Integer nanoseconds) -> Integer?
                                                 | (OffsetDateTime value, :- operator, Integer seconds, Integer nanoseconds) -> SignedDuration
+      def self.timestamp_constant: (Symbol name) -> Timestamp
+      def self.timestamp_now: () -> Timestamp
+      def self.timestamp_new: (Integer seconds, Integer nanoseconds) -> Timestamp
+      def self.timestamp_from_seconds: (Integer seconds) -> Timestamp
+      def self.timestamp_from_milliseconds: (Integer milliseconds) -> Timestamp
+      def self.timestamp_from_microseconds: (Integer microseconds) -> Timestamp
+      def self.timestamp_from_nanoseconds: (Integer nanoseconds) -> Timestamp
+      def self.timestamp_int: (Timestamp value, Symbol name) -> Integer
+      def self.timestamp_ints: (Timestamp value, :to_ordinal_date name) -> [Integer, Integer]
+                             | (Timestamp value, :to_calendar_date | :to_iso_week_date | :as_hms name) -> [Integer, Integer, Integer]
+                             | (Timestamp value, :as_hms_milli | :as_hms_micro | :as_hms_nano name) -> [Integer, Integer, Integer, Integer]
+      def self.timestamp_replace: (Timestamp value, Symbol name, Integer number) -> Timestamp
+      def self.timestamp_replace_time: (Timestamp value, Time time) -> Timestamp
+      def self.timestamp_replace_date: (Timestamp value, Date date) -> Timestamp
+      def self.timestamp_arith: (Timestamp value, :checked_add | :checked_sub name, SignedDuration duration) -> Timestamp?
+                              | (Timestamp value, :saturating_add | :saturating_sub | :+ | :- name, SignedDuration duration) -> Timestamp
+      def self.timestamp_date: (Timestamp value) -> Date
+      def self.timestamp_time: (Timestamp value) -> Time
+      def self.timestamp_to_offset: (Timestamp value, :to_offset name, UtcOffset offset) -> OffsetDateTime
+                                  | (Timestamp value, :checked_to_offset name, UtcOffset offset) -> OffsetDateTime?
+      def self.timestamp_to_utc: (Timestamp value) -> UtcDateTime
+      def self.timestamp_difference: (Timestamp value, Timestamp other) -> SignedDuration
+      def self.timestamp_with_utc: (Timestamp value, :== operator, UtcDateTime other) -> bool
+                                 | (Timestamp value, :<=> operator, UtcDateTime other) -> Integer
+                                 | (Timestamp value, :- operator, UtcDateTime other) -> SignedDuration
+      def self.timestamp_with_offset_date_time: (Timestamp value, :== operator, OffsetDateTime other) -> bool
+                                              | (Timestamp value, :<=> operator, OffsetDateTime other) -> Integer
+                                              | (Timestamp value, :- operator, OffsetDateTime other) -> SignedDuration
+      def self.timestamp_with_system_time: (Timestamp value, :== operator, Integer seconds, Integer nanoseconds) -> bool
+                                         | (Timestamp value, :<=> operator, Integer seconds, Integer nanoseconds) -> Integer
+                                         | (Timestamp value, :- operator, Integer seconds, Integer nanoseconds) -> SignedDuration
+      def self.timestamp_from_utc: (UtcDateTime value) -> Timestamp
+      def self.timestamp_from_offset_date_time: (OffsetDateTime value) -> Timestamp
+      def self.timestamp_from_system_time: (Integer seconds, Integer nanoseconds) -> Timestamp
+      def self.timestamp_to_system_time: (Timestamp value) -> [Integer, Integer]
+      def self.utc_difference_timestamp: (UtcDateTime value, Timestamp other) -> SignedDuration
+      def self.offset_date_time_difference_timestamp: (OffsetDateTime value, Timestamp other) -> SignedDuration
+      def self.utc_from_timestamp: (Timestamp value) -> UtcDateTime
+      def self.offset_date_time_from_timestamp: (Timestamp value) -> OffsetDateTime
+      def self.timestamp_try_from_parsed: (Parsing::Parsed parsed) -> Timestamp
+      def self.timestamp_parse_with_defaults: (String input, native_description description, Parsing::Parsed defaults) -> Timestamp
+      def self.timestamp_format: (Timestamp value, native_description description) -> String
+      def self.timestamp_format_into: (Timestamp value, native_description description) -> [String, Integer?, Exception?]
+      def self.timestamp_parse: (String input, native_description description) -> Timestamp
       def self.utc_with_system_time: (UtcDateTime value, :== operator, Integer seconds, Integer nanoseconds) -> bool
                                    | (UtcDateTime value, :<=> operator, Integer seconds, Integer nanoseconds) -> Integer?
                                    | (UtcDateTime value, :- operator, Integer seconds, Integer nanoseconds) -> SignedDuration

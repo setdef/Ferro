@@ -14,8 +14,8 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use magnus::{function, prelude::*, Error, RModule, Ruby, TypedData};
 use time::{
-    Date, Month, OffsetDateTime, PlainDateTime, SignedDuration, Time, UtcDateTime, UtcOffset,
-    Weekday,
+    Date, Month, OffsetDateTime, PlainDateTime, SignedDuration, Time, Timestamp, UtcDateTime,
+    UtcOffset, Weekday,
 };
 
 use crate::{guarded, Failure};
@@ -54,6 +54,15 @@ pub struct NUtc(pub UtcDateTime);
     frozen_shareable
 )]
 pub struct NOffsetDateTime(pub OffsetDateTime);
+
+/// `Ferro::Time::Timestamp`, holding a `time::Timestamp`.
+#[magnus::wrap(
+    class = "Ferro::Time::Timestamp",
+    free_immediately,
+    size,
+    frozen_shareable
+)]
+pub struct NTimestamp(pub Timestamp);
 
 /// `Ferro::Time::UtcOffset`, holding a `time::UtcOffset`.
 #[magnus::wrap(
@@ -106,6 +115,7 @@ wrapped! {
     NTime => Time,
     NPlain => PlainDateTime,
     NUtc => UtcDateTime,
+    NTimestamp => Timestamp,
     NOffsetDateTime => OffsetDateTime,
     NUtcOffset => UtcOffset,
     NDuration => SignedDuration,
@@ -192,6 +202,7 @@ pub fn define(ruby: &Ruby, time: RModule) -> Result<(), Error> {
         "Time",
         "PlainDateTime",
         "UtcDateTime",
+        "Timestamp",
         "OffsetDateTime",
         "UtcOffset",
         "SignedDuration",
@@ -204,6 +215,7 @@ pub fn define(ruby: &Ruby, time: RModule) -> Result<(), Error> {
     shared!(native, "time", NTime);
     shared!(native, "plain", NPlain);
     shared!(native, "utc", NUtc);
+    shared!(native, "timestamp", NTimestamp);
     shared!(native, "offset_date_time", NOffsetDateTime);
     shared!(native, "utc_offset", NUtcOffset);
     shared!(native, "duration", NDuration);

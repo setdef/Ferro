@@ -136,16 +136,17 @@ module Ferro
         end
 
         # Converts a UtcDateTime, as time's <tt>From<UtcDateTime></tt> does,
-        # or Ruby's ::Time, as <tt>From<SystemTime></tt> does (plan 007,
+        # a Timestamp, as <tt>From<Timestamp></tt> does, or Ruby's ::Time, as <tt>From<SystemTime></tt> does (plan 007,
         # decision 10); the result is in UTC. A ::Time keeps its seconds and
         # nanoseconds since the epoch and drops any finer fraction. Where Rust
         # panics because the result is outside the supported range, this
         # raises +RangeError+ with time's message. Mirrors time's
         # <tt>From<UtcDateTime> for OffsetDateTime</tt>
         # (<tt>src/interop/offsetdatetime_utcdatetime.rs:71-82,
+        # src/interop/offsetdatetime_timestamp.rs:93-107,
         # src/interop/offsetdatetime_systemtime.rs:59-67</tt>).
         #
-        # [value] UtcDateTime or ::Time.
+        # [value] UtcDateTime, Timestamp, or ::Time.
         #
         # === Example
         #
@@ -153,6 +154,7 @@ module Ferro
         def from(value)
           case value
           when UtcDateTime then Native.offset_date_time_from_utc(value)
+          when Timestamp then Native.offset_date_time_from_timestamp(value)
           when ::Time
             seconds, nanoseconds = Arguments.system_time(value)
             Native.offset_date_time_from_system_time(seconds, nanoseconds)
@@ -1008,7 +1010,7 @@ module Ferro
       # (<tt>src/interop/offsetdatetime_utcdatetime.rs,
       # src/interop/offsetdatetime_systemtime.rs</tt>).
       #
-      # [other] SignedDuration, OffsetDateTime, UtcDateTime, or ::Time.
+      # [other] SignedDuration, OffsetDateTime, UtcDateTime, Timestamp, or ::Time.
       #
       # === Example
       #
@@ -1021,6 +1023,7 @@ module Ferro
         when SignedDuration then Native.offset_date_time_arith(self, :-, other)
         when OffsetDateTime then Native.offset_date_time_difference(self, other)
         when UtcDateTime then Native.offset_date_time_difference_utc(self, other)
+        when Timestamp then Native.offset_date_time_difference_timestamp(self, other)
         when ::Time
           seconds, nanoseconds = Arguments.system_time(other)
           Native.offset_date_time_with_system_time(self, :-, seconds, nanoseconds)
@@ -1029,7 +1032,7 @@ module Ferro
       end
 
       # Whether +other+ is the same instant: a OffsetDateTime, a UtcDateTime,
-      # or Ruby's ::Time, by time's +PartialEq+ impls. +false+ for anything
+      # a Timestamp, or Ruby's ::Time, by time's +PartialEq+ impls. +false+ for anything
       # else. Ruby's own <tt>::Time#<=></tt> asks the other value when it is
       # not a ::Time (<tt>time.c:3987</tt> at Ruby v4.0.9), so <tt>time ==
       # datetime</tt> answers through this method too, as time's impls with
@@ -1052,6 +1055,7 @@ module Ferro
         when ::Time
           seconds, nanoseconds = Arguments.system_time(other)
           Native.offset_date_time_with_system_time(self, :==, seconds, nanoseconds)
+        when Timestamp then Native.timestamp_with_offset_date_time(other, :==, self)
         else false
         end
       end
@@ -1082,8 +1086,8 @@ module Ferro
         Native.offset_date_time_hash(self)
       end
 
-      # Orders by instant against a OffsetDateTime, a UtcDateTime, or Ruby's
-      # ::Time, by time's +Ord+ and +PartialOrd+ impls, so the Comparable
+      # Orders by instant against a OffsetDateTime, a UtcDateTime, a Timestamp,
+      # or Ruby's ::Time, by time's +Ord+ and +PartialOrd+ impls, so the Comparable
       # operators answer as Rust's do; +nil+ for anything else. Ruby's
       # <tt>::Time#<=></tt> asks this method in turn, so <tt>time <
       # datetime</tt> works too. Mirrors time's <tt>PartialOrd for
@@ -1104,6 +1108,7 @@ module Ferro
         when ::Time
           seconds, nanoseconds = Arguments.system_time(other)
           Native.offset_date_time_with_system_time(self, :<=>, seconds, nanoseconds)
+        when Timestamp then -Native.timestamp_with_offset_date_time(other, :<=>, self)
         end
       end
 

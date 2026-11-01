@@ -33,6 +33,7 @@ mod items;
 mod offset;
 mod parsed;
 mod system_time;
+mod timestamp;
 mod values;
 
 use std::any::Any;
@@ -165,6 +166,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     items::define(native)?;
     parsed::define(ruby, time, native)?;
     system_time::define(native)?;
+    timestamp::define(native)?;
     Ok(())
 }
 

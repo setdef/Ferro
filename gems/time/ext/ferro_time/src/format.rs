@@ -15,12 +15,12 @@ use time::format_description::well_known::{Rfc2822, Rfc3339};
 use time::format_description::{self, FormatDescriptionV3, OwnedFormatItem};
 use time::formatting::Formattable;
 use time::parsing::Parsed;
-use time::{error, Date, OffsetDateTime, PlainDateTime, Time, UtcDateTime, UtcOffset};
+use time::{error, Date, OffsetDateTime, PlainDateTime, Time, Timestamp, UtcDateTime, UtcOffset};
 
 use crate::iso8601::{self, Parts};
 use crate::items::Items;
 use crate::parsed::Checked;
-use crate::values::{NDate, NOffsetDateTime, NPlain, NTime, NUtc, NUtcOffset, Wrapped};
+use crate::values::{NDate, NOffsetDateTime, NPlain, NTime, NTimestamp, NUtc, NUtcOffset, Wrapped};
 use crate::{frozen, guarded, Failure};
 
 /// `Ferro::Time::FormatDescription::FormatDescriptionV3`, holding time's
@@ -182,6 +182,7 @@ formatted!(Time, |v| (None, Some(v), None), rfc: partial);
 formatted!(UtcOffset, |v| (None, None, Some(v)), rfc: partial);
 formatted!(PlainDateTime, |v| (Some(v.date()), Some(v.time()), None), rfc: partial);
 formatted!(UtcDateTime, |v| (Some(v.date()), Some(v.time()), Some(UtcOffset::UTC)), rfc: full);
+formatted!(Timestamp, |v| (Some(v.date()), Some(v.time()), Some(UtcOffset::UTC)), rfc: full);
 formatted!(OffsetDateTime, |v| (Some(v.date()), Some(v.time()), Some(v.offset())), rfc: full);
 
 /// Formats `value` into `out` with `description`, keeping in `out` what
@@ -342,6 +343,7 @@ pub fn define(ruby: &Ruby, time: RModule, native: RModule) -> Result<(), Error> 
         "utc_offset" => NUtcOffset,
         "plain" => NPlain,
         "utc" => NUtc,
+        "timestamp" => NTimestamp,
         "offset_date_time" => NOffsetDateTime,
     );
     Ok(())

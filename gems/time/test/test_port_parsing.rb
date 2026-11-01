@@ -1056,6 +1056,23 @@ class TestPortParsing < Minitest::Test
     end
     assert_equal "day", error.name
   end
+
+  # <tt>parsing.rs:1899</tt>, +parse_with_defaults_timestamp_success+.
+  def test_parse_with_defaults_timestamp_success
+    [
+      [fd1("[year]-[month]-[day]"), "2020-01-02", defaults(hour_24: 0), 1_577_923_200],
+      [fd1("[year]-[month]-[day] [hour]:[minute]"), "2020-01-02 12:30", defaults(hour_24: 0, minute: 0), 1_577_968_200],
+    ].each do |format, input, defaults, expected|
+      assert_equal T::Timestamp.new(expected, 0), T::Timestamp.parse_with_defaults(input, format, defaults)
+    end
+  end
+
+  # <tt>parsing.rs:1913</tt>, +parse_with_defaults_timestamp_insufficient_information+.
+  def test_parse_with_defaults_timestamp_insufficient_information
+    assert_raises(T::Error::Parse::TryFromParsed::InsufficientInformation) do
+      T::Timestamp.parse_with_defaults("01-15", fd1("[month]-[day]"), T::Parsing::Parsed.new)
+    end
+  end
 end
 
 #--

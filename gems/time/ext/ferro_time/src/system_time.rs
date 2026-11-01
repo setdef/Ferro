@@ -14,7 +14,7 @@
 use std::time::{Duration, SystemTime};
 
 use magnus::{function, prelude::*, Error, IntoValue, RModule, Ruby, Symbol, Value};
-use time::{OffsetDateTime, UtcDateTime};
+use time::{OffsetDateTime, SignedDuration, UtcDateTime};
 
 use crate::calendar::unknown;
 use crate::datetime::OUT_OF_RANGE;
@@ -129,10 +129,10 @@ pub fn utc_from(time: SystemTime) -> Result<UtcDateTime, Failure> {
     Ok(UtcDateTime::from(time))
 }
 
-/// `From<OffsetDateTime> for SystemTime` (`offsetdatetime_systemtime.rs:69-82`),
-/// refusing what std panics on where `SystemTime` is narrower (Windows).
-pub fn system_from_offset(datetime: OffsetDateTime) -> Result<SystemTime, Failure> {
-    let span = datetime - OffsetDateTime::UNIX_EPOCH;
+/// The `SystemTime` `span` after the epoch, as `UNIX_EPOCH + span` builds
+/// it from the unsigned `Duration` of its magnitude, refusing what std
+/// panics on where `SystemTime` is narrower (Windows).
+pub fn system_after_epoch(span: SignedDuration) -> Result<SystemTime, Failure> {
     let fits = if span.is_negative() {
         SystemTime::UNIX_EPOCH
             .checked_sub(span.unsigned_abs())
@@ -142,7 +142,13 @@ pub fn system_from_offset(datetime: OffsetDateTime) -> Result<SystemTime, Failur
             .checked_add(span.unsigned_abs())
             .ok_or(ADDING)
     };
-    fits.map_err(|message| Failure::Range(message.to_owned()))?;
+    fits.map_err(|message| Failure::Range(message.to_owned()))
+}
+
+/// `From<OffsetDateTime> for SystemTime` (`offsetdatetime_systemtime.rs:69-82`),
+/// refusing what std panics on where `SystemTime` is narrower (Windows).
+pub fn system_from_offset(datetime: OffsetDateTime) -> Result<SystemTime, Failure> {
+    system_after_epoch(datetime - OffsetDateTime::UNIX_EPOCH)?;
     Ok(SystemTime::from(datetime))
 }
 

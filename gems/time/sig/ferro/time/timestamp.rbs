@@ -1,0 +1,86 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    class Timestamp
+      include Comparable
+
+      UNIX_EPOCH: Timestamp
+      MIN: Timestamp
+      MAX: Timestamp
+
+      def self.now: () -> Timestamp
+      def self.new: (Integer seconds, Integer nanoseconds) -> Timestamp
+      def self.from_seconds: (Integer seconds) -> Timestamp
+      def self.from_milliseconds: (Integer milliseconds) -> Timestamp
+      def self.from_microseconds: (Integer microseconds) -> Timestamp
+      def self.from_nanoseconds: (Integer nanoseconds) -> Timestamp
+      def self.from: (UtcDateTime | OffsetDateTime | ::Time value) -> Timestamp
+      def self.parse: (String input, FormatDescription::description description) -> Timestamp
+      def self.parse_with_defaults: (String input, FormatDescription::description description, Parsing::Parsed defaults) -> Timestamp
+      def self.try_from: (Parsing::Parsed parsed) -> Timestamp
+
+      def to_offset: (UtcOffset offset) -> OffsetDateTime
+      def checked_to_offset: (UtcOffset offset) -> OffsetDateTime?
+      def to_utc: () -> UtcDateTime
+      def date: () -> Date
+      def time: () -> Time
+      def as_seconds: () -> Integer
+      def as_milliseconds: () -> Integer
+      def as_microseconds: () -> Integer
+      def as_nanoseconds: () -> Integer
+      def year: () -> Integer
+      def month: () -> Month
+      def day: () -> Integer
+      def ordinal: () -> Integer
+      def iso_week: () -> Integer
+      def sunday_based_week: () -> Integer
+      def monday_based_week: () -> Integer
+      def to_calendar_date: () -> [Integer, Month, Integer]
+      def to_ordinal_date: () -> [Integer, Integer]
+      def to_iso_week_date: () -> [Integer, Integer, Weekday]
+      def weekday: () -> Weekday
+      def to_julian_day: () -> Integer
+      def as_hms: () -> [Integer, Integer, Integer]
+      def as_hms_milli: () -> [Integer, Integer, Integer, Integer]
+      def as_hms_micro: () -> [Integer, Integer, Integer, Integer]
+      def as_hms_nano: () -> [Integer, Integer, Integer, Integer]
+      def hour: () -> Integer
+      def minute: () -> Integer
+      def second: () -> Integer
+      def millisecond: () -> Integer
+      def microsecond: () -> Integer
+      def nanosecond: () -> Integer
+      def checked_add: (SignedDuration duration) -> Timestamp?
+      def checked_sub: (SignedDuration duration) -> Timestamp?
+      def saturating_add: (SignedDuration duration) -> Timestamp
+      def saturating_sub: (SignedDuration duration) -> Timestamp
+      def replace_time: (Time time) -> Timestamp
+      def replace_date: (Date date) -> Timestamp
+      def replace_year: (Integer year) -> Timestamp
+      def replace_month: (Month month) -> Timestamp
+      def replace_day: (Integer day) -> Timestamp
+      def replace_ordinal: (Integer ordinal) -> Timestamp
+      def replace_hour: (Integer hour) -> Timestamp
+      def replace_minute: (Integer minute) -> Timestamp
+      def replace_second: (Integer second) -> Timestamp
+      def replace_millisecond: (Integer millisecond) -> Timestamp
+      def replace_microsecond: (Integer microsecond) -> Timestamp
+      def replace_nanosecond: (Integer nanosecond) -> Timestamp
+      def +: (SignedDuration duration) -> Timestamp
+      def -: (SignedDuration other) -> Timestamp | (Timestamp | UtcDateTime | OffsetDateTime | ::Time other) -> SignedDuration
+      def ==: (Object other) -> bool
+      def eql?: (Object other) -> bool
+      def hash: () -> Integer
+      def <=>: (Timestamp | UtcDateTime | OffsetDateTime | ::Time other) -> Integer | (Object other) -> Integer?
+      def to_time: () -> ::Time
+      def format: (FormatDescription::description description) -> String
+      def format_into: (String output, FormatDescription::description description) -> Integer
+      def to_s: () -> String
+      def inspect: () -> String
+      def dup: () -> self
+      def clone: (?freeze: bool?) -> self
+    end
+  end
+end

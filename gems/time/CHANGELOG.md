@@ -12,6 +12,15 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `Timestamp`, time's seconds-and-nanoseconds instant, whole: `new`, `from_seconds` to `from_nanoseconds`, `now`, `MIN`, `MAX`, `UNIX_EPOCH`, every reader and `replace_*`, `checked_` and `saturating_` arithmetic, `+` and `-`, `to_offset`, `to_utc`, `format`, `format_into`, `parse`, `parse_with_defaults`, and `try_from(parsed)`.
+- `Timestamp` converts to and from `UtcDateTime`, `OffsetDateTime`, and Ruby's `::Time`, and compares and subtracts with all three.
+
+### Fixed
+
+- An error's arguments could be freed by Ruby's garbage collector before the exception read them, crashing Ruby with a segmentation fault when many errors were raised.
+
 ## [0.1.0.pre.2] - 2026-11-01
 
 ### Added

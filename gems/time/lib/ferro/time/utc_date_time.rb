@@ -97,16 +97,17 @@ module Ferro
         end
 
         # Converts an OffsetDateTime, as time's <tt>From<OffsetDateTime></tt>
-        # does, or Ruby's ::Time, as <tt>From<SystemTime></tt> does (plan 007,
+        # does, a Timestamp, as <tt>From<Timestamp></tt> does, or Ruby's ::Time, as <tt>From<SystemTime></tt> does (plan 007,
         # decision 10). A ::Time keeps its seconds and nanoseconds since the
         # epoch and drops any finer fraction. Where Rust panics because the
         # result is outside the supported range, this raises +RangeError+ with
         # time's message. Mirrors time's <tt>From<OffsetDateTime> for
-        # UtcDateTime</tt>
+        # UtcDateTime</tt> and <tt>From<Timestamp> for UtcDateTime</tt>
         # (<tt>src/interop/offsetdatetime_utcdatetime.rs:60-69,
+        # src/interop/timestamp_utcdatetime.rs:74-86,
         # src/interop/utcdatetime_systemtime.rs:61-69</tt>).
         #
-        # [value] OffsetDateTime or ::Time.
+        # [value] OffsetDateTime, Timestamp, or ::Time.
         #
         # === Example
         #
@@ -114,6 +115,7 @@ module Ferro
         def from(value)
           case value
           when OffsetDateTime then Native.utc_from_offset(value)
+          when Timestamp then Native.utc_from_timestamp(value)
           when ::Time
             seconds, nanoseconds = Arguments.system_time(value)
             Native.utc_from_system_time(seconds, nanoseconds)
@@ -856,7 +858,7 @@ module Ferro
       # (<tt>src/interop/offsetdatetime_utcdatetime.rs,
       # src/interop/utcdatetime_systemtime.rs</tt>).
       #
-      # [other] SignedDuration, UtcDateTime, OffsetDateTime, or ::Time.
+      # [other] SignedDuration, UtcDateTime, OffsetDateTime, Timestamp, or ::Time.
       #
       # === Example
       #
@@ -868,6 +870,7 @@ module Ferro
         when SignedDuration then Native.utc_arith(self, :-, other)
         when UtcDateTime then Native.utc_difference(self, other)
         when OffsetDateTime then Native.utc_difference_offset(self, other)
+        when Timestamp then Native.utc_difference_timestamp(self, other)
         when ::Time
           seconds, nanoseconds = Arguments.system_time(other)
           Native.utc_with_system_time(self, :-, seconds, nanoseconds)
@@ -876,12 +879,13 @@ module Ferro
       end
 
       # Whether +other+ is the same instant: a UtcDateTime, a OffsetDateTime,
-      # or Ruby's ::Time, by time's +PartialEq+ impls. +false+ for anything
+      # a Timestamp, or Ruby's ::Time, by time's +PartialEq+ impls. +false+ for anything
       # else. Ruby's own <tt>::Time#<=></tt> asks the other value when it is
       # not a ::Time (<tt>time.c:3987</tt> at Ruby v4.0.9), so <tt>time ==
       # datetime</tt> answers through this method too, as time's impls with
       # +SystemTime+ on the left do. Mirrors time's <tt>PartialEq for
       # UtcDateTime</tt> (<tt>src/interop/offsetdatetime_utcdatetime.rs,
+      # src/interop/timestamp_utcdatetime.rs,
       # src/interop/utcdatetime_systemtime.rs</tt>).
       #
       # [other] Object.
@@ -898,6 +902,7 @@ module Ferro
         when ::Time
           seconds, nanoseconds = Arguments.system_time(other)
           Native.utc_with_system_time(self, :==, seconds, nanoseconds)
+        when Timestamp then Native.timestamp_with_utc(other, :==, self)
         else false
         end
       end
@@ -926,12 +931,13 @@ module Ferro
         Native.utc_hash(self)
       end
 
-      # Orders by instant against a UtcDateTime, a OffsetDateTime, or Ruby's
-      # ::Time, by time's +Ord+ and +PartialOrd+ impls, so the Comparable
+      # Orders by instant against a UtcDateTime, a OffsetDateTime, a Timestamp,
+      # or Ruby's ::Time, by time's +Ord+ and +PartialOrd+ impls, so the Comparable
       # operators answer as Rust's do; +nil+ for anything else. Ruby's
       # <tt>::Time#<=></tt> asks this method in turn, so <tt>time <
       # datetime</tt> works too. Mirrors time's <tt>PartialOrd for
       # UtcDateTime</tt> (<tt>src/interop/offsetdatetime_utcdatetime.rs,
+      # src/interop/timestamp_utcdatetime.rs,
       # src/interop/utcdatetime_systemtime.rs</tt>).
       #
       # [other] Object.
@@ -947,6 +953,7 @@ module Ferro
         when ::Time
           seconds, nanoseconds = Arguments.system_time(other)
           Native.utc_with_system_time(self, :<=>, seconds, nanoseconds)
+        when Timestamp then -Native.timestamp_with_utc(other, :<=>, self)
         end
       end
 

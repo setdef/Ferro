@@ -17,12 +17,16 @@ use magnus::{
 };
 use time::error;
 use time::parsing::Parsed;
-use time::{Date, Month, OffsetDateTime, PlainDateTime, Time, UtcDateTime, UtcOffset, Weekday};
+use time::{
+    Date, Month, OffsetDateTime, PlainDateTime, Time, Timestamp, UtcDateTime, UtcOffset, Weekday,
+};
 
 use crate::datetime::LOCAL_OUT_OF_RANGE;
 use crate::format::{Description, Formatted};
 use crate::items::Items;
-use crate::values::{self, NDate, NOffsetDateTime, NPlain, NTime, NUtc, NUtcOffset, Wrapped};
+use crate::values::{
+    self, NDate, NOffsetDateTime, NPlain, NTime, NTimestamp, NUtc, NUtcOffset, Wrapped,
+};
 use crate::{frozen, guarded, quietly, Failure, Panic};
 
 /// `Ferro::Time::Parsing::Parsed`, holding a `time::parsing::Parsed`.
@@ -363,7 +367,10 @@ impl Checked for OffsetDateTime {}
 //   TryFrom<Parsed> for UtcDateTime (src/parsing/parsed.rs:1308-1350)
 
 /// Refuses a `UtcDateTime` whose UTC instant leaves the range, before
-/// time's `to_utc` panics on it (plan 009, decision 19).
+/// time's `to_utc` panics on it (plan 009, decision 19). A `Timestamp`
+/// built without a Unix timestamp takes the same `UtcDateTime`
+/// conversion first (`src/parsing/parsed.rs:1395-1410`), so it is
+/// refused the same way.
 ///
 /// `odt` is the same input parsed, or the same `Parsed` converted, as an
 /// `OffsetDateTime`, whose `TryFrom<Parsed>` takes time's
@@ -379,10 +386,10 @@ impl Checked for OffsetDateTime {}
 /// which `Time` refuses to convert at second 60, so that one case runs
 /// time's conversion with its panic caught quietly and turned into the
 /// same refusal. Every other failure comes before `to_utc`.
-fn utc_refusing(
+fn utc_refusing<T>(
     odt: Result<OffsetDateTime, error::Parse>,
-    convert: impl FnOnce() -> Result<UtcDateTime, Failure>,
-) -> Result<UtcDateTime, Failure> {
+    convert: impl FnOnce() -> Result<T, Failure>,
+) -> Result<T, Failure> {
     match odt {
         Ok(odt) if odt.checked_to_utc().is_none() => {
             Err(Failure::Range(LOCAL_OUT_OF_RANGE.to_owned()))
@@ -405,6 +412,37 @@ fn utc_refusing(
 // SPDX-SnippetEnd
 
 impl Checked for UtcDateTime {
+    fn checked_parse(input: &str, description: &Description) -> Result<Self, Failure> {
+        let odt = <OffsetDateTime as Formatted>::parse_with_defaults(
+            input.as_bytes(),
+            description,
+            Parsed::new(),
+        );
+        utc_refusing(odt, || Ok(<Self as Formatted>::parse(input, description)?))
+    }
+
+    fn checked_parse_with_defaults(
+        input: &[u8],
+        description: &Description,
+        defaults: Parsed,
+    ) -> Result<Self, Failure> {
+        let odt = <OffsetDateTime as Formatted>::parse_with_defaults(input, description, defaults);
+        utc_refusing(odt, || {
+            Ok(<Self as Formatted>::parse_with_defaults(
+                input,
+                description,
+                defaults,
+            )?)
+        })
+    }
+
+    fn checked_try_from(parsed: Parsed) -> Result<Self, Failure> {
+        let odt = OffsetDateTime::try_from(parsed).map_err(error::Parse::TryFromParsed);
+        utc_refusing(odt, || Ok(Self::try_from(parsed)?))
+    }
+}
+
+impl Checked for Timestamp {
     fn checked_parse(input: &str, description: &Description) -> Result<Self, Failure> {
         let odt = <OffsetDateTime as Formatted>::parse_with_defaults(
             input.as_bytes(),
@@ -497,6 +535,7 @@ pub fn define(ruby: &Ruby, time: RModule, native: RModule) -> Result<(), Error> 
         "utc_offset" => NUtcOffset,
         "plain" => NPlain,
         "utc" => NUtc,
+        "timestamp" => NTimestamp,
         "offset_date_time" => NOffsetDateTime,
     );
     Ok(())
@@ -508,7 +547,7 @@ mod tests {
 
     use time::format_description::well_known::Rfc3339;
     use time::parsing::Parsed;
-    use time::{Month, UtcDateTime};
+    use time::{Month, Timestamp, UtcDateTime};
 
     use super::Checked;
     use crate::datetime::LOCAL_OUT_OF_RANGE;
@@ -579,5 +618,54 @@ mod tests {
             UtcDateTime::checked_parse(not_last, &Description::Rfc3339),
             Err(Failure::Parse(_))
         ));
+    }
+
+    #[test]
+    fn a_timestamp_is_refused_where_its_utc_date_time_panics() {
+        for parsed in [
+            local(9999, Month::December, 31, 23, -5),
+            local(-9999, Month::January, 1, 0, 5),
+        ] {
+            assert_eq!(
+                capture(|| Timestamp::try_from(parsed)).err(),
+                Some(Panic(LOCAL_OUT_OF_RANGE.to_owned()))
+            );
+            assert!(is_refusal(Timestamp::checked_try_from(parsed)));
+        }
+        for parsed in [
+            local(9999, Month::December, 31, 23, 5),
+            local(-9999, Month::January, 1, 0, -5),
+            local(9999, Month::December, 31, 18, -5),
+        ] {
+            assert_eq!(
+                Timestamp::checked_try_from(parsed).ok(),
+                Timestamp::try_from(parsed).ok()
+            );
+            assert!(Timestamp::try_from(parsed).is_ok());
+        }
+    }
+
+    #[test]
+    fn a_timestamp_is_parsed_as_its_utc_date_time_is() {
+        for input in [
+            "9999-12-31T23:59:60-05:00",
+            "-9999-01-01T00:00:00+05:00",
+            "9999-12-31T23:00:00-05:00",
+            "2016-12-31T23:59:60Z",
+            "2016-12-30T23:59:60Z",
+            "2019-01-02T03:04:05.006007008Z",
+        ] {
+            let ours = Timestamp::checked_parse(input, &Description::Rfc3339);
+            match capture(|| Timestamp::parse(input, &Rfc3339)) {
+                Err(Panic(message)) => {
+                    assert!(
+                        matches!(&ours, Err(Failure::Range(m)) if *m == message),
+                        "{input}"
+                    );
+                }
+                Ok(Ok(theirs)) => assert_eq!(ours.ok(), Some(theirs), "{input}"),
+                Ok(Err(_)) => assert!(matches!(ours, Err(Failure::Parse(_))), "{input}"),
+            }
+        }
     }
 }

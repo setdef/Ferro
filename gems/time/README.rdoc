@@ -91,14 +91,15 @@ with one consequence: wherever ferro-time is loaded, a bare +Time+ inside
 lexically first. Code in the Ferro namespace writes <tt>::Time</tt> and
 <tt>::Date</tt> for Ruby's own.
 
-OffsetDateTime and UtcDateTime convert to and from Ruby's ::Time, which
-stands for Rust's +SystemTime+: OffsetDateTime.from(time), #to_time (a UTC
-::Time), and <tt>==</tt>, <tt><=></tt>, and <tt>-</tt> with a ::Time on the
+OffsetDateTime, UtcDateTime, and Timestamp convert to and from Ruby's
+::Time, which stands for Rust's +SystemTime+: OffsetDateTime.from(time),
+#to_time (a UTC ::Time), and <tt>==</tt>, <tt><=></tt>, and <tt>-</tt> with a ::Time on the
 right, as time's +SystemTime+ impls do. Ruby's own ::Time is not
 changed; its <tt><=></tt> already asks the other value when that value is
 not a ::Time, so <tt>time == offset_date_time</tt> and
 <tt>time < offset_date_time</tt> work as well, while <tt>time - offset_date_time</tt>
-stays Ruby's +TypeError+. Nothing converts to or from Ruby's ::Date,
+stays Ruby's +TypeError+. Timestamp converts to and from UtcDateTime and
+OffsetDateTime as well, and compares and subtracts with both. Nothing converts to or from Ruby's ::Date,
 because time has no conversion for it.
 
 == How it maps time
@@ -130,6 +131,16 @@ The API is time's, translated where Rust has no Ruby meaning:
   A modifier comes only from its +default+ (or Modifier::Ignore.count)
   and its +with_+ builders, as in Rust. Naming a type or variant time
   deprecates warns in Ruby's +:deprecated+ category.
+* A Timestamp counts seconds and nanoseconds from the epoch, with the
+  nanoseconds always forward: <tt>Timestamp.new(-1, 500_000_000)</tt> is
+  half a second before the epoch. #replace_millisecond,
+  #replace_microsecond, and #replace_nanosecond differ from
+  UtcDateTime's only on an instant before the epoch that has a fraction:
+  there they replace the fraction as its decimal text writes it, so
+  replacing the 500 ms of -0.5 with 400 gives -0.4, where a clock would
+  give -0.6. A whole negative second is not special:
+  <tt>Timestamp.new(-1, 0).replace_millisecond(400)</tt> is -0.6, as time
+  does.
 * Parsing::Parsed is time's parser state: mutable, with time's getters,
   setters (+true+ or +nil+), and +with_+ builders. Each date and time type
   has +try_from+ a Parsed and +parse_with_defaults+.
@@ -138,7 +149,8 @@ The API is time's, translated where Rust has no Ruby meaning:
   <tt>Date.from_calendar_date(2020, Month::January, 2)</tt>; +time!+,
   +offset!+, +datetime!+, and +utc_datetime!+ are Time.from_hms,
   UtcOffset.from_hms, PlainDateTime.new with #assume_offset, and
-  UtcDateTime.new; and <tt>format_description!(version = 3, "...")</tt> is
+  UtcDateTime.new; <tt>timestamp!</tt> is Timestamp.new, or Timestamp.from
+  a UtcDateTime; and <tt>format_description!(version = 3, "...")</tt> is
   <tt>FormatDescription.parse_owned(3, "...")</tt>, while the macro's
   default version 1 is <tt>FormatDescription.parse_borrowed(1, "...")</tt>.
 
@@ -162,10 +174,9 @@ What differs from calling time from Rust:
   with time's formatters and joining them as time does; a test checks the
   result against time's own formatter.
 
-Not bound yet, each for a later release: +Timestamp+ (with its
-+parse_with_defaults+ and <tt>TryFrom<Parsed></tt>), the +iter+ module,
-the +unit+ module, every impl with std's unsigned +Duration+, and
-SignedDuration's +Display+ with a precision. ferro-time's plans 007 and
+Not bound yet, each for a later release: the +iter+ module, the +unit+
+module, every impl with std's unsigned +Duration+ (Timestamp's
+included), and SignedDuration's +Display+ with a precision. ferro-time's plans 007 and
 009 say why for each. time's +serde+ and +macros+ features are built and add no Ruby API.
 
 time's +large-dates+ feature is off, as Tauri and its plugins build time,
@@ -184,7 +195,7 @@ shareable. On Windows, Ruby 4.0.9 can hang when a Ractor starts a garbage
 collection while the main Ractor has another thread asleep; the bug is
 Ruby's (ferro-arboard's README says more).
 
-ferro-time 0.1.0.pre.1 binds time 0.3.55. The gem's version follows its
+ferro-time binds time 0.3.55. The gem's version follows its
 own API; its +time_version+ metadata names the time release.
 
 == License

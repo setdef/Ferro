@@ -20,6 +20,7 @@ class TestValues < Minitest::Test
       T::Time => plain.time,
       T::PlainDateTime => plain,
       T::UtcDateTime => plain.as_utc,
+      T::Timestamp => T::Timestamp.new(1_546_346_445, 123_456_789),
       T::OffsetDateTime => plain.assume_offset(offset(-5)),
       T::UtcOffset => offset(-5),
       T::SignedDuration => Duration.seconds(5),
@@ -74,6 +75,7 @@ class TestValues < Minitest::Test
     when T::Time then T::Time.from_hms_nano(*value.as_hms_nano)
     when T::PlainDateTime then T::PlainDateTime.new(rebuild(value.date), rebuild(value.time))
     when T::UtcDateTime then T::UtcDateTime.from_unix_timestamp_nanos(value.unix_timestamp_nanos)
+    when T::Timestamp then T::Timestamp.from_nanoseconds(value.as_nanoseconds)
     when T::OffsetDateTime then T::OffsetDateTime.new_in_offset(value.date, value.time, rebuild(value.offset))
     when T::UtcOffset then T::UtcOffset.from_whole_seconds(value.whole_seconds)
     when T::SignedDuration then Duration.nanoseconds_i128(value.whole_nanoseconds)
