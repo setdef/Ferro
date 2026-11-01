@@ -164,4 +164,23 @@ class TestValues < Minitest::Test
 
     assert_equal %w[dunst knopwob 1.12 1.2], info.to_h.values
   end
+
+  # A hint's fields are made before the symbol and the array that hold
+  # them, and each allocation can collect. Held in a Vec on Rust's heap,
+  # which the collector does not scan, a String was freed before the array
+  # read it; GC.stress collects at every allocation, so the child crashes
+  # without them on the stack.
+  def test_a_hint_keeps_its_fields_through_a_collection
+    (hints,) = in_child(<<~RUBY)
+      hint = Ferro::NotifyRust::Hint
+      GC.stress = true
+      hints = 100.times.map do
+        [hint.from_key_val("category", "email"), hint.from_key_val("resident", "true")]
+      end
+      GC.stress = false
+      hints.uniq
+    RUBY
+
+    assert_equal [[NotifyRust::Hint::Category.new("email"), NotifyRust::Hint::Resident.new(true)]], hints
+  end
 end

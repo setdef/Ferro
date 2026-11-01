@@ -12,6 +12,10 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Fixed
+
+- `Hint.from_key_val` and reading a Linux notification's hints could crash Ruby: the hint's fields were held where the garbage collector does not look while the tag array was allocated.
+
 ## [0.1.0.pre.3] - 2026-10-27
 
 ### Fixed

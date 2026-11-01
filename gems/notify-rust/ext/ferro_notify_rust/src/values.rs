@@ -145,35 +145,40 @@ pub fn hint_from_ruby(ruby: &Ruby, tag: RArray) -> Result<Hint, Error> {
 
 /// `hint` as its tag.
 pub fn hint_to_ruby(ruby: &Ruby, hint: &Hint) -> RArray {
-    let tag = |name: &str, values: Vec<Value>| {
-        let mut all = vec![symbol(ruby, name)];
-        all.extend(values);
-        ruby.ary_new_from_values(&all)
+    // The values are made before the symbol and the array, and each
+    // allocation can start a collection, which scans the machine stack but
+    // not Rust's heap (magnus 0.9.3 `src/into_value.rs:154-158`), so they
+    // travel in arrays on the stack, never in a `Vec`.
+    let tag = |name: &str, values: &[Value]| {
+        const MOST: usize = 2;
+        assert!(values.len() <= MOST, "a hint has at most {MOST} fields");
+        let mut all = [ruby.qnil().as_value(); MOST + 1];
+        all[1..=values.len()].copy_from_slice(values);
+        all[0] = symbol(ruby, name);
+        ruby.ary_new_from_values(&all[..=values.len()])
     };
     let text = |value: &str| ruby.str_new(value).as_value();
     match hint {
-        Hint::ActionIcons(value) => tag("ActionIcons", vec![value.into_value_with(ruby)]),
-        Hint::Category(value) => tag("Category", vec![text(value)]),
-        Hint::DesktopEntry(value) => tag("DesktopEntry", vec![text(value)]),
+        Hint::ActionIcons(value) => tag("ActionIcons", &[value.into_value_with(ruby)]),
+        Hint::Category(value) => tag("Category", &[text(value)]),
+        Hint::DesktopEntry(value) => tag("DesktopEntry", &[text(value)]),
         #[cfg(all(unix, not(target_os = "macos")))]
         Hint::ImageData(image) => tag(
             "ImageData",
-            vec![crate::platform::Image::new(image.clone()).into_value_with(ruby)],
+            &[crate::platform::Image::new(image.clone()).into_value_with(ruby)],
         ),
-        Hint::ImagePath(value) => tag("ImagePath", vec![text(value)]),
-        Hint::Resident(value) => tag("Resident", vec![value.into_value_with(ruby)]),
-        Hint::SoundFile(value) => tag("SoundFile", vec![text(value)]),
-        Hint::SoundName(value) => tag("SoundName", vec![text(value)]),
-        Hint::SuppressSound(value) => tag("SuppressSound", vec![value.into_value_with(ruby)]),
-        Hint::Transient(value) => tag("Transient", vec![value.into_value_with(ruby)]),
-        Hint::X(value) => tag("X", vec![value.into_value_with(ruby)]),
-        Hint::Y(value) => tag("Y", vec![value.into_value_with(ruby)]),
-        Hint::Urgency(value) => tag("Urgency", vec![urgency_to_ruby(ruby, *value)]),
-        Hint::Custom(key, value) => tag("Custom", vec![text(key), text(value)]),
-        Hint::CustomInt(key, value) => {
-            tag("CustomInt", vec![text(key), value.into_value_with(ruby)])
-        }
-        Hint::Invalid => tag("Invalid", vec![]),
+        Hint::ImagePath(value) => tag("ImagePath", &[text(value)]),
+        Hint::Resident(value) => tag("Resident", &[value.into_value_with(ruby)]),
+        Hint::SoundFile(value) => tag("SoundFile", &[text(value)]),
+        Hint::SoundName(value) => tag("SoundName", &[text(value)]),
+        Hint::SuppressSound(value) => tag("SuppressSound", &[value.into_value_with(ruby)]),
+        Hint::Transient(value) => tag("Transient", &[value.into_value_with(ruby)]),
+        Hint::X(value) => tag("X", &[value.into_value_with(ruby)]),
+        Hint::Y(value) => tag("Y", &[value.into_value_with(ruby)]),
+        Hint::Urgency(value) => tag("Urgency", &[urgency_to_ruby(ruby, *value)]),
+        Hint::Custom(key, value) => tag("Custom", &[text(key), text(value)]),
+        Hint::CustomInt(key, value) => tag("CustomInt", &[text(key), value.into_value_with(ruby)]),
+        Hint::Invalid => tag("Invalid", &[]),
     }
 }
 
