@@ -12,6 +12,8 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0.pre.3] - 2026-11-01
+
 ### Added
 
 - `Timestamp`, time's seconds-and-nanoseconds instant, whole: `new`, `from_seconds` to `from_nanoseconds`, `now`, `MIN`, `MAX`, `UNIX_EPOCH`, every reader and `replace_*`, `checked_` and `saturating_` arithmetic, `+` and `-`, `to_offset`, `to_utc`, `format`, `format_into`, `parse`, `parse_with_defaults`, and `try_from(parsed)`.
@@ -50,6 +52,7 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 - `UtcOffset.current_local_offset`, `.local_offset_at`, `OffsetDateTime.now_local`, and `Util` with `refresh_tz`.
 - `Error` with a class for each of time's error types and variants, and time's messages. Inputs time panics on raise `RangeError` with time's message instead of ending the process.
 
-[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.2...HEAD
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.3...HEAD
+[0.1.0.pre.3]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.2...ferro-time/v0.1.0.pre.3
 [0.1.0.pre.2]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.1...ferro-time/v0.1.0.pre.2
 [0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-time/v0.1.0.pre.1
