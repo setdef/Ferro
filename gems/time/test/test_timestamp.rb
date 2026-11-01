@@ -116,8 +116,10 @@ class TestTimestamp < Minitest::Test
     assert_equal at, other
     assert_equal other, at
     assert_equal 0, at <=> other
-    assert_operator ::Time.at(5, 99, :nsec), :<, at
-    assert_operator ::Time.at(5, 101, :nsec), :>, at
+    # A ::Time crosses as a SystemTime, which keeps only whole 100 ns
+    # intervals on Windows, so these differ from +at+ by a whole interval.
+    assert_operator ::Time.at(5, 0, :nsec), :<, at
+    assert_operator ::Time.at(5, 200, :nsec), :>, at
     assert_equal T::SignedDuration::ZERO, at - other
     assert_equal Duration.new(5, 100), at - ::Time.at(0)
     assert_equal Duration.seconds(-5), ts(0) - ::Time.at(5)
