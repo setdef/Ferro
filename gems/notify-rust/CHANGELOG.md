@@ -12,6 +12,8 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0.pre.4] - 2026-11-01
+
 ### Fixed
 
 - `Hint.from_key_val` and reading a Linux notification's hints could crash Ruby: the hint's fields were held where the garbage collector does not look while the tag array was allocated.
@@ -41,7 +43,8 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 - Showing and waiting release Ruby's global VM lock; on Linux an interrupt ends a wait.
 - Built with notify-rust's `z` (zbus), `images`, and `chrono` features; `d`, `tokio`, `debug_namespace`, and `preview-macos-un` are not built.
 
-[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.3...HEAD
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.4...HEAD
+[0.1.0.pre.4]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.3...ferro-notify-rust/v0.1.0.pre.4
 [0.1.0.pre.3]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.2...ferro-notify-rust/v0.1.0.pre.3
 [0.1.0.pre.2]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.1...ferro-notify-rust/v0.1.0.pre.2
 [0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-notify-rust/v0.1.0.pre.1
