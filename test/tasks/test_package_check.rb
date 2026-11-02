@@ -65,6 +65,25 @@ class TestPackageCheck < Minitest::Test
     PackageCheck.new(root: @root, gems: gems.empty? ? [target] : gems, out: @out).fast
   end
 
+  def test_run_returns_only_stdout_so_stderr_noise_cannot_break_parsing
+    script = %($stderr.puts "Blocking waiting for file lock on package cache"; puts '{"ok":true}')
+
+    output = PackageCheck.new(root: @root, gems: [], out: @out).__send__(:run!, {}, RbConfig.ruby, "-e", script, chdir: @root)
+
+    assert_equal({ "ok" => true }, JSON.parse(output))
+  end
+
+  def test_run_failure_reports_stdout_and_stderr
+    script = %(puts "from stdout"; $stderr.puts "from stderr"; exit 1)
+
+    error = assert_raises(PackageCheck::Failure) do
+      PackageCheck.new(root: @root, gems: [], out: @out).__send__(:run!, {}, RbConfig.ruby, "-e", script, chdir: @root)
+    end
+
+    assert_includes error.message, "from stdout"
+    assert_includes error.message, "from stderr"
+  end
+
   def test_a_complete_package_passes_and_runs_its_smoke_script
     check
 

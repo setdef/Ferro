@@ -186,8 +186,9 @@ class PackageCheck
   # license) fails the check, since the gate allows no warnings.
   private def build(gem, work)
     package = File.join(work, "#{gem.name}.gem")
-    log = run!(UNBUNDLED, Gem.ruby, "-S", "gem", "build", gem.gemspec, "--output", package,
+    stdout, stderr = capture!(UNBUNDLED, Gem.ruby, "-S", "gem", "build", gem.gemspec, "--output", package,
       chdir: File.join(@root, gem.dir))
+    log = stdout + stderr
     raise Failure, "#{gem.name}: gem build warned:\n#{log}" if log.match?(/^WARNING:/)
 
     package
@@ -284,8 +285,10 @@ class PackageCheck
     includes = load_paths.flat_map { |path| ["-I", path] }
     context = -> (run_mode) { [dir, File.expand_path(@root), run_mode, gem.name, allowed.join(","), ours, work] }
     run!(env, Gem.ruby, *includes, "-e", "#{REQUIRE_ALL}\n#{ISOLATED}", *context.call("files"), chdir: Dir.tmpdir)
-    output = run!(env, Gem.ruby, *includes, "-e", "#{gem.smoke}\n#{ISOLATED}", *context.call(mode), chdir: Dir.tmpdir)
+    output, errors = capture!(env, Gem.ruby, *includes, "-e", "#{gem.smoke}\n#{ISOLATED}", *context.call(mode),
+      chdir: Dir.tmpdir)
     @out.puts "✅ #{gem.name}: #{output.strip}"
+    @out.puts errors unless errors.empty?
   end
 
   private def ours
@@ -317,11 +320,20 @@ class PackageCheck
     UNBUNDLED.merge("GEM_HOME" => home, "GEM_PATH" => [home, Gem.default_dir].join(File::PATH_SEPARATOR))
   end
 
+  # Runs +command+ and returns its standard output alone, so a caller that
+  # parses it is not tripped by stderr noise such as Cargo's "Blocking
+  # waiting for file lock". A failure reports both streams.
   private def run!(env, *command, chdir:)
-    output, status = Open3.capture2e(env, *command, chdir:)
-    raise Failure, "#{command.join(' ')} failed in #{chdir}:\n#{output}" unless status.success?
+    capture!(env, *command, chdir:).first
+  end
 
-    output
+  # Runs +command+ and returns <tt>[stdout, stderr]</tt>, raising Failure
+  # with both streams if it exits non-zero.
+  private def capture!(env, *command, chdir:)
+    stdout, stderr, status = Open3.capture3(env, *command, chdir:)
+    raise Failure, "#{command.join(' ')} failed in #{chdir}:\n#{[stdout, stderr].reject(&:empty?).join("\n")}" unless status.success?
+
+    [stdout, stderr]
   end
 
   private def list(paths)
