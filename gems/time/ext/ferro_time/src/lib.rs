@@ -16,8 +16,12 @@
 //!   time documents are refused first with `RangeError` and time's own
 //!   message, and every call runs under `catch_unwind` as a net, raising
 //!   `Ferro::Time::Error` (plan 007, decision 7).
-//! - No value is ever changed after it is made, so there is no lock, and
-//!   nothing of Ruby's can run while one is held (plan 005, decision 20).
+//! - The value types are never changed after they are made, so they need
+//!   no lock. The two mutable kinds, `Parsed` and the iterators, hold
+//!   their value behind a `Mutex` that is held only to copy the value out
+//!   or write it back, so nothing of Ruby's, and no crate code, runs while
+//!   it is held (plan 005, decision 20; plan 009, decision 12; plan 010,
+//!   decision 1).
 //! - Every call keeps the GVL: each is short CPU work or one system call
 //!   (plan 007, decision 17).
 
@@ -30,10 +34,12 @@ mod failure;
 mod format;
 mod iso8601;
 mod items;
+mod iter;
 mod offset;
 mod parsed;
 mod system_time;
 mod timestamp;
+mod unit;
 mod values;
 
 use std::any::Any;
@@ -142,8 +148,16 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     // `SystemTimeToTzSpecificLocalTime`, are thread-safe (time 0.3.55
     // src/sys/local_offset_at/unix.rs:18-20, windows.rs:95), and `tzset`
     // runs only where time proves it sound (src/sys/refresh_tz/unix.rs).
-    // Every wrapped type holds a `Copy` value no method changes, made
-    // frozen, so sharing it is sound. Every other value a function touches
+    // Every value type holds a `Copy` value no method changes, made
+    // frozen, so sharing it is sound. The mutable types, `Parsed` and the
+    // iterators, are wrapped without `frozen_shareable`, so
+    // `Ractor.make_shareable` refuses them even frozen and moving one
+    // between Ractors is refused too; handing one to `Ractor.new` copies it
+    // through `initialize_copy` into a new object the other Ractor owns.
+    // Each object is therefore reached from one Ractor only, and its
+    // `Mutex` is never held across Ruby code, so the lock cannot be taken
+    // by a second Ractor or re-entered by a block (test_ractor.rb,
+    // test_iter.rb). Every other value a function touches
     // is an argument, which Ruby guarantees is the calling Ractor's own or
     // shareable (extension.rdoc:2260-2261). `rb_ext_ractor_safe` takes a
     // plain flag, called from `Init_` as extension.rdoc:2218-2220 asks.
@@ -167,6 +181,8 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     parsed::define(ruby, time, native)?;
     system_time::define(native)?;
     timestamp::define(native)?;
+    iter::define(ruby, time, native)?;
+    unit::define(native)?;
     Ok(())
 }
 

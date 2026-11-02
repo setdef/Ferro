@@ -144,6 +144,19 @@ The API is time's, translated where Rust has no Ruby meaning:
 * Parsing::Parsed is time's parser state: mutable, with time's getters,
   setters (+true+ or +nil+), and +with_+ builders. Each date and time type
   has +try_from+ a Parsed and +parse_with_defaults+.
+* The iterators of Iter are time's, not Ruby's Enumerator:
+  <tt>date.iter_to(end_date)</tt>, Month.iter_from, and Weekday.iter_from
+  make them, and +next+ advances one in place and returns +nil+ once a
+  DateIter is done, never +StopIteration+. Each includes Enumerable, whose
+  methods walk a copy and leave the iterator where it was. time's own
+  methods keep their names (+next_back+, +nth+, +len+, +size_hint+,
+  +all+, +any+, +is_sorted+); +count+ and +last+ on a never-ending month
+  or weekday iterator raise +RangeError+ where Rust panics.
+* The units of time are frozen values: <tt>Unit::Nanosecond.per(Unit::Second)</tt>
+  is 1_000_000_000, and <tt>per_t(Float, ...)</tt> takes the output type
+  first, Integer or Float. Rust's const +N+ on each unit is 1 here, the
+  only value +per+ exists for. The deprecated +Convert+ is the same
+  module, and naming it warns.
 * time's macros check their input when Rust compiles; their run-time
   equivalents are bound. <tt>date!(2020-01-02)</tt> is
   <tt>Date.from_calendar_date(2020, Month::January, 2)</tt>; +time!+,
@@ -174,10 +187,12 @@ What differs from calling time from Rust:
   with time's formatters and joining them as time does; a test checks the
   result against time's own formatter.
 
-Not bound yet, each for a later release: the +iter+ module, the +unit+
-module, every impl with std's unsigned +Duration+ (Timestamp's
-included), and SignedDuration's +Display+ with a precision. ferro-time's plans 007 and
-009 say why for each. time's +serde+ and +macros+ features are built and add no Ruby API.
+Not bound yet: every impl with std's unsigned +Duration+ (Timestamp's
+included), whose Ruby value is a choice for all of Ferro's gems at once,
+and SignedDuration's +Display+ with a precision, which waits with the
+width and fill of every type's +Display+ for one translation of Rust's
+formatter. Each operation with std's +Duration+ has a SignedDuration twin
+that is bound. ferro-time's plan 010 says why for each. time's +serde+ and +macros+ features are built and add no Ruby API.
 
 time's +large-dates+ feature is off, as Tauri and its plugins build time,
 so years run from -9999 to 9999. The +rand+, +quickcheck+, and

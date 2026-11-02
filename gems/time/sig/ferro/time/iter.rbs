@@ -1,0 +1,139 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    module Iter
+      module Frozen : BasicObject
+        private
+
+        def check_frozen: () -> void
+      end
+
+      class DateIter
+        include Enumerable[Date]
+        include Frozen
+
+        def initialize: (Date start, Date end_date) -> void
+        def next: () -> Date?
+        def next_back: () -> Date?
+        def nth: (Integer n) -> Date?
+        def nth_back: (Integer n) -> Date?
+        def len: () -> Integer
+        def size_hint: () -> [Integer, Integer?]
+        def count: () -> Integer
+                 | (Date item) -> Integer
+                 | () { (Date) -> boolish } -> Integer
+        def last: () -> Date?
+        def max: () -> Date?
+               | () { (Date a, Date b) -> Integer } -> Date?
+               | (Integer n) -> Array[Date]
+               | (Integer n) { (Date a, Date b) -> Integer } -> Array[Date]
+        def min: () -> Date?
+               | () { (Date a, Date b) -> Integer } -> Date?
+               | (Integer n) -> Array[Date]
+               | (Integer n) { (Date a, Date b) -> Integer } -> Array[Date]
+        def is_sorted: () -> bool
+        def each: () { (Date) -> void } -> self
+                | () -> Enumerator[Date, self]
+        def reverse_each: () { (Date) -> void } -> self
+                        | () -> Enumerator[Date, self]
+        def ==: (Object other) -> bool
+        def inspect: () -> String
+      end
+
+      class MonthIter
+        include Enumerable[Month]
+        include Frozen
+
+        def initialize: (Month start) -> void
+        def rev: () -> Rev
+        def next: () -> Month
+        def nth: (Integer n) -> Month
+        def size_hint: () -> [Integer, Integer?]
+        def count: () -> bot
+                 | (Month item) -> Integer
+                 | () { (Month) -> boolish } -> Integer
+        def last: () -> bot
+        def all: () { (Month) -> boolish } -> bool
+        def any: () { (Month) -> boolish } -> bool
+        def max: () -> Month
+               | () { (Month a, Month b) -> Integer } -> Month?
+               | (Integer n) -> Array[Month]
+               | (Integer n) { (Month a, Month b) -> Integer } -> Array[Month]
+        def min: () -> Month
+               | () { (Month a, Month b) -> Integer } -> Month?
+               | (Integer n) -> Array[Month]
+               | (Integer n) { (Month a, Month b) -> Integer } -> Array[Month]
+        def is_sorted: () -> bool
+        def each: () { (Month) -> void } -> self
+                | () -> Enumerator[Month, self]
+        def ==: (Object other) -> bool
+        def inspect: () -> String
+      end
+
+      class WeekdayIter
+        include Enumerable[Weekday]
+        include Frozen
+
+        def initialize: (Weekday start) -> void
+        def rev: () -> Rev
+        def next: () -> Weekday
+        def nth: (Integer n) -> Weekday
+        def size_hint: () -> [Integer, Integer?]
+        def count: () -> bot
+                 | (Weekday item) -> Integer
+                 | () { (Weekday) -> boolish } -> Integer
+        def last: () -> bot
+        def all: () { (Weekday) -> boolish } -> bool
+        def any: () { (Weekday) -> boolish } -> bool
+        def each: () { (Weekday) -> void } -> self
+                | () -> Enumerator[Weekday, self]
+        def ==: (Object other) -> bool
+        def inspect: () -> String
+      end
+
+      class Rev
+        include Enumerable[Month | Weekday]
+        include Frozen
+
+        private def self.new: () -> Rev
+
+        def next: () -> (Month | Weekday)
+        def nth: (Integer n) -> (Month | Weekday)
+        def size_hint: () -> [Integer, Integer?]
+        def count: () -> bot
+                 | (Month | Weekday item) -> Integer
+                 | () { (Month | Weekday) -> boolish } -> Integer
+        def last: () -> bot
+        def all: () { (Month | Weekday) -> boolish } -> bool
+        def any: () { (Month | Weekday) -> boolish } -> bool
+        def each: () { (Month | Weekday) -> void } -> self
+                | () -> Enumerator[Month | Weekday, self]
+        def ==: (Object other) -> bool
+        def inspect: () -> String
+
+        private
+
+        def item: (Integer number) -> (Month | Weekday)
+
+        class Months < Rev
+          def max: () -> Month
+                 | () { (Month | Weekday a, Month | Weekday b) -> Integer } -> (Month | Weekday)?
+                 | (Integer? n) -> (Month | Array[Month | Weekday])
+                 | (Integer n) { (Month | Weekday a, Month | Weekday b) -> Integer } -> Array[Month | Weekday]
+          def min: () -> Month
+                 | () { (Month | Weekday a, Month | Weekday b) -> Integer } -> (Month | Weekday)?
+                 | (Integer? n) -> (Month | Array[Month | Weekday])
+                 | (Integer n) { (Month | Weekday a, Month | Weekday b) -> Integer } -> Array[Month | Weekday]
+          def is_sorted: () -> bool
+        end
+
+        class Weekdays < Rev
+        end
+      end
+
+      private def self.bare?: (Array[Integer?] args, Proc? block) -> bool
+    end
+  end
+end

@@ -75,6 +75,46 @@ class TestRactor < Minitest::Test
 ], result.last
   end
 
+  # The iterators and units work in another Ractor: the iterators made
+  # there, since they are not shareable (plan 010, decision 18), and the
+  # units shared, since they are frozen.
+  def test_another_ractor_iterates_and_converts_units
+    result = run_script(<<~RUBY)
+      Ractor.new(Ferro::Time::Unit::Second) do |second|
+        t = Ferro::Time
+        start = t::Date.from_calendar_date(2019, t::Month::December, 30)
+        dates = start.iter_to(start.next_day.next_day).map(&:to_s)
+        months = t::Month.iter_from(t::Month::May)
+        [dates, months.rev.first(2).map(&:to_s), months.any { |m| m == t::Month::June },
+          t::Unit::Nanosecond.per(second), second < t::Unit::Unit::Minute,]
+      end.value
+    RUBY
+
+    assert_equal [%w[2019-12-30 2019-12-31 2020-01-01], %w[May April], true, 1_000_000_000, true], result
+  end
+
+  # A mutable iterator never crosses Ractors itself: moving one is refused,
+  # and passing one to Ractor.new hands the other Ractor its own copy,
+  # which advances apart from the original (plan 010, decision 18).
+  def test_an_iterator_reaches_another_ractor_only_as_a_copy
+    result = run_script(<<~RUBY)
+      months = Ferro::Time::Month.iter_from(Ferro::Time::Month::May)
+      copied = Ractor.new(months) { |copy| [copy.next.to_s, copy.next.to_s] }.value
+      receiver = Ractor.new { Ractor.receive }
+      moved = begin
+        receiver.send(months, move: true)
+        :moved
+      rescue Ractor::Error => e
+        e.message
+      ensure
+        receiver.send(nil)
+      end
+      [copied, months.next.to_s, moved]
+    RUBY
+
+    assert_equal [%w[May June], "May", "can not move Ferro::Time::Iter::MonthIter object."], result
+  end
+
   # Building an error's arguments must not touch Ruby's global state:
   # registering them with the collector (BoxValue) edits a VM-wide list
   # without a lock on Ruby 4.0.9 and crashed parallel Ractors. The child

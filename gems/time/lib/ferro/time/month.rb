@@ -27,9 +27,8 @@ module Ferro
     # its English name. Months compare in calendar order, as time's derived
     # +Ord+ does, which assumes the months are in the same year.
     #
-    # Mirrors time's +Month+ (<tt>src/month.rs:13-292</tt>). Its +iter_from+
-    # and the +MonthIter+ it returns are deferred with the +iter+ module
-    # (plan 007, decision 1); step with #next and #previous.
+    # Mirrors time's +Month+ (<tt>src/month.rs:13-292</tt>). Step with
+    # #next and #previous, or cycle through the months with Month.iter_from.
     #
     # === Examples
     #
@@ -68,6 +67,23 @@ module Ferro
         #   Ferro::Time::Month.try_from(13) # raises Ferro::Time::Error::ComponentRange
         def try_from(value)
           Arguments.month_of(Native.month_try_from(value))
+        end
+
+        # Create an infinite iterator starting at +start+, an
+        # Iter::MonthIter. Mirrors time's <tt>Month::iter_from</tt>
+        # (<tt>src/month.rs:178-203</tt>).
+        #
+        # [start] Month.
+        #
+        # === Example
+        #
+        #   iter = Ferro::Time::Month.iter_from(Ferro::Time::Month::January)
+        #   iter.first(13).last # => Ferro::Time::Month::January
+        #   iter.next # => Ferro::Time::Month::January
+        #   iter.next # => Ferro::Time::Month::February
+        #   # ... continuing forever
+        def iter_from(start)
+          Iter::MonthIter.new(start)
         end
       end
 

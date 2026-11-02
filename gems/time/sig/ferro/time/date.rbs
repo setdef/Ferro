@@ -35,6 +35,7 @@ module Ferro
       def prev_occurrence: (Weekday weekday) -> Date
       def nth_next_occurrence: (Weekday weekday, Integer n) -> Date
       def nth_prev_occurrence: (Weekday weekday, Integer n) -> Date
+      def iter_to: (Date end_date) -> Iter::DateIter
       def checked_add: (SignedDuration duration) -> Date?
       def checked_sub: (SignedDuration duration) -> Date?
       def saturating_add: (SignedDuration duration) -> Date

@@ -383,6 +383,49 @@ module Ferro
       def self.utc_with_system_time: (UtcDateTime value, :== operator, Integer seconds, Integer nanoseconds) -> bool
                                    | (UtcDateTime value, :<=> operator, Integer seconds, Integer nanoseconds) -> Integer?
                                    | (UtcDateTime value, :- operator, Integer seconds, Integer nanoseconds) -> SignedDuration
+      def self.date_iter_initialize: (Iter::DateIter iter, Date start, Date end_date) -> nil
+      def self.date_iter_step: (Iter::DateIter iter, :next | :next_back name) -> Date?
+      def self.date_iter_nth: (Iter::DateIter iter, :nth | :nth_back name, Integer n) -> Date?
+      def self.date_iter_count: (Iter::DateIter iter, :len | :count name) -> Integer
+      def self.date_iter_end: (Iter::DateIter iter, :last | :max | :min name) -> Date?
+      def self.date_iter_size_hint: (Iter::DateIter iter) -> [Integer, Integer?]
+      def self.date_iter_is_sorted: (Iter::DateIter iter) -> bool
+      def self.date_iter_eq: (Iter::DateIter left, Iter::DateIter right) -> bool
+      def self.date_iter_debug: (Iter::DateIter iter) -> String
+      def self.month_iter_initialize: (Iter::MonthIter iter, Integer number) -> nil
+      def self.month_iter_rev: (Iter::MonthIter iter) -> Iter::Rev
+      def self.weekday_iter_initialize: (Iter::WeekdayIter iter, Integer days) -> nil
+      def self.weekday_iter_rev: (Iter::WeekdayIter iter) -> Iter::Rev
+      def self.month_iter_next: (Iter::MonthIter iter) -> Integer
+      def self.month_iter_nth: (Iter::MonthIter iter, Integer n) -> Integer
+      def self.month_iter_size_hint: (Iter::MonthIter iter) -> [Integer, Integer?]
+      def self.month_iter_infinite: (Iter::MonthIter iter, :count | :last name) -> bot
+      def self.month_iter_test: (Iter::MonthIter iter, :all | :any name) { (Integer number) -> boolish } -> bool
+      def self.month_iter_ordered: (Iter::MonthIter iter, :max | :min name) -> Integer
+                                 | (Iter::MonthIter iter, :is_sorted name) -> bool
+      def self.month_iter_eq: (Iter::MonthIter left, Iter::MonthIter right) -> bool
+      def self.month_iter_debug: (Iter::MonthIter iter) -> String
+      def self.weekday_iter_next: (Iter::WeekdayIter iter) -> Integer
+      def self.weekday_iter_nth: (Iter::WeekdayIter iter, Integer n) -> Integer
+      def self.weekday_iter_size_hint: (Iter::WeekdayIter iter) -> [Integer, Integer?]
+      def self.weekday_iter_infinite: (Iter::WeekdayIter iter, :count | :last name) -> bot
+      def self.weekday_iter_test: (Iter::WeekdayIter iter, :all | :any name) { (Integer days) -> boolish } -> bool
+      def self.weekday_iter_ordered: (Iter::WeekdayIter iter, :max | :min | :is_sorted name) -> nil
+      def self.weekday_iter_eq: (Iter::WeekdayIter left, Iter::WeekdayIter right) -> bool
+      def self.weekday_iter_debug: (Iter::WeekdayIter iter) -> String
+      def self.rev_next: (Iter::Rev iter) -> Integer
+      def self.rev_nth: (Iter::Rev iter, Integer n) -> Integer
+      def self.rev_size_hint: (Iter::Rev iter) -> [Integer, Integer?]
+      def self.rev_infinite: (Iter::Rev iter, :count | :last name) -> bot
+      def self.rev_test: (Iter::Rev iter, :all | :any name) { (Integer number) -> boolish } -> bool
+      def self.rev_ordered: (Iter::Rev iter, :max | :min name) -> Integer
+                          | (Iter::Rev iter, :is_sorted name) -> bool
+      def self.rev_eq: (Iter::Rev left, Iter::Rev right) -> bool
+      def self.rev_debug: (Iter::Rev iter) -> String
+      def self.unit_per: (Symbol small, Symbol large) -> Integer
+      def self.unit_per_integer: (Symbol small, Symbol large) -> Integer
+      def self.unit_per_float: (Symbol small, Symbol large) -> Float
+      def self.unit_cmp: (bool left_variant, Integer left, bool right_variant, Integer right) -> Integer?
     end
   end
 end

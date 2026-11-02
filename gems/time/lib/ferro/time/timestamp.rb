@@ -810,7 +810,7 @@ module Ferro
       # <tt>Add<SignedDuration> for Timestamp</tt>
       # (<tt>src/timestamp.rs:1450-1462</tt>); the <tt>AddAssign</tt> impls
       # are Ruby's <tt>+=</tt>, and std's +Duration+ waits with the rest of
-      # its operations (plan 009, decision 18).
+      # its operations (plan 010, decision 16).
       #
       # [duration] SignedDuration.
       #

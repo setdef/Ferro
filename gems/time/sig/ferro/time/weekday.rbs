@@ -19,6 +19,7 @@ module Ferro
       private def self.new: (Integer days_from_monday, Symbol name) -> instance
 
       def self.from_str: (String text) -> Weekday
+      def self.iter_from: (Weekday start) -> Iter::WeekdayIter
 
       def initialize: (Integer days_from_monday, Symbol name) -> void
       def previous: () -> Weekday

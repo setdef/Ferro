@@ -19,6 +19,8 @@ require_relative "time/plain_date_time"
 require_relative "time/utc_date_time"
 require_relative "time/offset_date_time"
 require_relative "time/timestamp"
+require_relative "time/iter"
+require_relative "time/unit"
 require_relative "time/format_description"
 require_relative "time/format_description/format_description_v3"
 require_relative "time/format_description/modifier"
@@ -55,9 +57,9 @@ module Ferro
   # This module binds time (https://github.com/time-rs/time), Rust's
   # date and time library, one to one: Date, Time, PlainDateTime,
   # UtcDateTime, OffsetDateTime, Timestamp, UtcOffset, SignedDuration, Month,
-  # Weekday, the format descriptions in every version with the format
-  # items they parse into, the well-known formats, Parsing::Parsed, every
-  # error, and Util. time's +large-dates+ feature is off, as Tauri builds it, so
+  # Weekday, the iterators of Iter, the units of time in Unit, the format
+  # descriptions in every version with the format items they parse into,
+  # the well-known formats, Parsing::Parsed, every error, and Util. time's +large-dates+ feature is off, as Tauri builds it, so
   # years run from -9999 to 9999.
   #
   # Ferro::Time::Time and Ferro::Time::Date are time's types, not Ruby's.

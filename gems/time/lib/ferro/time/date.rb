@@ -400,6 +400,24 @@ module Ferro
         Native.date_occurrence(self, :nth_prev_occurrence, Arguments.weekday(weekday), n)
       end
 
+      # Create an iterator of dates from this date to +end_date+ inclusive,
+      # an Iter::DateIter. Mirrors time's <tt>Date::iter_to</tt>
+      # (<tt>src/date.rs:752-765</tt>).
+      #
+      # [end_date] Date, time's +end+, which is a Ruby keyword.
+      #
+      # === Example
+      #
+      #   jan = ->(day) { Ferro::Time::Date.from_calendar_date(2019, Ferro::Time::Month::January, day) }
+      #   iter = jan[1].iter_to(jan[3])
+      #   iter.next.to_s # => "2019-01-01"
+      #   iter.next.to_s # => "2019-01-02"
+      #   iter.next.to_s # => "2019-01-03"
+      #   iter.next # => nil
+      def iter_to(end_date)
+        Iter::DateIter.new(self, end_date)
+      end
+
       # Computes <tt>self + duration</tt>, returning +nil+ if an overflow
       # occurred. Mirrors time's <tt>Date::checked_add</tt>
       # (<tt>src/date.rs:802-862</tt>).

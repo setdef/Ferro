@@ -57,7 +57,7 @@ module Ferro
       # Mirrors time's <tt>error::ConversionRange</tt>
       # (<tt>src/error/conversion_range.rs</tt>). Its only sources are
       # time's conversions with std's +Duration+, which this gem defers
-      # (plan 007, decision 9), so nothing raises it yet.
+      # (plan 010, decision 16), so nothing raises it yet.
       #
       # === Example
       #
@@ -262,8 +262,7 @@ module Ferro
       #
       # time raises it inside Error::Parse, as
       # Error::Parse::ParseFromDescription and its subclasses; on its own it
-      # comes only from +Parsed+, which this gem defers (plan 007,
-      # decision 1).
+      # comes from Parsing::Parsed's methods (plan 009, decision 16).
       #
       # Mirrors time's <tt>error::ParseFromDescription</tt>
       # (<tt>src/error/parse_from_description.rs</tt>).
@@ -326,8 +325,8 @@ module Ferro
       # another type.
       #
       # time raises it inside Error::Parse, as Error::Parse::TryFromParsed
-      # and its subclasses; on its own it comes only from +Parsed+, which
-      # this gem defers (plan 007, decision 1).
+      # and its subclasses; on its own it comes from +try_from+ a
+      # Parsing::Parsed (plan 009, decision 16).
       #
       # Mirrors time's <tt>error::TryFromParsed</tt>
       # (<tt>src/error/try_from_parsed.rs</tt>).

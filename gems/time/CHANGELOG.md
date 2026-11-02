@@ -12,6 +12,11 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `Iter::DateIter`, `Iter::MonthIter`, `Iter::WeekdayIter`, and `Iter::Rev`, time's iterators, with `Date#iter_to`, `Month.iter_from`, and `Weekday.iter_from`; each includes Enumerable over a copy, and `DateIter#reverse_each` walks back through `next_back`.
+- `Unit`, time's units of time, with `per`, `per_t`, ordering, and the `Unit::Unit` enum; the deprecated `Convert` is the same module.
+
 ## [0.1.0.pre.3] - 2026-11-01
 
 ### Added

@@ -27,6 +27,7 @@ module Ferro
 
       def self.from_str: (String text) -> Month
       def self.try_from: (Integer value) -> Month
+      def self.iter_from: (Month start) -> Iter::MonthIter
 
       def initialize: (Integer number, Symbol name) -> void
       def length: (Integer year) -> Integer

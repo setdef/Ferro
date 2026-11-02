@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    Convert: singleton(Unit)
+
+    module Unit
+      type side = [bool, Integer]
+
+      class Value
+        include Comparable
+
+        @place: Integer
+        @name: Symbol
+
+        private def self.new: (Integer place, Symbol name) -> instance
+
+        def initialize: (Integer place, Symbol name) -> void
+        def per: (Value larger) -> Integer
+        def per_t: (singleton(Integer) output, Value larger) -> Integer
+                 | (singleton(Float) output, Value larger) -> Float
+        def <=>: (Value | Unit other) -> Integer | (Object other) -> Integer?
+        def inspect: () -> String
+
+        private
+
+        attr_reader name: Symbol
+        attr_reader place: Integer
+      end
+
+      Nanosecond: Value
+      Microsecond: Value
+      Millisecond: Value
+      Second: Value
+      Minute: Value
+      Hour: Value
+      Day: Value
+      Week: Value
+
+      class Unit
+        include Comparable
+
+        @place: Integer
+        @name: Symbol
+
+        Nanosecond: Unit
+        Microsecond: Unit
+        Millisecond: Unit
+        Second: Unit
+        Minute: Unit
+        Hour: Unit
+        Day: Unit
+        Week: Unit
+
+        private def self.new: (Integer place, Symbol name) -> instance
+
+        def initialize: (Integer place, Symbol name) -> void
+        def <=>: (Value | Unit other) -> Integer | (Object other) -> Integer?
+        def inspect: () -> String
+
+        private
+
+        attr_reader place: Integer
+      end
+
+      private def self.name_of: (Object larger, Symbol small) -> Symbol
+      private def self.compare: (side side, Object other) -> Integer?
+    end
+  end
+end

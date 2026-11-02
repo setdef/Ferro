@@ -31,8 +31,9 @@ module Ferro
     # +saturating_+ methods answer without raising.
     #
     # A SignedDuration is frozen and shareable between Ractors. std's
-    # unsigned +Duration+ has no Ruby counterpart and is not bound (plan 007,
-    # decision 9).
+    # unsigned +Duration+ is not bound: which Ruby value stands for it is a
+    # choice for all of Ferro's gems at once (plan 010, decision 16), and
+    # every operation with it has a SignedDuration twin here.
     #
     # Mirrors time's +SignedDuration+ (<tt>src/signed_duration.rs</tt>).
     #
@@ -805,7 +806,10 @@ module Ferro
         Native.duration_cmp(self, other) if other.is_a?(SignedDuration)
       end
 
-      # The value as time's +Display+ writes it.
+      # The value as time's +Display+ writes it: the exact, full-precision
+      # form. time's concise, rounded form takes a precision from Rust's
+      # formatter (<tt>{:.3}</tt>), which Ruby's +to_s+ has no counterpart
+      # for, and is not bound (plan 010, decision 17).
       #
       # === Example
       #

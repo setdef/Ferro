@@ -27,9 +27,8 @@ module Ferro
     # does not compare with <tt><</tt> or <tt>></tt>, as time derives no
     # +Ord+ for it.
     #
-    # Mirrors time's +Weekday+ (<tt>src/weekday.rs:12-247</tt>). Its
-    # +iter_from+ and the +WeekdayIter+ it returns are deferred with the
-    # +iter+ module (plan 007, decision 1); step with #next and #previous.
+    # Mirrors time's +Weekday+ (<tt>src/weekday.rs:12-247</tt>). Step with
+    # #next and #previous, or cycle through the week with Weekday.iter_from.
     #
     # === Examples
     #
@@ -51,6 +50,23 @@ module Ferro
       #   Ferro::Time::Weekday.from_str("Mon") # raises Ferro::Time::Error::InvalidVariant
       def self.from_str(text)
         Arguments.weekday_of(Native.weekday_from_str(text))
+      end
+
+      # Create an infinite iterator starting at +start+, an
+      # Iter::WeekdayIter. Mirrors time's <tt>Weekday::iter_from</tt>
+      # (<tt>src/weekday.rs:172-192</tt>).
+      #
+      # [start] Weekday.
+      #
+      # === Example
+      #
+      #   iter = Ferro::Time::Weekday.iter_from(Ferro::Time::Weekday::Monday)
+      #   iter.first(8).last # => Ferro::Time::Weekday::Monday
+      #   iter.next # => Ferro::Time::Weekday::Monday
+      #   iter.next # => Ferro::Time::Weekday::Tuesday
+      #   # ... continuing forever
+      def self.iter_from(start)
+        Iter::WeekdayIter.new(start)
       end
 
       # Creates the weekday +days_from_monday+ days after Monday. The
