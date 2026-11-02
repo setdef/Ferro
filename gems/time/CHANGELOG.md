@@ -12,6 +12,8 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0.pre.4] - 2026-11-02
+
 ### Added
 
 - `Iter::DateIter`, `Iter::MonthIter`, `Iter::WeekdayIter`, and `Iter::Rev`, time's iterators, with `Date#iter_to`, `Month.iter_from`, and `Weekday.iter_from`; each includes Enumerable over a copy, and `DateIter#reverse_each` walks back through `next_back`.
@@ -57,7 +59,8 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 - `UtcOffset.current_local_offset`, `.local_offset_at`, `OffsetDateTime.now_local`, and `Util` with `refresh_tz`.
 - `Error` with a class for each of time's error types and variants, and time's messages. Inputs time panics on raise `RangeError` with time's message instead of ending the process.
 
-[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.3...HEAD
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.4...HEAD
+[0.1.0.pre.4]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.3...ferro-time/v0.1.0.pre.4
 [0.1.0.pre.3]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.2...ferro-time/v0.1.0.pre.3
 [0.1.0.pre.2]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.1...ferro-time/v0.1.0.pre.2
 [0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-time/v0.1.0.pre.1
