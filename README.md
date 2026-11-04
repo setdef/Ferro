@@ -5,8 +5,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Ferro
 
-[![Certified Shovelware](https://justin.searls.co/img/shovelware.svg)](https://justin.searls.co/shovelware/)
-[![CI](https://github.com/setdef/Ferro/actions/workflows/ci.yml/badge.svg?branch=trunk)](https://github.com/setdef/Ferro/actions/workflows/ci.yml)
+[![CI](https://github.com/setdef/Ferro/actions/workflows/ci.yml/badge.svg?branch=trunk)](https://github.com/setdef/Ferro/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/License-MIT%20%2F%20Apache--2.0-a2c93e)](#license) [![Ruby](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fsetdef%2FFerro%2Ftrunk%2Fgems%2Furl%2Fferro-url.gemspec&search=spec%5C.required_ruby_version%20%3D%20%22(.*)%22&replace=%241&label=Ruby&logo=ruby&color=a2c93e)](#compatibility) [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-a2c93e)](#compatibility) [![Certified Shovelware](https://justin.searls.co/img/shovelware.svg)](https://justin.searls.co/shovelware/)
 
 Ruby gems that bind Rust crates one to one: the clipboard, file dialogs,
 notifications, global hotkeys, URLs, domain names, and dates.
