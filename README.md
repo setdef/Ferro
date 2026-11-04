@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Ferro
 
-[![CI](https://github.com/setdef/Ferro/actions/workflows/ci.yml/badge.svg?branch=trunk)](https://github.com/setdef/Ferro/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/License-MIT%20%2F%20Apache--2.0-a2c93e)](#license) [![Ruby](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fsetdef%2FFerro%2Ftrunk%2Fgems%2Furl%2Fferro-url.gemspec&search=spec%5C.required_ruby_version%20%3D%20%22(.*)%22&replace=%241&label=Ruby&logo=ruby&color=a2c93e)](#compatibility) [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-a2c93e)](#compatibility) [![Certified Shovelware](https://justin.searls.co/img/shovelware.svg)](https://justin.searls.co/shovelware/)
+[![CI](https://github.com/setdef/Ferro/actions/workflows/ci.yml/badge.svg?branch=trunk)](https://github.com/setdef/Ferro/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/License-MIT%20%2F%20Apache--2.0-a2c93e)](#license) [![Ruby](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fsetdef%2FFerro%2Ftrunk%2Fgems%2Furl%2Fferro-url.gemspec&search=spec%5C.required_ruby_version%20%3D%20%22(.*)%22&replace=%241&label=Ruby&logo=ruby&color=a2c93e)](#compatibility) [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-a2c93e)](#compatibility) [![Forum: Discussion](https://img.shields.io/badge/forum-discussion-5865F2.svg?logo=discourse)](https://forum.setdef.com/tags/c/ferro/discussion) [![Forum: Bug Reports](https://img.shields.io/badge/forum-bug_reports-4954d5.svg?logo=discourse)](https://forum.setdef.com/tags/c/ferro/bug) [![Forum: Announcements](https://img.shields.io/badge/forum-announcements-3b44ac.svg?logo=discourse)](https://forum.setdef.com/tags/c/ferro/announcement) [![Certified Shovelware](https://justin.searls.co/img/shovelware.svg)](https://justin.searls.co/shovelware/)
 
 Ruby gems that bind Rust crates one to one: the clipboard, file dialogs,
 notifications, global hotkeys, URLs, domain names, and dates.
@@ -245,8 +245,13 @@ gems you use depend on, at the tag of the version they pin.
 
 ## Reporting problems
 
-Ferro's GitHub repository has issues turned off, and Ferro has no other
-public issue tracker yet.
+Report a bug under
+[Bug Reports](https://forum.setdef.com/tags/c/ferro/bug) on the setdef
+forum, and ask questions under
+[Discussion](https://forum.setdef.com/tags/c/ferro/discussion). Ferro's
+GitHub repository has issues turned off. Name the gem and its version,
+your operating system, `ruby -v` and `rustc -V`, the code you ran, and
+its full output.
 
 ## Contributing
 
