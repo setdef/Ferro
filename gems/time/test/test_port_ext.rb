@@ -152,12 +152,14 @@ class TestExt < Minitest::Test
   end
 
   def test_system_time_ext_checks_its_range
-    at = ::Time.at(1_000, 5, :nsec)
-    later = at.checked_add_signed(Duration.new(1, 1))
-    assert_equal ::Time.at(1_001, 6, :nsec), later
+    # Whole hundreds of nanoseconds, since std's SystemTime on Windows
+    # counts in 100 ns intervals and Rust itself drops the rest there.
+    at = ::Time.at(1_000, 500, :nsec)
+    later = at.checked_add_signed(Duration.new(1, 100))
+    assert_equal ::Time.at(1_001, 600, :nsec), later
     assert_predicate later, :utc?
-    assert_equal ::Time.at(999, 4, :nsec), at.checked_sub_signed(Duration.new(1, 1))
-    assert_equal ::Time.at(999, 4, :nsec), at.checked_add_signed(-Duration.new(1, 1))
+    assert_equal ::Time.at(999, 400, :nsec), at.checked_sub_signed(Duration.new(1, 100))
+    assert_equal ::Time.at(999, 400, :nsec), at.checked_add_signed(-Duration.new(1, 100))
     assert_nil at.checked_add_signed(Duration::MAX)
     assert_raises(TypeError) { at.checked_add_signed(1) }
     assert_equal Duration::MAX, ::Time.at(2 ** 62).signed_duration_since(::Time.at(-(2 ** 62)))
