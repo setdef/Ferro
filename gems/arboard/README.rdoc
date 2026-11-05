@@ -18,10 +18,15 @@ format you cannot decode) come with it.
 
 ferro-arboard binds arboard (https://github.com/1Password/arboard), the
 clipboard crate 1Password maintains, one to one. It keeps arboard's names,
-errors, and behavior, and adds nothing of its own. Use it to copy a result
+errors, and behavior, and adds no API of its own. Use it to copy a result
 for the user, read what they copied, or clear a password once it is pasted.
 
+ferro-arboard binds arboard 3.7.0. The gem's version follows its own API;
+its +arboard_version+ metadata names the arboard release.
+
 == Install
+
+Add the gem to your Gemfile, with a version, or let Bundler write the line:
 
 --
 SPDX-SnippetBegin
@@ -29,22 +34,44 @@ SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
 SPDX-License-Identifier: MIT-0
 ++
 
-  bundle add ferro-arboard
+  gem "ferro-arboard", "~> 0.1"
+
+  # or, from the command line:
+  bundle add ferro-arboard --version "~> 0.1"
 
 --
 SPDX-SnippetEnd
 ++
 
-The gem compiles a Rust extension when it installs, so the machine that
-installs it needs Rust and Cargo: Rust 1.88 or newer (the highest
-+rust-version+ among the locked dependencies), and 1.99 or newer on
-macOS 27, where earlier toolchains strip the extension in a way the new
-loader rejects. The build runs <tt>cargo --locked</tt>, so it compiles
-exactly the dependency versions this gem was tested with. To build against
-newer ones anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will do);
-it replaces <tt>--locked</tt>.
+The gem needs Ruby 4.0 or newer. It compiles a Rust extension when it
+installs, so the machine that installs it needs:
+
+* Rust and Cargo, 1.88 or newer (the highest +rust-version+ among the
+  locked dependencies). On Windows, use Rust's +x86_64-pc-windows-gnu+
+  toolchain, since RubyInstaller's Ruby is a MinGW build and rb-sys
+  refuses to build it with the MSVC target.
+* libclang, which rb-sys's bindgen reads Ruby's headers with
+  (<tt>libclang-dev</tt> on Debian and Ubuntu, +clang+ with the Xcode
+  command line tools on macOS, LLVM on Windows).
+
+The build runs <tt>cargo --locked</tt>, so it compiles exactly the
+dependency versions this gem was tested with. To build against newer ones
+anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will do); it
+replaces <tt>--locked</tt>.
+
+On Linux the build links no system library, since arboard's X11 client
+(x11rb) and Wayland client (wayland-backend, without its +client_system+
+feature) are pure Rust; macOS and Windows use the system's own frameworks.
+At run time on Linux the clipboard needs an X11
+server (or XWayland), or a Wayland compositor that implements the
+data-control protocol (<tt>ext-data-control-v1</tt> or
+<tt>wlr-data-control-unstable-v1</tt>); without a
+display, Clipboard.new raises an Error.
 
 == Use
+
+Writing replaces what the user had on the clipboard, so copy only what they
+asked you to copy.
 
 --
 SPDX-SnippetBegin
@@ -55,22 +82,31 @@ SPDX-License-Identifier: MIT-0
   require "ferro/arboard"
 
   clipboard = Ferro::Arboard::Clipboard.new
+
+  # Text
   clipboard.set_text("Hello, world!")
   clipboard.get_text # => "Hello, world!"
 
+  # HTML, with plain text for programs that cannot paste it
   clipboard.set_html("<b>Hello</b>, world!", "Hello, world!")
-  clipboard.get.html
+  clipboard.get.html # => "<html>...<b>Hello</b>, world!...</html>" (macOS)
+  # On macOS, arboard wraps the fragment in a document that declares UTF-8,
+  # so readers do not take the text for Windows Latin 1. Linux and Windows
+  # return the fragment as set.
 
-  # Four bytes per pixel: red, green, blue, alpha.
+  # Images: four bytes per pixel, red, green, blue, alpha, from the top left
   pixel = [255, 0, 0, 255].pack("C*")
   clipboard.set_image(Ferro::Arboard::ImageData.new(width: 1, height: 1, bytes: pixel))
-  clipboard.get_image # => #<data Ferro::Arboard::ImageData width=1, height=1, bytes="...">
+  clipboard.get_image # => #<data Ferro::Arboard::ImageData width=1, height=1, bytes="\xFF\x00\x00\xFF">
 
-  clipboard.set.file_list(["README.rdoc"])
-  clipboard.get.file_list # => ["/full/path/to/README.rdoc"]
+  # Files: arboard skips paths that do not exist
+  clipboard.set.file_list([File.expand_path("report.pdf")])
+  clipboard.get.file_list # => ["/full/path/to/report.pdf"]
+  # With none of the paths existing, set.file_list raises ConversionFailure.
 
+  # An empty clipboard, or one holding another kind of data, raises
+  clipboard.clear
   begin
-    clipboard.clear
     clipboard.get_text
   rescue Ferro::Arboard::Error::ContentNotAvailable => e
     puts e.message
@@ -86,8 +122,9 @@ only on the platform that has it, so <tt>respond_to?</tt> tells you what
 you can use:
 
 [Linux] LinuxClipboardKind picks a selection (GetExtLinux, SetExtLinux,
-        ClearExtLinux). SetExtLinux#wait, #wait_until, and #wait_once keep
-        serving what you set until another program takes it, and
+        ClearExtLinux). SetExtLinux#wait keeps serving what you set until
+        another program takes it, #wait_until serves until its deadline,
+        and #wait_once serves until one program has read it.
         #exclude_from_history keeps it out of clipboard managers.
 [macOS] SetExtApple#exclude_from_history.
 [Windows] SetExtWindows#exclude_from_monitoring, #exclude_from_cloud, and
@@ -120,16 +157,16 @@ The API is arboard's, translated where Rust has no Ruby meaning:
   <tt>clipboard.get.text</tt>. A builder works once, as arboard's does: the
   method that finishes it uses it up, and any later call on it raises
   +IOError+, as a closed IO does.
-* +Debug+ is <tt>debug</tt>, which answers arboard's text exactly, as Rust formats
-  it, on each Error variant, ImageData, and LinuxClipboardKind; +inspect+
-  stays Ruby's.
+* +Debug+ is +debug+, which answers arboard's text exactly, as Rust
+  formats it, on each Error variant, ImageData, and LinuxClipboardKind;
+  +inspect+ stays Ruby's.
 * An +Instant+ is any +Numeric+ number of seconds on Ruby's monotonic clock,
   as <tt>Process.clock_gettime(Process::CLOCK_MONOTONIC)</tt> returns it.
 * Every arboard feature is built in: images, and Wayland's data-control
   protocol on Linux. Ruby reaches both and neither needs a system library,
   so the gem offers no build options.
 
-Three things differ from calling arboard from Rust:
+Four things differ from calling arboard from Rust:
 
 * On Linux and Windows, an ImageData with a zero width or height, or a byte
   count other than <tt>width * height * 4</tt>, raises
@@ -152,20 +189,29 @@ Three things differ from calling arboard from Rust:
   progress, so once it runs they take effect when it returns, and the
   process does not exit until a thread stuck in such a call is done;
   SetExtLinux#wait returns only once another program takes the clipboard.
-* On Linux, dropping the last clipboard hands its contents to the desktop's
-  clipboard manager, waiting up to 100 ms, and stops arboard's X11 server
-  thread. That happens when the garbage collector frees the clipboard, so a
-  GC sweep can pause for it.
-* The extension is Ractor-safe, and a frozen Clipboard may be shared with
-  other Ractors. On Windows, Ruby 4.0.9 can hang when a Ractor starts a
-  garbage collection while the main Ractor has another thread asleep and
-  its main thread waits in Ractor#value; the bug is Ruby's, needs no
-  clipboard, and Ruby 4.1 replaces the Windows scheduler involved. Keep
-  the main Ractor's other threads busy or absent while it waits on a
-  Ractor there.
+* On Linux under X11, dropping the last clipboard hands its contents to
+  the desktop's clipboard manager, waiting up to 100 ms, and stops
+  arboard's X11 server thread. That happens when the garbage collector
+  frees the clipboard, so a GC sweep can pause for it.
 
-ferro-arboard 0.1.0.pre.1 binds arboard 3.7.0. The gem's version follows its
-own API; its +arboard_version+ metadata names the arboard release.
+== Ractors
+
+The extension is Ractor-safe, and a frozen Clipboard may be shared with
+other Ractors. One caveat belongs to Ruby, not to the gem: on Windows, Ruby
+4.0.9's scheduler can hang when a Ractor starts a garbage collection while
+the main Ractor has another thread asleep (in +sleep+ or Queue#pop) and
+its main thread waits in Ractor#value; a main thread that polls instead
+of waiting did not hang in CI. It needs no clipboard, and Ruby 4.1 replaces the Windows
+scheduler involved. Keep the main Ractor's other threads busy or absent
+while it waits on a Ractor there.
+
+== Links
+
+* Source: https://github.com/setdef/Ferro/tree/trunk/gems/arboard
+* Changelog: https://github.com/setdef/Ferro/blob/trunk/gems/arboard/CHANGELOG.md
+* The translation rules every Ferro gem follows (ADR 001):
+  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/adr/001.md
+* arboard: https://github.com/1Password/arboard
 
 == License
 

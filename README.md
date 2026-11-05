@@ -89,7 +89,7 @@ every release.
 | | Linux | macOS | Windows |
 |---|---|---|---|
 | Ruby | 4.0 or newer | 4.0 or newer | 4.0 or newer, from RubyInstaller |
-| Rust | 1.89 or newer | 1.89 or newer (1.99 or newer on macOS 27) | 1.89 or newer, with the `x86_64-pc-windows-gnu` toolchain |
+| Rust | 1.89 or newer | 1.89 or newer | 1.89 or newer, with the `x86_64-pc-windows-gnu` toolchain |
 | To build | libclang (`libclang-dev` on Debian and Ubuntu) | Xcode's command-line tools | LLVM's libclang |
 | Tested in CI | X11 and Wayland | Yes | Yes |
 

@@ -211,7 +211,10 @@ module Ferro
       # the display. A value from another gem works too when its class is
       # named for the same raw-window-handle struct and answers that
       # struct's fields, so a window library's own handles cross as they
-      # are. Both are read now, as rfd reads them.
+      # are. AppKitWindowHandle is the exception: ferro-rfd reads its
+      # +window_number+, not raw-window-handle's +ns_view+ pointer, so a
+      # library's own AppKit handle does not cross. Both are read now, as
+      # rfd reads them.
       #
       # ferro-rfd binds only handles that cannot crash your process when
       # wrong. On Windows, Win32WindowHandle: an +HWND+, which Windows

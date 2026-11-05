@@ -17,12 +17,19 @@ or with a Tauri app, gets different answers from +URI+.
 
 ferro-url binds url (https://github.com/servo/rust-url), the crate Servo,
 Firefox's Rust code, and Tauri use, one to one. It keeps url's names and
-behavior, and its form_urlencoded module, and adds nothing of its own. Use
-it to validate a link the way a webview will follow it, resolve relative
+behavior, and its form_urlencoded module. Where Rust has no Ruby meaning
+it translates: the one class it adds is Ferro::Url::Error, which stands in
+for url's <tt>Result<_, ()></tt> failures and carries a panic it caught.
+Use it to validate a link the way a webview will follow it, resolve relative
 references against a page, change a URL's parts with a browser's setters,
 or read and write query strings.
 
+ferro-url binds url 2.5.8 and form_urlencoded 1.2.2. The gem's version
+follows its own API; its +url_version+ metadata names the url release.
+
 == Install
+
+Add the gem to your Gemfile, with a version, or let Bundler write the line:
 
 --
 SPDX-SnippetBegin
@@ -30,27 +37,40 @@ SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
 SPDX-License-Identifier: MIT-0
 ++
 
-  bundle add ferro-url
+  gem "ferro-url", "~> 0.1"
+
+  # or, from the command line:
+  bundle add ferro-url --version "~> 0.1"
 
 --
 SPDX-SnippetEnd
 ++
 
-The gem compiles a Rust extension when it installs, so the machine that
-installs it needs Rust and Cargo: Rust 1.88 or newer, and 1.99 or newer on
-macOS 27, where earlier toolchains strip the extension in a way the new
-loader rejects. The build runs <tt>cargo --locked</tt>, so it compiles
-exactly the dependency versions this gem was tested with. To build against
-newer ones anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will
-do); it replaces <tt>--locked</tt>. url's Unicode data comes from ICU4X
-through idna and is compiled in, so building needs no system libraries.
+The gem needs Ruby 4.0 or newer. It compiles a Rust extension when it
+installs, so the machine that installs it needs:
+
+* Rust and Cargo, 1.88 or newer (the highest +rust-version+ among the
+  locked dependencies). On Windows, use Rust's +x86_64-pc-windows-gnu+
+  toolchain, since RubyInstaller's Ruby is a MinGW build and rb-sys
+  refuses to build it with the MSVC target.
+* libclang, which rb-sys's bindgen reads Ruby's headers with
+  (<tt>libclang-dev</tt> on Debian and Ubuntu, +clang+ with the Xcode
+  command line tools on macOS, LLVM on Windows).
+
+The build runs <tt>cargo --locked</tt>, so it compiles exactly the
+dependency versions this gem was tested with. To build against newer ones
+anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will do); it
+replaces <tt>--locked</tt>. url's Unicode data comes from ICU4X through
+idna and is compiled in, so url links no system library, at build time or
+run time.
 
 == Use
 
 --
 SPDX-SnippetBegin
-SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
-SPDX-License-Identifier: MIT-0
+SPDX-SnippetCopyrightText: 2013-2025 The rust-url developers
+SPDX-License-Identifier: MIT OR Apache-2.0
+SPDX-SnippetComment: Translated from url 2.5.8 src/lib.rs:32 and :93-111
 ++
 
   require "ferro/url"
@@ -78,7 +98,30 @@ SPDX-SnippetEnd
 A string that is not a URL raises a subclass of Ferro::Url::ParseError
 with url's message, the text a Tauri app reports. The setters url answers
 only yes or no for, such as +set_port+ on a <tt>mailto:</tt> URL, raise
-Ferro::Url::Error instead of failing in silence.
+Ferro::Url::Error instead of returning false.
+
+Setters change the URL in place, like a browser's:
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  url = Ferro::Url::Url.parse("https://example.com/a/b")
+  url.path_segments_mut { |segments| segments.pop.push("c d") }
+  url.set_host("example.org")
+  url.as_str # => "https://example.org/a/c%20d"
+
+  Ferro::Url::Url.parse("mailto:me@example.com").set_port(80)
+  # raises Ferro::Url::Error: url::Url::set_port returned Err(())
+
+  Ferro::Url::Url.parse("http://example.com:99999")
+  # raises Ferro::Url::ParseError::InvalidPort: invalid port number
+
+--
+SPDX-SnippetEnd
+++
 
 == How it maps url
 
@@ -92,7 +135,7 @@ The API is url's, translated where Rust has no Ruby meaning:
   refuses every setter, and URLs compare and hash by their serialization.
   +debug+ is url's +Debug+ text, and +inspect+ is Ruby's.
 * Host's and Origin's variants are Data classes; addresses are IPAddr, and
-  socket_addrs returns Addrinfo.
+  socket_addrs returns an Array of Addrinfo.
 * <tt>url[Position::BeforePath..]</tt> slices as url's +Index+ impls do,
   with Ruby ranges of Position.
 * ParseOptions is a frozen value whose setters return a new one, as
@@ -119,19 +162,27 @@ What differs from calling url from Rust:
   Ruby's global VM lock released, so other threads run, and Ctrl-C,
   <tt>Thread#raise</tt>, and +Timeout+ end the wait at once; the lookup,
   which nothing can cancel, then finishes alone, as Ruby's own
-  <tt>Addrinfo.getaddrinfo</tt> leaves its resolver thread. Every other
-  call keeps the lock.
+  <tt>Addrinfo.getaddrinfo</tt> leaves its resolver thread. When no
+  lookup thread can start, the lookup runs on the calling thread, still
+  with the lock released. Every other call keeps the lock.
 * Nothing of Ruby's runs while a Url's native lock is held, so threads and
   Ractors sharing one Url never wait on each other inside the VM.
 * A Serializer calls its encoding override for each name and value before
   form_urlencoded runs, in form_urlencoded's order, rather than during.
-* Not bound: +serialize_internal+ and +deserialize_internal+, which exist
-  for serde.
+* Not bound, each for a reason:
+  * +serialize_internal+ and +deserialize_internal+ exist only for a serde
+    caller, and the gem does not build serde.
+  * The +quirks+ module and +check_invariants+ are hidden in url
+    (<tt>#[doc(hidden)]</tt>), and Tauri uses neither.
+  * +into_string+ is deprecated since url 2.3.0, in favor of <tt>Into<String></tt>;
+    use Url#to_s. Tauri does not use it either.
 
-url's +std+ and +serde+ features are built; +serde+
-adds no Ruby API, since the string serde writes is Url#as_str. Its
-+debugger_visualizer+ feature names a file the published crate does not
-include, so it cannot build and is left off; it would add no Ruby API.
+url's +std+ feature (its default) is built. Three others are off. +serde+
+reaches only Rust, since the string it writes is Url#as_str, which
+Url.parse reads; ADR 002 drops it. +expose_internals+ adds only items to
+the unbound +quirks+ module. +debugger_visualizer+ names a file the
+published crate does not include, so it cannot build; it would add no Ruby
+API.
 
 url keeps one piece of process-wide state, the counter that numbers opaque
 origins, and nothing the operating system holds, so another library in the
@@ -139,13 +190,21 @@ same process may link its own copy. url's host parser uses its own copy of
 idna; ferro-idna binds idna directly and locks the same release.
 
 The extension is Ractor-safe; Host, Origin, Position, SyntaxViolation, and
-a frozen Url may cross Ractors. On Windows, Ruby 4.0.9 can hang when a
-Ractor starts a garbage collection while the main Ractor has another
-thread asleep; the bug is Ruby's (ferro-arboard's README says more).
+a frozen Url may cross Ractors. One caveat belongs to Ruby, not to the
+gem: on Windows, Ruby 4.0.9's scheduler can hang when a Ractor starts a
+garbage collection while the main Ractor has another thread asleep (in
++sleep+ or Queue#pop) and its main thread waits in Ractor#value. It needs
+no URL, and Ruby 4.1 replaces the Windows scheduler involved.
+ferro-arboard's README says more.
 
-ferro-url 0.1.0.pre.1 binds url 2.5.8 and form_urlencoded 1.2.2. The gem's
-version follows its own API; its +url_version+ metadata names the url
-release.
+== Links
+
+* Source: https://github.com/setdef/Ferro/tree/trunk/gems/url
+* Changelog: https://github.com/setdef/Ferro/blob/trunk/gems/url/CHANGELOG.md
+* The translation rules every Ferro gem follows (ADR 001):
+  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/adr/001.md
+* url: https://github.com/servo/rust-url
+* The WHATWG URL Standard: https://url.spec.whatwg.org/
 
 == License
 
@@ -156,6 +215,7 @@ icu_normalizer, icu_properties, their +_data+ crates, zerovec, and the
 rest), are Unicode-3.0. This gem ships none of their code, only the
 lockfile that names them, so it carries no copy of that license; a
 precompiled gem, which would contain them, would ship
-LICENSES/Unicode-3.0.txt. This README is CC-BY-SA-4.0, and its code
-examples are MIT-0, so paste them freely. The lockfile is CC0-1.0. The
+LICENSES/Unicode-3.0.txt. This README is CC-BY-SA-4.0. Its first code
+example comes from url's rustdoc and is MIT OR Apache-2.0, as url's code
+is; the other examples are MIT-0, so paste them freely. The lockfile is CC0-1.0. The
 license texts are in LICENSES/.

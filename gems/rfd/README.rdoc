@@ -16,11 +16,19 @@ shortcuts. Each system has its own API for them: AppKit on macOS, the
 Common Item Dialog on Windows, the XDG desktop portal on Linux.
 
 ferro-rfd binds rfd (https://github.com/PolyMeilex/rfd), Rusty File
-Dialogs, one to one. It keeps rfd's names and behavior and adds nothing of
-its own. Use it to let the user open a document, choose where to save an
-export, pick a folder, or answer a yes-or-no question.
+Dialogs, one to one. It keeps rfd's names and behavior. The gem adds three
+things rfd has no type for: Ferro::Rfd::Error, which carries a panic it
+caught, since rfd reports no errors; the +Errno+ class FileHandle#write
+raises for a <tt>std::io::Error</tt>; and Future, Ruby's stand-in for a
+Rust future. Use it to let the user open a document, choose where to
+save an export, pick a folder, or answer a yes-or-no question.
+
+ferro-rfd binds rfd 0.17.2. The gem's version follows its own API; its
++rfd_version+ metadata names the rfd release.
 
 == Install
+
+Add the gem to your Gemfile, with a version, or let Bundler write the line:
 
 --
 SPDX-SnippetBegin
@@ -28,36 +36,50 @@ SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
 SPDX-License-Identifier: MIT-0
 ++
 
-  bundle add ferro-rfd
+  gem "ferro-rfd", "~> 0.1"
+
+  # or, from the command line:
+  bundle add ferro-rfd --version "~> 0.1"
 
 --
 SPDX-SnippetEnd
 ++
 
-The gem compiles a Rust extension when it installs, so the machine that
-installs it needs Rust and Cargo: Rust 1.86 or newer (the highest
-+rust-version+ among the locked dependencies), and 1.99 or newer on macOS 27, where earlier toolchains
-strip the extension in a way the new loader rejects. The build runs
-<tt>cargo --locked</tt>, so it compiles exactly the dependency versions
-this gem was tested with. To build against newer ones anyway, set
-+RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will do); it replaces
-<tt>--locked</tt>.
+The gem needs Ruby 4.0 or newer. It compiles a Rust extension when it
+installs, so the machine that installs it needs:
 
-On Linux, building also needs +pkg-config+ and libwayland's development
-files (<tt>libwayland-dev</tt> on Debian and Ubuntu, +wayland-devel+ on
-Fedora): rfd's +wayland+ feature links <tt>libwayland-client</tt>, which
-must then be present at run time too. Dialogs need the
+* Rust and Cargo, 1.86 or newer (the highest +rust-version+ among the
+  locked dependencies). On Windows, use Rust's +x86_64-pc-windows-gnu+
+  toolchain, since RubyInstaller's Ruby is a MinGW build and rb-sys
+  refuses to build it with the MSVC target.
+* libclang, which rb-sys's bindgen reads Ruby's headers with
+  (<tt>libclang-dev</tt> on Debian and Ubuntu, +clang+ with the Xcode
+  command line tools on macOS, LLVM on Windows).
+* On Linux, +pkg-config+ and libwayland's development files
+  (<tt>libwayland-dev</tt> on Debian and Ubuntu, +wayland-devel+ on
+  Fedora): rfd's +wayland+ feature, which the 0.1.0 build has on,
+  links <tt>libwayland-client</tt>, so it has to be present at run time
+  too. ADR 002 plans to let you leave +wayland+ out at install; that
+  option comes in a later release.
+
+The build runs <tt>cargo --locked</tt>, so it compiles exactly the
+dependency versions this gem was tested with. To build against newer ones
+anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will do); it
+replaces <tt>--locked</tt>.
+
+macOS and Windows need nothing more at run time. On Linux, dialogs need the
 <tt>libdbus-1</tt> library and an XDG desktop portal backend (GTK, GNOME,
 or KDE; the wlroots portal does not implement the file chooser), which
 desktops install, and +zenity+ for message dialogs and as the file
-dialogs' fallback. Ship both with an app you package.
+dialogs' fallback. Ship all three with an app you package.
 
 == Use
 
 --
 SPDX-SnippetBegin
-SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
-SPDX-License-Identifier: MIT-0
+SPDX-SnippetCopyrightText: 2022 Bartłomiej Maryńczak
+SPDX-License-Identifier: MIT
+SPDX-SnippetComment: Translated from rfd 0.17.2 examples/simple.rs, examples/save.rs, and examples/msg.rs
 ++
 
   require "ferro/rfd"
@@ -70,6 +92,7 @@ SPDX-License-Identifier: MIT-0
   puts "The user chose: #{path.inspect}" # a String, or nil if they cancelled
 
   target = Ferro::Rfd::FileDialog.new.set_file_name("foo.txt").save_file
+  File.write(target, "hello") if target
 
   result = Ferro::Rfd::MessageDialog.new
     .set_title("Msg!")
@@ -112,6 +135,11 @@ SPDX-License-Identifier: MIT-0
     puts file.path if file
   end
 
+  # A FileHandle reads and writes through Futures too:
+  handle = Ferro::Rfd::FileHandle.new("notes.txt")
+  handle.write("hello").value
+  handle.read.value # => "hello"
+
 --
 SPDX-SnippetEnd
 ++
@@ -120,10 +148,10 @@ On macOS this is the pattern rfd recommends: called on the main thread
 while your app's event loop runs, rfd opens the dialog as a sheet on your
 window and returns at once, and the sheet finishes on the main thread's
 event loop. Waiting for it on the main thread would never end, so
-Future#value refuses there. Without a running application, rfd prints a
-note and shows an ordinary modal dialog at once instead. On Windows and
-Linux, the dialog opens when you first call Future#value, on a thread of
-rfd's own.
+Future#value refuses there. Without a running application or without any
+window, rfd prints a note and shows an ordinary modal dialog at once
+instead. On Windows and Linux, the dialog opens when you first call
+Future#value, on a thread of rfd's own.
 
 === Threads on macOS
 
@@ -137,9 +165,9 @@ show dialogs from the main thread. AsyncMessageDialog without a parent is
 the exception: rfd shows it on a thread of its own, from anywhere.
 
 While a dialog is open on the main thread, the main thread's run loop
-runs, with Ruby's lock released. Native code the run loop calls must not
-call Ruby without taking the lock back; tao, the windowing crate Tokra
-uses, queues its events instead of calling back in.
+runs, with Ruby's lock released. Native code the run loop calls has to take
+the lock back before it calls Ruby; tao, the windowing crate Tokra uses,
+queues its events instead of calling back in.
 
 === Parent windows
 
@@ -156,6 +184,7 @@ SPDX-License-Identifier: MIT-0
 
   Parent = Data.define(:window_handle, :display_handle)
 
+  # On Windows:
   window = Parent.new(Ferro::Rfd::Win32WindowHandle.new(hwnd: my_hwnd, hinstance: nil),
     Ferro::Rfd::WindowsDisplayHandle.new)
   Ferro::Rfd::FileDialog.new.set_parent(window).pick_file
@@ -166,8 +195,10 @@ SPDX-SnippetEnd
 
 A handle value is a +Data+ of Integers, so it crosses from any gem. A
 value from your window library works as is when its class is named for the
-same raw-window-handle struct (+Win32WindowHandle+, +AppKitWindowHandle+,
-and so on) and answers that struct's fields. Nothing checks that an
+same raw-window-handle struct (+Win32WindowHandle+, +XlibWindowHandle+,
+and so on) and answers that struct's fields. AppKitWindowHandle is the
+exception: ferro-rfd reads its +window_number+, not raw-window-handle's
++ns_view+ pointer, so a library's own AppKit handle does not cross. Nothing checks that an
 Integer names a live window, so ferro-rfd binds only handles that cannot
 crash your process when wrong:
 
@@ -245,13 +276,19 @@ What differs from calling rfd from Rust:
   prints its usual panic message to stderr for a caught one.
 * FileHandle#write's <tt>std::io::Error</tt> raises the matching +Errno+
   class on Unix, and +IOError+ on Windows.
-* The extension is Ractor-safe, and a builder, handle value, or FileHandle
-  made shareable may cross Ractors. On Windows, Ruby 4.0.9 can hang when a
-  Ractor starts a garbage collection while the main Ractor has another
-  thread asleep and its main thread waits in Ractor#value; the bug is
-  Ruby's (ferro-arboard's README says more).
 
-Two of rfd's Cargo features are not built:
+The extension is Ractor-safe, and a builder, handle value, or FileHandle
+made shareable may cross Ractors. One caveat belongs to Ruby, not to the
+gem: on Windows, Ruby 4.0.9's scheduler can hang when a Ractor starts a
+garbage collection while the main Ractor has another thread asleep (in
++sleep+ or Queue#pop) and its main thread waits in Ractor#value. It needs
+no dialog, and Ruby 4.1 replaces the Windows scheduler involved.
+ferro-arboard's README says more.
+
+Two of rfd's Cargo features are not built in 0.1.0. ADR 002 offers +gtk3+
+at install, and plans to let you leave +wayland+ out; that install-time
+machinery comes in a later release, so the 0.1.0 build is rfd's defaults
+(+xdg-portal+ and +wayland+) plus +file-handle-inner+.
 
 * +gtk3+. rfd builds either its GTK backend or its XDG portal backend on
   Linux, never both, and the portal is rfd's default. The GTK backend runs
@@ -265,11 +302,17 @@ Two of rfd's Cargo features are not built:
   Windows, MessageButtons' custom labels show the standard
   buttons, and MessageDialog#show returns Ok, Cancel, Yes, or No for them.
 
-ferro-rfd 0.1.0.pre.1 binds rfd 0.17.2. The gem's version follows its own
-API; its +rfd_version+ metadata names the rfd release.
+== Links
+
+* Source: https://github.com/setdef/Ferro/tree/trunk/gems/rfd
+* Changelog: https://github.com/setdef/Ferro/blob/trunk/gems/rfd/CHANGELOG.md
+* The translation rules every Ferro gem follows (ADR 001):
+  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/adr/001.md
+* rfd: https://github.com/PolyMeilex/rfd
 
 == License
 
-ferro-rfd's code is MIT, as rfd's is. This README is CC-BY-SA-4.0, and its
-code examples are MIT-0, so paste them freely. The lockfile is CC0-1.0.
+ferro-rfd's code is MIT, as rfd's is. This README is CC-BY-SA-4.0. Its
+first code example comes from rfd's examples and is MIT, as rfd's code is;
+the other examples are MIT-0, so paste them freely. The lockfile is CC0-1.0.
 The license texts are in LICENSES/.
