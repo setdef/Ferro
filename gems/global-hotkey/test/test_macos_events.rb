@@ -7,51 +7,77 @@
 
 require "test_helper"
 
-# Real hotkey events on macOS, each in a child process, whose main thread
-# makes the manager and runs Carbon's event loop, as global-hotkey asks
-# (src/lib.rs:15-18). A child posts Control-Option-Shift-Command-F19, with
-# the modifiers as the key events' flags, so no modifier key is left down,
-# through CoreGraphics with Fiddle. Posting needs the Accessibility
-# permission and watching media keys a permission of its own, so each
-# test skips, saying which, when this process lacks or holds it.
+# Hotkey events on macOS, each in a child process, whose main thread makes
+# the manager, as global-hotkey asks (src/lib.rs:15-18).
+#
+# A press reaches global-hotkey as a Carbon event: the window server
+# matches the key against the table RegisterEventHotKey fills, and Carbon
+# hands the application's event target a kEventClassKeyboard event of kind
+# kEventHotKeyPressed or kEventHotKeyReleased, whose direct object is the
+# EventHotKeyID registered with the key. global-hotkey's handler, which
+# GlobalHotKeyManager.new installs on that target (macos/mod.rs:44-72),
+# reads that id and sends the event on (:304-339). The child builds that
+# very event with Carbon's CreateEvent and SetEventParameter, through
+# Fiddle, and dispatches it with SendEventToEventTarget, so the crate's
+# handler and the gem's delivery run for real, synchronously, and need no
+# permission. SendEventToEventTarget answers noErr only when a handler
+# took the event, and eventNotHandledErr (-9874) when none did, so the
+# statuses show the crate's handler ran.
+#
+# The window server's match is left out. A key posted with CGEventPost did
+# not fire the hotkey on GitHub's macOS 26 runner, where the process may
+# post, and Apple documents no rule for when a posted key reaches the
+# hotkey table, so no test here can count on it (plan 004, Follow-up:
+# macOS delivery without the window server).
 class TestMacosEvents < Minitest::Test
   include HotkeySuite
 
-  # The child's Fiddle bindings: CoreGraphics to post keys and ask for the
-  # permissions, and Carbon's RunCurrentEventLoop to pump the main thread.
+  # The child's Fiddle bindings: Carbon's event functions, and
+  # CoreGraphics's check for permission to watch input.
   PRELUDE = <<~RUBY
     require "fiddle"
     G = Ferro::GlobalHotkey
     CG = Fiddle.dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
     CARBON = Fiddle.dlopen("/System/Library/Frameworks/Carbon.framework/Carbon")
-    def cg(name, args, ret) = Fiddle::Function.new(CG[name], args, ret)
-    POST_ACCESS = cg("CGPreflightPostEventAccess", [], Fiddle::TYPE_CHAR)
-    LISTEN_ACCESS = cg("CGPreflightListenEventAccess", [], Fiddle::TYPE_CHAR)
-    KEY_EVENT = cg("CGEventCreateKeyboardEvent", [Fiddle::TYPE_VOIDP, Fiddle::TYPE_SHORT, Fiddle::TYPE_CHAR],
-      Fiddle::TYPE_VOIDP)
-    SET_FLAGS = cg("CGEventSetFlags", [Fiddle::TYPE_VOIDP, Fiddle::TYPE_LONG_LONG], Fiddle::TYPE_VOID)
-    POST = cg("CGEventPost", [Fiddle::TYPE_INT, Fiddle::TYPE_VOIDP], Fiddle::TYPE_VOID)
-    RELEASE = Fiddle::Function.new(CG["CFRelease"], [Fiddle::TYPE_VOIDP], Fiddle::TYPE_VOID)
-    RUN_LOOP = Fiddle::Function.new(CARBON["RunCurrentEventLoop"], [Fiddle::TYPE_DOUBLE], Fiddle::TYPE_INT)
+    def carbon(name, args, ret) = Fiddle::Function.new(CARBON[name], args, ret)
+    LISTEN_ACCESS = Fiddle::Function.new(CG["CGPreflightListenEventAccess"], [], Fiddle::TYPE_CHAR)
+    CREATE_EVENT = carbon("CreateEvent", [Fiddle::TYPE_VOIDP, Fiddle::TYPE_UINT32_T, Fiddle::TYPE_UINT32_T,
+      Fiddle::TYPE_DOUBLE, Fiddle::TYPE_UINT32_T, Fiddle::TYPE_VOIDP], Fiddle::TYPE_INT32_T)
+    SET_PARAMETER = carbon("SetEventParameter", [Fiddle::TYPE_VOIDP, Fiddle::TYPE_UINT32_T, Fiddle::TYPE_UINT32_T,
+      Fiddle::TYPE_SIZE_T, Fiddle::TYPE_VOIDP], Fiddle::TYPE_INT32_T)
+    SEND = carbon("SendEventToEventTarget", [Fiddle::TYPE_VOIDP, Fiddle::TYPE_VOIDP], Fiddle::TYPE_INT32_T)
+    APPLICATION_TARGET = carbon("GetApplicationEventTarget", [], Fiddle::TYPE_VOIDP)
+    RELEASE_EVENT = carbon("ReleaseEvent", [Fiddle::TYPE_VOIDP], Fiddle::TYPE_VOID)
 
-    # kVK_F19, and Shift, Control, Option, and Command as CGEventFlags.
-    F19 = 0x50
-    FLAGS = 0x20000 | 0x40000 | 0x80000 | 0x100000
+    # The four-character codes global-hotkey uses (macos/ffi.rs:63-72):
+    # kEventClassKeyboard, kEventHotKeyPressed and kEventHotKeyReleased,
+    # kEventParamDirectObject, and typeEventHotKeyID; and the signature it
+    # registers its hotkeys with (macos/mod.rs:102-112).
+    KEYBOARD = "keyb".unpack1("N")
+    KINDS = { Pressed: 5, Released: 6 }.freeze
+    DIRECT_OBJECT = "----".unpack1("N")
+    HOTKEY_ID_TYPE = "hkid".unpack1("N")
+    SIGNATURE = "htrs".unpack1("N")
 
-    def press_f19
-      [true, false].each do |down|
-        event = KEY_EVENT.call(nil, F19, down ? 1 : 0)
-        SET_FLAGS.call(event, FLAGS)
-        POST.call(0, event) # kCGHIDEventTap
-        RELEASE.call(event)
+    # Dispatches the Carbon event a press or release of the hotkey +id+
+    # becomes, and returns SendEventToEventTarget's status.
+    def dispatch(id, state)
+      out = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP, Fiddle::RUBY_FREE)
+      created = CREATE_EVENT.call(nil, KEYBOARD, KINDS.fetch(state), 0.0, 0, out)
+      raise "CreateEvent failed: \#{created}" unless created.zero?
+
+      event = out.ptr
+      begin
+        # EventHotKeyID: an OSType signature, then a UInt32 id
+        # (macos/ffi.rs:78-81).
+        hotkey_id = [SIGNATURE, id].pack("L2")
+        set = SET_PARAMETER.call(event, DIRECT_OBJECT, HOTKEY_ID_TYPE, hotkey_id.bytesize, hotkey_id)
+        raise "SetEventParameter failed: \#{set}" unless set.zero?
+
+        SEND.call(event, APPLICATION_TARGET.call)
+      ensure
+        RELEASE_EVENT.call(event)
       end
-    end
-
-    # Pumps the main thread until the block answers true or ten seconds
-    # pass.
-    def pump_until
-      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
-      RUN_LOOP.call(0.05) until yield || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
     end
 
     MANAGER = G::GlobalHotKeyManager.new
@@ -63,45 +89,41 @@ class TestMacosEvents < Minitest::Test
   end
 
   def test_the_receiver_gets_the_press_and_the_release
-    (allowed, id, events), = in_child(PRELUDE + <<~RUBY)
-      next_value = [false, nil, []]
-      if POST_ACCESS.call == 1
-        MANAGER.register(HOTKEY)
-        receiver = G::GlobalHotKeyEvent.receiver
-        events = []
-        press_f19
-        pump_until { events.concat(receiver.try_iter.to_a).size >= 2 }
-        MANAGER.unregister(HOTKEY)
-        next_value = [true, HOTKEY.id, events.map(&:debug)]
-      end
-      next_value
+    (statuses, id, events), = in_child(PRELUDE + <<~RUBY)
+      statuses = %i[Pressed Released].map { |state| dispatch(HOTKEY.id, state) }
+      [statuses, HOTKEY.id, G::GlobalHotKeyEvent.receiver.try_iter.map(&:debug)]
     RUBY
-    skip "posting keys needs the Accessibility permission, which this process lacks" unless allowed
 
+    assert_equal [0, 0], statuses
     assert_equal ["GlobalHotKeyEvent { id: #{id}, state: Pressed }", "GlobalHotKeyEvent { id: #{id}, state: Released }"],
       events
   end
 
   def test_the_handler_gets_the_events_and_the_receiver_none
-    (allowed, id, events, leftover), = in_child(PRELUDE + <<~RUBY)
-      next_value = [false, nil, [], 0]
-      if POST_ACCESS.call == 1
-        queue = Thread::Queue.new
-        G::GlobalHotKeyEvent.set_event_handler { |event| queue << event }
-        MANAGER.register(HOTKEY)
-        press_f19
-        pump_until { queue.size >= 2 }
-        MANAGER.unregister(HOTKEY)
-        events = Array.new(2) { queue.pop(timeout: 1) }.compact
-        next_value = [true, HOTKEY.id, events.map(&:debug), G::GlobalHotKeyEvent.receiver.try_iter.to_a.size]
-      end
-      next_value
+    (statuses, id, events, leftover), = in_child(PRELUDE + <<~RUBY)
+      queue = Thread::Queue.new
+      G::GlobalHotKeyEvent.set_event_handler { |event| queue << event }
+      statuses = %i[Pressed Released].map { |state| dispatch(HOTKEY.id, state) }
+      events = Array.new(2) { queue.pop(timeout: 10) }.compact
+      [statuses, HOTKEY.id, events.map(&:debug), G::GlobalHotKeyEvent.receiver.try_iter.to_a.size]
     RUBY
-    skip "posting keys needs the Accessibility permission, which this process lacks" unless allowed
 
+    assert_equal [0, 0], statuses
     assert_equal ["GlobalHotKeyEvent { id: #{id}, state: Pressed }", "GlobalHotKeyEvent { id: #{id}, state: Released }"],
       events
     assert_equal 0, leftover
+  end
+
+  # Without a manager no handler is on the application's target, so the
+  # same events go unhandled and nothing arrives: what the tests above
+  # receive comes from global-hotkey's handler, not from the dispatch.
+  def test_without_a_manager_the_events_go_unhandled
+    (statuses, events), = in_child(PRELUDE.sub("MANAGER = G::GlobalHotKeyManager.new\n", "") + <<~RUBY)
+      statuses = %i[Pressed Released].map { |state| dispatch(HOTKEY.id, state) }
+      [statuses, G::GlobalHotKeyEvent.receiver.try_iter.to_a]
+    RUBY
+
+    assert_equal [[-9874, -9874], []], [statuses, events]
   end
 
   # A media key makes global-hotkey install a CGEventTap
