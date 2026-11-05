@@ -4,7 +4,7 @@
 //! The failures the native layer hands Ruby (plan 004, decision 7).
 //!
 //! A function that can fail returns `[:ok, value]` or
-//! `[:error, path, message, hotkey]`, and the Ruby side raises the class at
+//! `[:error, path, message, hotkey, os_error]`, and the Ruby side raises the class at
 //! `path` under `Ferro::GlobalHotkey`. Building the exception in Ruby keeps
 //! its constructor, its `hotkey`, and its docs in one place. The message is
 //! always the source crate's own `Display` text.
@@ -15,13 +15,19 @@ use magnus::{IntoValue, RArray, Ruby, Value};
 use crate::hotkey::{parts, Parts};
 use crate::Panic;
 
+/// What an `io::Error` carries into Ruby: its OS error code, if it has
+/// one, and its text.
+pub type OsError = (Option<i32>, String);
+
 /// Where a failure goes in Ruby: the class path under
-/// `Ferro::GlobalHotkey`, the message, and the hotkey the error carries.
+/// `Ferro::GlobalHotkey`, the message, the hotkey the error carries, and
+/// the `io::Error` an `OsError` carries.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Failure {
     pub path: String,
     pub message: String,
     pub hotkey: Option<Parts>,
+    pub os_error: Option<OsError>,
 }
 
 impl Failure {
@@ -30,6 +36,7 @@ impl Failure {
             path: path.into(),
             message: message.into(),
             hotkey: None,
+            os_error: None,
         }
     }
 }
@@ -64,6 +71,10 @@ pub fn classify(error: &global_hotkey::Error) -> Failure {
         },
         message: error.to_string(),
         hotkey,
+        os_error: match error {
+            E::OsError(io) => Some((io.raw_os_error(), io.to_string())),
+            _ => None,
+        },
     }
 }
 
@@ -87,14 +98,16 @@ pub fn ok(ruby: &Ruby, value: impl IntoValue) -> RArray {
     ruby.ary_new_from_values(&[tag, value.into_value_with(ruby)])
 }
 
-/// `[:error, path, message, hotkey]`, `hotkey` being `nil` or the parts
-/// of the hotkey the error carries.
+/// `[:error, path, message, hotkey, os_error]`, `hotkey` being `nil` or
+/// the parts of the hotkey the error carries, and `os_error` `nil` or the
+/// `[code, text]` of the `io::Error` an `OsError` carries.
 pub fn error(ruby: &Ruby, failure: Failure) -> RArray {
-    let values: [Value; 4] = [
+    let values: [Value; 5] = [
         ruby.to_symbol("error").into_value_with(ruby),
         failure.path.into_value_with(ruby),
         failure.message.into_value_with(ruby),
         failure.hotkey.into_value_with(ruby),
+        failure.os_error.into_value_with(ruby),
     ];
     ruby.ary_new_from_values(&values)
 }
@@ -128,10 +141,11 @@ mod tests {
     fn each_variant_goes_to_its_class_with_global_hotkeys_text() {
         let os = std::io::Error::from_raw_os_error(1);
         let os_text = os.to_string();
-        assert_eq!(
-            classify(&Error::OsError(os)),
-            failure("Error::OsError", &os_text)
-        );
+        let mut expected = failure("Error::OsError", &os_text);
+        expected.os_error = Some((Some(1), os_text));
+        assert_eq!(classify(&Error::OsError(os)), expected);
+        let coded = classify(&Error::OsError(std::io::Error::other("no code")));
+        assert_eq!(coded.os_error, Some((None, "no code".to_owned())));
         assert_eq!(
             classify(&Error::HotKeyParseError("bad".to_owned())),
             failure("Error::HotKeyParseError", "bad")

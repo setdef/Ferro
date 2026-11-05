@@ -21,8 +21,19 @@ module Ferro
         SYMBOL_LOCK: Modifiers
         HYPER: Modifiers
         SUPER: Modifiers
-        FLAGS: Hash[String, Modifiers]
+        FLAGS: Array[Flag]
         ALL_BITS: Integer
+
+        class Flag < Data
+          attr_reader name: String
+          attr_reader value: Modifiers
+
+          def self.new: (String name, Modifiers value) -> Flag
+                      | (name: String, value: Modifiers) -> Flag
+
+          def is_named: () -> bool
+          def is_unnamed: () -> bool
+        end
 
         attr_reader bits: Integer
 
@@ -34,11 +45,15 @@ module Ferro
         def self.from_bits: (Integer bits) -> Modifiers?
         def self.from_bits_truncate: (Integer bits) -> Modifiers
         def self.from_bits_retain: (Integer bits) -> Modifiers
+        def self.all_named: () -> Modifiers
         def self.from_name: (String name) -> Modifiers?
 
         def initialize: (Integer bits) -> void
         def is_empty: () -> bool
         def is_all: () -> bool
+        def known_bits: () -> Integer
+        def unknown_bits: () -> Integer
+        def contains_unknown_bits: () -> bool
         def contains: (Modifiers other) -> bool
         def intersects: (Modifiers other) -> bool
         def union: (Modifiers other) -> Modifiers

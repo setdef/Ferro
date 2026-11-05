@@ -5,27 +5,41 @@ module Ferro
   module GlobalHotkey
     class GlobalHotKeyEventReceiver
       class TryRecvError < StandardError
+        def self.from: (RecvError error) -> Disconnected
+        def is_empty: () -> bool
+        def is_disconnected: () -> bool
+
         class Empty < TryRecvError
+          def initialize: (?String? message) -> void
         end
 
         class Disconnected < TryRecvError
+          def initialize: (?String? message) -> void
         end
       end
 
       class RecvError < StandardError
+        def initialize: (?String? message) -> void
       end
 
       class RecvTimeoutError < StandardError
+        def self.from: (RecvError error) -> Disconnected
+        def is_timeout: () -> bool
+        def is_disconnected: () -> bool
+
         class Timeout < RecvTimeoutError
+          def initialize: (?String? message) -> void
         end
 
         class Disconnected < RecvTimeoutError
+          def initialize: (?String? message) -> void
         end
       end
 
       private def self.new: () -> instance
 
       def initialize: () -> void
+      def dup: () -> instance
       def try_recv: () -> GlobalHotKeyEvent
       def recv: () -> GlobalHotKeyEvent
       def recv_timeout: (Numeric timeout) -> GlobalHotKeyEvent

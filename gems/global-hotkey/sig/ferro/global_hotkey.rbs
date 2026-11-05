@@ -7,11 +7,13 @@ module Ferro
     PLATFORM: :macos | :linux | :windows
 
     type parts = [Integer, String, Integer]
-    type native_error = [:error, String, String, parts?]
+    type os_error = [Integer?, String]
+    type native_error = [:error, String, String, parts?, os_error?]
     type native_result[T] = [:ok, T] | native_error
     type native_event = [Integer, :Pressed | :Released]
 
     private def self.settle: [T] (native_result[T] result) -> T
+    private def self.io_error: (Integer? code, String text) -> (SystemCallError | IOError)
     private def self.parts: (Object hotkey) -> parts
     private def self.event: (native_event pair) -> GlobalHotKeyEvent
 
@@ -34,6 +36,8 @@ module Ferro
       def self.modifiers_from_name: (String name) -> Integer?
       def self.receiver_try_recv: () -> native_result[native_event]
       def self.receiver_recv: (Numeric? seconds) -> native_result[native_event]
+      def self.receive_error_text: (String path) -> String?
+      def self.recv_error_into: (String target) -> String?
       def self.receiver_len: () -> Integer
       def self.receiver_is_empty: () -> bool
       def self.receiver_is_full: () -> bool

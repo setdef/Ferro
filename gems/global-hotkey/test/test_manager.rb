@@ -113,6 +113,8 @@ class TestManager < Minitest::Test
 
     error = assert_raises(Error::OsError) { GlobalHotkey::GlobalHotKeyManager.new }
     assert_match(/\(os error \d+\)\z/, error.message)
+    assert_kind_of SystemCallError, error.io_error
+    assert_equal error.message[/\(os error (\d+)\)\z/, 1].to_i, error.io_error.errno
   end
 
   # A manager the garbage collector frees runs global-hotkey's Drop, which

@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 
 use crossbeam_channel::{unbounded, Receiver, RecvError, RecvTimeoutError, Sender, TryRecvError};
 use global_hotkey::GlobalHotKeyEvent;
-use magnus::{Error, RArray, Ruby, Symbol};
+use magnus::{Error, RArray, RString, Ruby, Symbol};
 
 use crate::error::{error, ok, panicked, Failure};
 use crate::gvl::{self, Received};
@@ -45,6 +45,41 @@ fn receive_failure(class: &str, message: &impl ToString) -> Failure {
         format!("GlobalHotKeyEventReceiver::{class}"),
         message.to_string(),
     )
+}
+
+/// crossbeam's `Display` text for the error class at `path` under
+/// `GlobalHotKeyEventReceiver` (crossbeam-channel 0.5.17
+/// `src/err.rs:282-333`), or `None` for any other path.
+pub fn receive_error_text(path: RString) -> Result<Option<String>, Error> {
+    Ok(error_text(&path.to_string()?))
+}
+
+/// `receive_error_text` for a Rust string.
+fn error_text(path: &str) -> Option<String> {
+    Some(match path {
+        "RecvError" => RecvError.to_string(),
+        "TryRecvError::Empty" => TryRecvError::Empty.to_string(),
+        "TryRecvError::Disconnected" => TryRecvError::Disconnected.to_string(),
+        "RecvTimeoutError::Timeout" => RecvTimeoutError::Timeout.to_string(),
+        "RecvTimeoutError::Disconnected" => RecvTimeoutError::Disconnected.to_string(),
+        _ => return None,
+    })
+}
+
+/// The `Display` text of `TryRecvError::from(RecvError)` for `"try_recv"`
+/// (`src/err.rs:301-307`), or of `RecvTimeoutError::from(RecvError)` for
+/// `"recv_timeout"` (`src/err.rs:338-344`); `None` for anything else.
+pub fn recv_error_into(target: RString) -> Result<Option<String>, Error> {
+    Ok(converted_text(&target.to_string()?))
+}
+
+/// `recv_error_into` for a Rust string.
+fn converted_text(target: &str) -> Option<String> {
+    match target {
+        "try_recv" => Some(TryRecvError::from(RecvError).to_string()),
+        "recv_timeout" => Some(RecvTimeoutError::from(RecvError).to_string()),
+        _ => None,
+    }
 }
 
 /// crossbeam's `Receiver::try_recv` (crossbeam-channel 0.5.17
@@ -156,4 +191,49 @@ pub fn handler_recv(ruby: &Ruby) -> Result<RArray, Error> {
 pub fn handler_close() {
     HANDLER_OPEN.store(false, Ordering::Release);
     HANDLER.1.try_iter().for_each(drop);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{converted_text, error_text};
+
+    #[test]
+    fn each_receive_error_has_crossbeams_display_text() {
+        let texts = [
+            (
+                "RecvError",
+                "receiving on an empty and disconnected channel",
+            ),
+            ("TryRecvError::Empty", "receiving on an empty channel"),
+            (
+                "TryRecvError::Disconnected",
+                "receiving on an empty and disconnected channel",
+            ),
+            (
+                "RecvTimeoutError::Timeout",
+                "timed out waiting on receive operation",
+            ),
+            (
+                "RecvTimeoutError::Disconnected",
+                "channel is empty and disconnected",
+            ),
+        ];
+        for (path, text) in texts {
+            assert_eq!(error_text(path).as_deref(), Some(text));
+        }
+        assert_eq!(error_text("Nope"), None);
+    }
+
+    #[test]
+    fn a_recv_error_converts_to_a_disconnected_with_crossbeams_text() {
+        assert_eq!(
+            converted_text("try_recv").as_deref(),
+            Some("receiving on an empty and disconnected channel")
+        );
+        assert_eq!(
+            converted_text("recv_timeout").as_deref(),
+            Some("channel is empty and disconnected")
+        );
+        assert_eq!(converted_text("recv"), None);
+    }
 }

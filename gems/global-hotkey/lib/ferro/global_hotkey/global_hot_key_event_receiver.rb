@@ -34,7 +34,8 @@ module Ferro
     # returning.
     #
     # Every receiver reads the one channel, so a copy (+dup+, +clone+) is
-    # the same receiver, and a receiver can be shared with other Ractors.
+    # the same receiver, frozen like it, and a receiver can be shared with
+    # other Ractors.
     # Its sender never closes, so the +Disconnected+ errors below cannot
     # happen; they exist because crossbeam's error types have them.
     #
@@ -66,6 +67,18 @@ module Ferro
         freeze
       end
 
+      # A frozen copy, which is Ractor-shareable as the receiver is.
+      # Mirrors crossbeam's <tt>Receiver::clone</tt>
+      # (<tt>src/channel.rs:1174-1187</tt>), which makes another receiver
+      # of the same channel; Object#dup would make an unfrozen one.
+      #
+      # === Example
+      #
+      #   Ractor.shareable?(receiver.dup) # => true
+      def dup
+        self.class.__send__(:new)
+      end
+
       # crossbeam's error for a read that did not wait and found nothing.
       #
       # === Example
@@ -73,12 +86,65 @@ module Ferro
       #   rescue Ferro::GlobalHotkey::GlobalHotKeyEventReceiver::TryRecvError => e
       #     e.message # => "receiving on an empty channel"
       class TryRecvError < StandardError
+        class << self
+          # Converts a RecvError, as Rust's <tt>From<RecvError></tt> does:
+          # returns (does not raise) a Disconnected with crossbeam's text
+          # for it. Mirrors crossbeam-channel 0.5.17
+          # <tt>src/err.rs:301-307</tt>.
+          #
+          # [error] RecvError.
+          #
+          # === Example
+          #
+          #   TryRecvError.from(RecvError.new).is_disconnected # => true
+          def from(error)
+            unless error.is_a?(RecvError)
+              raise TypeError, "wrong argument type #{error.class} (expected #{RecvError})"
+            end
+
+            Disconnected.new(Native.recv_error_into("try_recv"))
+          end
+        end
+
+        # Whether the read failed because the channel is empty. Mirrors
+        # <tt>TryRecvError::is_empty</tt> (crossbeam-channel 0.5.17
+        # <tt>src/err.rs:309-325</tt>).
+        #
+        # === Example
+        #
+        #   error.is_empty # => true
+        def is_empty
+          is_a?(Empty)
+        end
+
+        # Whether the read failed because the channel is disconnected.
+        # Mirrors <tt>TryRecvError::is_disconnected</tt>.
+        #
+        # === Example
+        #
+        #   error.is_disconnected # => false
+        def is_disconnected
+          is_a?(Disconnected)
+        end
+
         # The channel is empty. Mirrors <tt>TryRecvError::Empty</tt>.
+        # Without a message, its message is crossbeam's.
         #
         # === Example
         #
         #   rescue Ferro::GlobalHotkey::GlobalHotKeyEventReceiver::TryRecvError::Empty
         class Empty < TryRecvError
+          # Creates the error. Without a +message+, or with +nil+, the
+          # message is crossbeam's: "receiving on an empty channel".
+          #
+          # [message] String, the error message.
+          #
+          # === Example
+          #
+          #   TryRecvError::Empty.new.message # => "receiving on an empty channel"
+          def initialize(message = nil)
+            super(message || Native.receive_error_text("TryRecvError::Empty"))
+          end
         end
 
         # The channel is empty and disconnected, which cannot happen to
@@ -88,6 +154,18 @@ module Ferro
         #
         #   rescue Ferro::GlobalHotkey::GlobalHotKeyEventReceiver::TryRecvError::Disconnected
         class Disconnected < TryRecvError
+          # Creates the error. Without a +message+, or with +nil+, the
+          # message is crossbeam's: "receiving on an empty and
+          # disconnected channel".
+          #
+          # [message] String, the error message.
+          #
+          # === Example
+          #
+          #   TryRecvError::Disconnected.new.is_disconnected # => true
+          def initialize(message = nil)
+            super(message || Native.receive_error_text("TryRecvError::Disconnected"))
+          end
         end
       end
 
@@ -99,6 +177,18 @@ module Ferro
       #
       #   rescue Ferro::GlobalHotkey::GlobalHotKeyEventReceiver::RecvError
       class RecvError < StandardError
+        # Creates the error. Without a +message+, or with +nil+, the
+        # message is crossbeam's: "receiving on an empty and disconnected
+        # channel".
+        #
+        # [message] String, the error message.
+        #
+        # === Example
+        #
+        #   RecvError.new.message # => "receiving on an empty and disconnected channel"
+        def initialize(message = nil)
+          super(message || Native.receive_error_text("RecvError"))
+        end
       end
 
       # crossbeam's error for a wait with a limit that ended without an
@@ -109,12 +199,66 @@ module Ferro
       #   rescue Ferro::GlobalHotkey::GlobalHotKeyEventReceiver::RecvTimeoutError => e
       #     e.message # => "timed out waiting on receive operation"
       class RecvTimeoutError < StandardError
+        class << self
+          # Converts a RecvError, as Rust's <tt>From<RecvError></tt> does:
+          # returns (does not raise) a Disconnected with crossbeam's text
+          # for it. Mirrors crossbeam-channel 0.5.17
+          # <tt>src/err.rs:338-344</tt>.
+          #
+          # [error] RecvError.
+          #
+          # === Example
+          #
+          #   RecvTimeoutError.from(RecvError.new).is_disconnected # => true
+          def from(error)
+            unless error.is_a?(RecvError)
+              raise TypeError, "wrong argument type #{error.class} (expected #{RecvError})"
+            end
+
+            Disconnected.new(Native.recv_error_into("recv_timeout"))
+          end
+        end
+
+        # Whether the wait timed out. Mirrors
+        # <tt>RecvTimeoutError::is_timeout</tt> (crossbeam-channel 0.5.17
+        # <tt>src/err.rs:346-362</tt>).
+        #
+        # === Example
+        #
+        #   error.is_timeout # => true
+        def is_timeout
+          is_a?(Timeout)
+        end
+
+        # Whether the wait failed because the channel is disconnected.
+        # Mirrors <tt>RecvTimeoutError::is_disconnected</tt>.
+        #
+        # === Example
+        #
+        #   error.is_disconnected # => false
+        def is_disconnected
+          is_a?(Disconnected)
+        end
+
         # No event came in time. Mirrors <tt>RecvTimeoutError::Timeout</tt>.
+        # Without a message, its message is crossbeam's.
         #
         # === Example
         #
         #   rescue Ferro::GlobalHotkey::GlobalHotKeyEventReceiver::RecvTimeoutError::Timeout
         class Timeout < RecvTimeoutError
+          # Creates the error. Without a +message+, or with +nil+, the
+          # message is crossbeam's: "timed out waiting on receive
+          # operation".
+          #
+          # [message] String, the error message.
+          #
+          # === Example
+          #
+          #   RecvTimeoutError::Timeout.new.message # => "timed out waiting on receive operation"
+          def initialize(message = nil)
+            super(message || Native.receive_error_text("RecvTimeoutError::Timeout"))
+          end
         end
 
         # The channel is empty and disconnected, which cannot happen to
@@ -124,6 +268,17 @@ module Ferro
         #
         #   rescue Ferro::GlobalHotkey::GlobalHotKeyEventReceiver::RecvTimeoutError::Disconnected
         class Disconnected < RecvTimeoutError
+          # Creates the error. Without a +message+, or with +nil+, the
+          # message is crossbeam's: "channel is empty and disconnected".
+          #
+          # [message] String, the error message.
+          #
+          # === Example
+          #
+          #   RecvTimeoutError::Disconnected.new.message # => "channel is empty and disconnected"
+          def initialize(message = nil)
+            super(message || Native.receive_error_text("RecvTimeoutError::Disconnected"))
+          end
         end
       end
 
@@ -174,7 +329,11 @@ module Ferro
       #   receiver.iter.each { |event| p event }
       def iter
         Enumerator.new do |events|
-          loop { events << recv }
+          # Kernel#loop would rescue a StopIteration the consumer's block
+          # raises and end the enumeration silently.
+          while true
+            events << recv
+          end
         end
       end
 
@@ -187,10 +346,14 @@ module Ferro
       #   receiver.try_iter.to_a
       def try_iter
         Enumerator.new do |events|
-          loop do
-            events << try_recv
-          rescue TryRecvError
-            break
+          # Kernel#loop would rescue a StopIteration the consumer's block
+          # raises and end the enumeration silently.
+          while true
+            begin
+              events << try_recv
+            rescue TryRecvError
+              break
+            end
           end
         end
       end

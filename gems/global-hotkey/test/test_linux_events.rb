@@ -146,4 +146,18 @@ class TestLinuxEvents < Minitest::Test
     assert_equal ["nil", 0], [status, leftover]
     assert_includes errors, "handler failed"
   end
+
+  # Kernel#loop would rescue a StopIteration and end the thread quietly.
+  def test_a_handler_that_raises_stop_iteration_ends_with_a_report
+    status, errors = run_child(<<~RUBY)
+      G::GlobalHotKeyEvent.set_event_handler { |_| raise StopIteration, "handler stopped" }
+      thread = G::GlobalHotKeyEvent.instance_variable_get(:@handler_thread)
+      press
+      thread.join(10) rescue nil
+      thread.status.inspect
+    RUBY
+
+    assert_equal "nil", status
+    assert_includes errors, "handler stopped"
+  end
 end

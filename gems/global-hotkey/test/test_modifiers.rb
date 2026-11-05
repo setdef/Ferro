@@ -23,6 +23,38 @@ class TestModifiers < Minitest::Test
     assert_equal native.sum { |_, bits| bits }, Mods.all.bits
   end
 
+  # Modifiers::FLAGS is bitflags' Flags::FLAGS: the flag table itself.
+  def test_flags_is_bitflags_flag_table
+    native = GlobalHotkey.const_get(:Native).modifier_flags
+
+    assert_equal native, Mods::FLAGS.map { |flag| [flag.name, flag.value.bits] }
+    assert_instance_of Mods::Flag, Mods::FLAGS.first
+    assert(Mods::FLAGS.all? { |flag| flag.is_a?(Mods::Flag) && flag.value.is_a?(Mods) })
+    assert(Mods::FLAGS.all?(&:is_named))
+    assert(Mods::FLAGS.none?(&:is_unnamed))
+    assert(Ractor.shareable?(Mods::FLAGS))
+    assert_predicate Mods::FLAGS, :frozen?
+  end
+
+  def test_an_unnamed_flag_has_an_empty_name
+    flag = Mods::Flag.new("", Mods::SHIFT)
+
+    assert_predicate flag, :is_unnamed
+    refute_predicate flag, :is_named
+  end
+
+  def test_known_and_unknown_bits
+    mixed = Mods.from_bits_retain(0x1_0000 | 0x200)
+
+    assert_equal 0x200, mixed.known_bits
+    assert_equal 0x1_0000, mixed.unknown_bits
+    assert_predicate mixed, :contains_unknown_bits
+    refute_predicate Mods::SHIFT, :contains_unknown_bits
+    assert_equal 0, Mods::SHIFT.unknown_bits
+    assert_equal 0x8000_0000, Mods.from_bits_retain(0x8000_0000).unknown_bits
+    assert_equal Mods.all, Mods.all_named
+  end
+
   def test_hyper_and_super_are_deprecated
     assert_output(nil, /SUPER is deprecated/) do
       deprecated = Warning[:deprecated]

@@ -70,6 +70,36 @@ module Ferro
           freeze
         end
 
+        # A defined flag, named or unnamed: bitflags' +Flag+ for
+        # Modifiers (bitflags 2.13.2 <tt>src/traits.rs:13-62</tt>), which
+        # is generic over the flags type. Modifiers::FLAGS lists them.
+        #
+        # === Example
+        #
+        #   flag = Ferro::GlobalHotkey::Hotkey::Modifiers::FLAGS.first
+        #   [flag.name, flag.is_named] # => ["ALT", true]
+        class Flag < Data.define(:name, :value)
+          # Whether the flag is named: its name is not empty. Mirrors
+          # <tt>Flag::is_named</tt>.
+          #
+          # === Example
+          #
+          #   Ferro::GlobalHotkey::Hotkey::Modifiers::FLAGS.first.is_named # => true
+          def is_named
+            !name.empty?
+          end
+
+          # Whether the flag is unnamed: its name is empty. Mirrors
+          # <tt>Flag::is_unnamed</tt>.
+          #
+          # === Example
+          #
+          #   Ferro::GlobalHotkey::Hotkey::Modifiers::FLAGS.first.is_unnamed # => false
+          def is_unnamed
+            name.empty?
+          end
+        end
+
         # An Alt key, or Option on a Mac.
         ALT = new(0x01)
 
@@ -113,27 +143,33 @@ module Ferro
         # Super. Deprecated: marked as legacy in the spec, use META instead.
         SUPER = new(0x2000)
 
-        # Every flag, by name, in declaration order, as bitflags lists them.
-        FLAGS = {
-          "ALT" => ALT,
-          "ALT_GRAPH" => ALT_GRAPH,
-          "CAPS_LOCK" => CAPS_LOCK,
-          "CONTROL" => CONTROL,
-          "FN" => FN,
-          "FN_LOCK" => FN_LOCK,
-          "META" => META,
-          "NUM_LOCK" => NUM_LOCK,
-          "SCROLL_LOCK" => SCROLL_LOCK,
-          "SHIFT" => SHIFT,
-          "SYMBOL" => SYMBOL,
-          "SYMBOL_LOCK" => SYMBOL_LOCK,
-          "HYPER" => HYPER,
-          "SUPER" => SUPER,
-        }.freeze
-        private_constant :FLAGS
+        # Every flag keyboard-types defines, in declaration order, as
+        # bitflags' <tt>Flags::FLAGS</tt> lists them
+        # (bitflags 2.13.2 <tt>src/traits.rs:134</tt>). All fourteen are
+        # named.
+        #
+        # === Example
+        #
+        #   Ferro::GlobalHotkey::Hotkey::Modifiers::FLAGS.first.name # => "ALT"
+        FLAGS = Ractor.make_shareable([
+          Flag.new("ALT", ALT),
+          Flag.new("ALT_GRAPH", ALT_GRAPH),
+          Flag.new("CAPS_LOCK", CAPS_LOCK),
+          Flag.new("CONTROL", CONTROL),
+          Flag.new("FN", FN),
+          Flag.new("FN_LOCK", FN_LOCK),
+          Flag.new("META", META),
+          Flag.new("NUM_LOCK", NUM_LOCK),
+          Flag.new("SCROLL_LOCK", SCROLL_LOCK),
+          Flag.new("SHIFT", SHIFT),
+          Flag.new("SYMBOL", SYMBOL),
+          Flag.new("SYMBOL_LOCK", SYMBOL_LOCK),
+          Flag.new("HYPER", HYPER),
+          Flag.new("SUPER", SUPER),
+        ])
 
         # Every known bit.
-        ALL_BITS = FLAGS.each_value.sum(&:bits)
+        ALL_BITS = FLAGS.sum { |flag| flag.value.bits }
         private_constant :ALL_BITS
 
         deprecate_constant :HYPER, :SUPER
@@ -155,6 +191,16 @@ module Ferro
           #   Ferro::GlobalHotkey::Hotkey::Modifiers.all.bits # => 16383
           def all
             new(ALL_BITS)
+          end
+
+          # Every named flag, which is every flag here. Mirrors bitflags'
+          # <tt>Flags::all_named</tt> (<tt>src/traits.rs:155-165</tt>).
+          #
+          # === Example
+          #
+          #   Ferro::GlobalHotkey::Hotkey::Modifiers.all_named == Ferro::GlobalHotkey::Hotkey::Modifiers.all # => true
+          def all_named
+            from_bits_retain(FLAGS.select(&:is_named).sum { |flag| flag.value.bits })
           end
 
           # No flags, keyboard-types' derived +Default+.
@@ -225,6 +271,36 @@ module Ferro
         #   Ferro::GlobalHotkey::Hotkey::Modifiers.all.is_all # => true
         def is_all
           @bits.allbits?(ALL_BITS)
+        end
+
+        # The bits set here that name a flag. Mirrors bitflags'
+        # <tt>Flags::known_bits</tt> (<tt>src/traits.rs:167-170</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::GlobalHotkey::Hotkey::Modifiers.from_bits_retain(0x10200).known_bits # => 512
+        def known_bits
+          @bits & ALL_BITS
+        end
+
+        # The bits set here that name no flag. Mirrors bitflags'
+        # <tt>Flags::unknown_bits</tt> (<tt>src/traits.rs:172-175</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::GlobalHotkey::Hotkey::Modifiers.from_bits_retain(0x10200).unknown_bits # => 65536
+        def unknown_bits
+          @bits & ~ALL_BITS & 0xFFFF_FFFF
+        end
+
+        # Whether any bit is set that names no flag. Mirrors bitflags'
+        # <tt>Flags::contains_unknown_bits</tt> (<tt>src/traits.rs:177-180</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::GlobalHotkey::Hotkey::Modifiers.from_bits_retain(0x10000).contains_unknown_bits # => true
+        def contains_unknown_bits
+          !unknown_bits.zero?
         end
 
         # Whether every flag in +other+ is set here. Mirrors bitflags'
@@ -428,11 +504,12 @@ module Ferro
         private def names_and_remaining
           remaining = @bits
           # @type var named: Array[[String, Modifiers]]
-          named = FLAGS.filter_map do |name, flag|
-            next unless @bits.allbits?(flag.bits) && remaining.anybits?(flag.bits)
+          named = FLAGS.filter_map do |flag|
+            bits = flag.value.bits
+            next unless @bits.allbits?(bits) && remaining.anybits?(bits)
 
-            remaining &= ~flag.bits
-            [name, flag]
+            remaining &= ~bits
+            [flag.name, flag.value]
           end
           [named, remaining]
         end

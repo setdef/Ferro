@@ -140,7 +140,11 @@ module Ferro
         private def start_handler(handler)
           Thread.new do
             Thread.current.name = "ferro-global-hotkey handler"
-            loop { handler.call(GlobalHotkey.__send__(:event, GlobalHotkey.__send__(:settle, Native.handler_recv))) }
+            # Kernel#loop would rescue a StopIteration the handler raises
+            # and end the thread silently, with nothing reported.
+            while true
+              handler.call(GlobalHotkey.__send__(:event, GlobalHotkey.__send__(:settle, Native.handler_recv)))
+            end
           ensure
             Native.handler_close
           end

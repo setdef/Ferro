@@ -8,7 +8,7 @@
 //! live on `Ferro::GlobalHotkey::Native`, a private module, beside
 //! `Native::Manager`, which owns global-hotkey's manager. A hotkey crosses
 //! as its three public fields (`hotkey.rs`), and a call that can fail
-//! returns `[:ok, value]` or `[:error, path, message, hotkey]` for the Ruby
+//! returns `[:ok, value]` or `[:error, path, message, hotkey, os_error]` for the Ruby
 //! side to raise (`error.rs`).
 //!
 //! Two rules hold for every function:
@@ -130,6 +130,11 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
 
     native.define_singleton_method("receiver_try_recv", function!(events::receiver_try_recv, 0))?;
     native.define_singleton_method("receiver_recv", function!(events::receiver_recv, 1))?;
+    native.define_singleton_method(
+        "receive_error_text",
+        function!(events::receive_error_text, 1),
+    )?;
+    native.define_singleton_method("recv_error_into", function!(events::recv_error_into, 1))?;
     native.define_singleton_method("receiver_len", function!(events::receiver_len, 0))?;
     native.define_singleton_method("receiver_is_empty", function!(events::receiver_is_empty, 0))?;
     native.define_singleton_method("receiver_is_full", function!(events::receiver_is_full, 0))?;

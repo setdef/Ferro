@@ -112,6 +112,102 @@ class TestReceiver < Minitest::Test
     assert_instance_of Enumerator, receiver.iter
   end
 
+  # crossbeam's Receiver is Clone (channel.rs:1174-1187): a copy reads the
+  # same channel, and here it is as frozen and shareable as the receiver.
+  def test_a_cloned_receiver_reads_the_same_channel
+    copy = receiver.clone
+
+    assert_predicate copy, :frozen?
+    assert Ractor.shareable?(copy)
+    assert receiver.same_channel(copy)
+    assert_raises(Receiver::TryRecvError::Empty) { copy.try_recv }
+  end
+
+  def test_a_duplicated_receiver_is_frozen_and_shareable
+    copy = receiver.dup
+
+    refute_same receiver, copy
+    assert_predicate copy, :frozen?
+    assert Ractor.shareable?(copy)
+    assert receiver.same_channel(copy)
+    assert_raises(Receiver::TryRecvError::Empty) { copy.try_recv }
+  end
+
+  def test_try_recv_error_predicates
+    empty = assert_raises(Receiver::TryRecvError::Empty) { receiver.try_recv }
+
+    assert_predicate empty, :is_empty
+    refute_predicate empty, :is_disconnected
+    disconnected = Receiver::TryRecvError.from(Receiver::RecvError.new)
+    assert_predicate disconnected, :is_disconnected
+    refute_predicate disconnected, :is_empty
+  end
+
+  def test_recv_timeout_error_predicates
+    timeout = assert_raises(Receiver::RecvTimeoutError::Timeout) { receiver.recv_timeout(0) }
+
+    assert_predicate timeout, :is_timeout
+    refute_predicate timeout, :is_disconnected
+    disconnected = Receiver::RecvTimeoutError.from(Receiver::RecvError.new)
+    assert_predicate disconnected, :is_disconnected
+    refute_predicate disconnected, :is_timeout
+  end
+
+  # From<RecvError> (err.rs:301-307, :338-344) makes a Disconnected with
+  # the Display text of the converted value.
+  def test_a_recv_error_converts_to_a_disconnected
+    try = Receiver::TryRecvError.from(Receiver::RecvError.new)
+    timed = Receiver::RecvTimeoutError.from(Receiver::RecvError.new)
+
+    assert_instance_of Receiver::TryRecvError::Disconnected, try
+    assert_equal "receiving on an empty and disconnected channel", try.message
+    assert_instance_of Receiver::RecvTimeoutError::Disconnected, timed
+    assert_equal "channel is empty and disconnected", timed.message
+    assert_raises(TypeError) { Receiver::TryRecvError.from(Receiver::TryRecvError::Empty.new) }
+    error = assert_raises(TypeError) { Receiver::RecvTimeoutError.from("x") }
+    assert_equal "wrong argument type String (expected #{Receiver::RecvError})", error.message
+  end
+
+  # An error built with new has crossbeam's Display text (err.rs:282-333).
+  def test_errors_built_with_new_have_crossbeams_text
+    {
+      Receiver::RecvError => "receiving on an empty and disconnected channel",
+      Receiver::TryRecvError::Empty => "receiving on an empty channel",
+      Receiver::TryRecvError::Disconnected => "receiving on an empty and disconnected channel",
+      Receiver::RecvTimeoutError::Timeout => "timed out waiting on receive operation",
+      Receiver::RecvTimeoutError::Disconnected => "channel is empty and disconnected",
+    }.each do |error_class, text|
+      assert_equal text, error_class.new.message
+      assert_equal text, error_class.new(nil).message
+      assert_equal "mine", error_class.new("mine").message
+      assert_equal text, assert_raises(error_class) { raise error_class }.message
+    end
+  end
+
+  # Kernel#loop rescues StopIteration; a block that raises it must
+  # propagate it like any exception.
+  def test_a_stop_iteration_from_an_iter_block_propagates
+    subclass = Class.new(Receiver) do
+      def recv
+        :event
+      end
+    end
+
+    error = assert_raises(StopIteration) { subclass.__send__(:new).iter.each { raise StopIteration, "consumer stopped" } }
+    assert_equal "consumer stopped", error.message
+  end
+
+  def test_a_stop_iteration_from_a_try_iter_block_propagates
+    subclass = Class.new(Receiver) do
+      def try_recv
+        :event
+      end
+    end
+
+    error = assert_raises(StopIteration) { subclass.__send__(:new).try_iter.each { raise StopIteration, "consumer stopped" } }
+    assert_equal "consumer stopped", error.message
+  end
+
   def test_every_receiver_reads_the_one_channel
     one = receiver
 

@@ -53,6 +53,29 @@ module Ferro
       #   rescue Ferro::GlobalHotkey::Error::OsError => e
       #     warn e.message # => "Access is denied. (os error 5)"
       class OsError < Error
+        # The +io::Error+ the system call failed with, as a Ruby value: on
+        # Unix, the +SystemCallError+ (an +Errno+ class) of its OS error
+        # code; otherwise an +IOError+ with Rust's text. It is +nil+ for
+        # an error built without one. global-hotkey's variant is
+        # <tt>#[error(transparent)]</tt>, so the error has no cause.
+        #
+        # === Example
+        #
+        #   error.io_error.errno # => 13
+        attr_reader :io_error
+
+        # Creates the error.
+        #
+        # [message] String, the system's description.
+        # [io_error] SystemCallError or IOError, or +nil+.
+        #
+        # === Example
+        #
+        #   Ferro::GlobalHotkey::Error::OsError.new("Access is denied. (os error 5)", SystemCallError.new(nil, 5)).io_error
+        def initialize(message = nil, io_error = nil)
+          @io_error = io_error
+          super(message)
+        end
       end
 
       # A hotkey did not parse. global-hotkey 0.9.0 never raises it:

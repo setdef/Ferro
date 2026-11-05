@@ -5,6 +5,9 @@ module Ferro
   module GlobalHotkey
     class Error < StandardError
       class OsError < Error
+        attr_reader io_error: (SystemCallError | IOError)?
+
+        def initialize: (?String? message, ?(SystemCallError | IOError)? io_error) -> void
       end
 
       class HotKeyParseError < Error

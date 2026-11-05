@@ -69,20 +69,36 @@ module Ferro
     private_constant :PLATFORM, :Native
 
     # The value in +result+, a native <tt>[:ok, value]</tt>, or the
-    # exception a native <tt>[:error, path, message, hotkey]</tt> names,
-    # raised. +path+ is a class path under this module.
+    # exception a native <tt>[:error, path, message, hotkey, os_error]</tt>
+    # names, raised. +path+ is a class path under this module; +os_error+
+    # is +nil+ or the <tt>[code, text]</tt> of an +OsError+'s +io::Error+.
     def self.settle(result) # :nodoc:
       case result
       in [:ok, value]
         value
-      in [:error, String => path, String => message, parts]
+      in [:error, String => path, String => message, parts, os_error]
         error_class = path.split("::").reduce(self) { |namespace, name| namespace.const_get(name, false) }
         raise error_class.new(message, Hotkey::HotKey.__send__(:from_parts, parts)) if parts
+        raise error_class.new(message, io_error(*os_error)) if os_error
 
         raise error_class, message
       end
     end
     private_class_method :settle
+
+    # The Ruby value of an +io::Error+: on Unix, the +Errno+ class of its
+    # OS error code (a plain +SystemCallError+ for a code Ruby has no
+    # +Errno+ class for); otherwise, and for an error without a code,
+    # +IOError+ with Rust's text, as
+    # ferro-rfd and ferro-url do (plan 002, decision 10; plan 005,
+    # decision 11).
+    def self.io_error(code, text) # :nodoc:
+      # Ruby takes a nil message here; Steep's core signature does not.
+      return SystemCallError.new(nil, code) if code && PLATFORM != :windows # steep:ignore ArgumentTypeMismatch
+
+      IOError.new(text)
+    end
+    private_class_method :io_error
 
     # The parts of +hotkey+ the native layer rebuilds the Rust value from:
     # its modifiers' bits, its key's name, and its id. Anything but a

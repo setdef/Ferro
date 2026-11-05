@@ -51,6 +51,30 @@ class TestEvent < Minitest::Test
     assert_equal Event.new(id: 5, state: State::Released), GlobalHotkey.__send__(:event, [5, :Released])
   end
 
+  # Kernel#loop rescues StopIteration, which would end the handler's
+  # thread as if it had finished. The child feeds the thread events from
+  # a replacement for the native layer's read, so no key press is needed;
+  # the loop, the thread, and Ruby's report are the gem's own.
+  def test_a_handler_that_raises_stop_iteration_ends_its_thread_with_a_report
+    (status, raised), errors = in_child(<<~RUBY)
+      native = Ferro::GlobalHotkey.const_get(:Native)
+      native.define_singleton_method(:handler_recv) { [:ok, [1, :Pressed]] }
+      Ferro::GlobalHotkey::GlobalHotKeyEvent.set_event_handler { |_| raise StopIteration, "handler stopped" }
+      thread = Ferro::GlobalHotkey::GlobalHotKeyEvent.instance_variable_get(:@handler_thread)
+      thread.join(10) rescue nil
+      raised = begin
+        thread.value
+        nil
+      rescue StopIteration => e
+        e.message
+      end
+      [thread.status.inspect, raised]
+    RUBY
+
+    assert_equal ["nil", "handler stopped"], [status, raised]
+    assert_includes errors, "handler stopped"
+  end
+
   def test_set_event_handler_takes_a_handler_or_a_block_not_both
     assert_raises(ArgumentError) { Event.set_event_handler(proc {}) { nil } }
     assert_raises(TypeError) { Event.set_event_handler(42) }

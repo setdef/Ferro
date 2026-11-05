@@ -12,6 +12,22 @@ its own API. Releases are tagged `ferro-global-hotkey/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `TryRecvError#is_empty` and `#is_disconnected`; `RecvTimeoutError#is_timeout` and `#is_disconnected`.
+- `TryRecvError.from` and `RecvTimeoutError.from`, which convert a `RecvError` to a `Disconnected` with crossbeam's text.
+- `Error::OsError#io_error`, the `io::Error` as a `SystemCallError` on Unix and an `IOError` otherwise.
+- `Hotkey::Modifiers::FLAGS`, an Array of `Hotkey::Modifiers::Flag` (`name`, `value`, `is_named`, `is_unnamed`); `Modifiers#known_bits`, `#unknown_bits`, `#contains_unknown_bits`, and `Modifiers.all_named`.
+
+### Changed
+
+- `RecvError.new`, `TryRecvError::Empty.new`, `TryRecvError::Disconnected.new`, `RecvTimeoutError::Timeout.new`, and `RecvTimeoutError::Disconnected.new` carry crossbeam's text as their message, not the class name.
+
+### Fixed
+
+- `GlobalHotKeyEventReceiver#dup` returns a frozen, Ractor-shareable receiver, as documented.
+- A handler block or an `iter` or `try_iter` consumer block that raises `StopIteration` no longer ends delivery or iteration silently; the exception propagates like any other.
+
 ## [0.1.0.pre.1] - 2026-10-26
 
 ### Added
