@@ -105,12 +105,17 @@ module Ferro
       #
       # Mirrors time's <tt>error::ConversionRange</tt>
       # (<tt>src/error/conversion_range.rs</tt>). Its only sources are
-      # time's conversions with std's +Duration+, which this gem defers
-      # (plan 010, decision 16), so nothing raises it yet.
+      # time's conversions with std's +Duration+: SignedDuration.try_from
+      # raises it for seconds past a 64-bit signed integer, and
+      # SignedDuration#to_r for a negative duration, which no std
+      # +Duration+ holds (<tt>src/signed_duration.rs:1423-1455</tt>).
       #
       # === Example
       #
       #   Ferro::Time::Error::ConversionRange.new.message # => "Source value is out of range for the target type"
+      #
+      #   (-Ferro::Time::Duration::SECOND).to_r
+      #   # raises Ferro::Time::Error::ConversionRange: Source value is out of range for the target type
       class ConversionRange < Error
         # Creates the error, with time's message by default.
         #

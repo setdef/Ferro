@@ -17,12 +17,19 @@ the words an error uses. Getting those right by hand means porting a
 parser step for step and keeping the port current.
 
 ferro-time binds time (https://github.com/time-rs/time), Rust's date and
-time library, one to one. It keeps time's names and behavior and adds
-nothing of its own. Use it to parse a date the way a Rust program will,
-format one it will read back, or do calendar arithmetic with time's
-answers.
+time library, one to one. It keeps time's names and behavior. Where Rust
+has no Ruby meaning it translates, and it adds no class that time lacks:
+the refinements under Ferro::Time::Ext are time's extension traits, and
+the errors are time's error types as classes. Use it to parse a date the
+way a Rust program will, format one it will read back, or do calendar
+arithmetic with time's answers.
+
+ferro-time binds time 0.3.55. Its +time_version+ metadata names the time
+release; the gem's own version follows its own API.
 
 == Install
+
+Add the gem to your Gemfile, with a version, or let Bundler write the line:
 
 --
 SPDX-SnippetBegin
@@ -30,20 +37,30 @@ SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
 SPDX-License-Identifier: MIT-0
 ++
 
-  bundle add ferro-time
+  gem "ferro-time", "~> 0.1"
+
+  # or, from the command line:
+  bundle add ferro-time --version "~> 0.1"
 
 --
 SPDX-SnippetEnd
 ++
 
-The gem compiles a Rust extension when it installs, so the machine that
-installs it needs Rust and Cargo: Rust 1.88 or newer, and 1.99 or newer on
-macOS 27, where earlier toolchains strip the extension in a way the new
-loader rejects. The build runs <tt>cargo --locked</tt>, so it compiles
-exactly the dependency versions this gem was tested with. To build against
-newer ones anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will
-do); it replaces <tt>--locked</tt>. Building also needs libclang, which
-rb-sys loads through bindgen to read Ruby's headers.
+The gem needs Ruby 4.0 or newer. It compiles a Rust extension when it
+installs, so the machine that installs it needs:
+
+* Rust and Cargo, 1.88 or newer (the highest +rust-version+ among the
+  locked dependencies). On Windows, use Rust's +x86_64-pc-windows-gnu+
+  toolchain, since RubyInstaller's Ruby is a MinGW build and rb-sys
+  refuses to build it with the MSVC target.
+* libclang, which rb-sys's bindgen reads Ruby's headers with
+  (<tt>libclang-dev</tt> on Debian and Ubuntu, +clang+ with the Xcode
+  command line tools on macOS, LLVM on Windows).
+
+The build runs <tt>cargo --locked</tt>, so it compiles exactly the
+dependency versions this gem was tested with. To build against newer ones
+anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will do); it
+replaces <tt>--locked</tt>.
 
 == Use
 
@@ -65,14 +82,16 @@ SPDX-License-Identifier: MIT-0
   # Move it, and write it back:
   later = (at + t::Duration.hours(36)).to_offset(t::UtcOffset.from_hms(9, 0, 0))
   later.format(well_known::Rfc3339) # => "2026-10-28T09:00:00+09:00"
+  at.format(well_known::Rfc2822)    # => "Mon, 26 Oct 2026 12:00:00 +0000"
 
   # Describe your own format, checked once and used as often as you like:
   day = t::FormatDescription.parse_owned(3, "[weekday], [month repr:long] [day padding:none]")
   later.format(day) # => "Wednesday, October 28"
 
-  # time's errors, as classes:
-  t::Date.from_calendar_date(2026, t::Month::February, 29)
-  # raises Ferro::Time::Error::ComponentRange: day was not in range
+  # Walk the calendar:
+  first = t::Date.from_calendar_date(2026, t::Month::January, 1)
+  first.iter_to(t::Date.from_calendar_date(2026, t::Month::January, 4)).map(&:to_s)
+  # => ["2026-01-01", "2026-01-02", "2026-01-03", "2026-01-04"]
 
 --
 SPDX-SnippetEnd
@@ -81,7 +100,81 @@ SPDX-SnippetEnd
 Every error time raises is a Ferro::Time::Error, with a class for each of
 time's error types and variants nested as Rust nests them, so <tt>rescue
 Ferro::Time::Error::Parse</tt> catches any failed parse. Every message is
-time's own.
+time's own, and <tt>Error#source</tt> answers the error one holds, as
+time's does:
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  begin
+    t::Date.from_calendar_date(2026, t::Month::February, 29)
+  rescue t::Error::ComponentRange => e
+    e.message # => "day was not in range"
+  end
+
+  begin
+    t::Date.parse("2019-02-30", well_known::Iso8601::DATE)
+  rescue t::Error::Parse => e
+    e.source.class # => Ferro::Time::Error::TryFromParsed::ComponentRange
+  end
+
+--
+SPDX-SnippetEnd
+++
+
+=== Durations and Ruby's numbers
+
+A SignedDuration, also named Duration as in time, is time's
++SignedDuration+. Where time takes or returns std's unsigned duration,
+Ruby takes any Numeric number of seconds and returns a Rational. As in
+Rust, the operator picks the impl: <tt>*</tt>, and <tt>/</tt> by a
+number, take a count, while <tt>+</tt>, <tt>-</tt>, comparisons, and a
+number divided by a duration take seconds.
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  minute = t::Duration.minutes(1)
+  minute == 60                  # => true
+  (minute + 1.5).to_s           # => "1m1s500ms"
+  (minute * 3).to_s             # => "3m"
+  minute.to_r                   # => (60/1)
+  first + 86_400                # a day later: 2026-01-02
+  first + 1                     # unchanged: one second adds no whole day
+  minute / 0                    # raises RangeError: attempt to divide by zero
+
+--
+SPDX-SnippetEnd
+++
+
+time's extension traits are refinements, in effect only where you bring
+them in, as Rust's are only where you +use+ them. Put +using+ at the top
+of a file:
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  require "ferro/time"
+  using Ferro::Time::Ext::NumericalDuration
+  using Ferro::Time::Ext::NumericalStdDuration
+  using Ferro::Time::Ext::SystemTimeExt
+
+  (5.seconds + 500.milliseconds).to_s # => "5s500ms"
+  5.std_minutes                       # => (300/1)
+  ::Time.utc(2026, 1, 1).checked_add_signed(2.hours) # => 2026-01-01 02:00:00 UTC
+
+--
+SPDX-SnippetEnd
+++
 
 == Ferro::Time, Ruby's Time, and Ruby's Date
 
@@ -94,13 +187,14 @@ lexically first. Code in the Ferro namespace writes <tt>::Time</tt> and
 
 OffsetDateTime, UtcDateTime, and Timestamp convert to and from Ruby's
 ::Time, which stands for Rust's +SystemTime+: OffsetDateTime.from(time),
-#to_time (a UTC ::Time), and <tt>==</tt>, <tt><=></tt>, and <tt>-</tt> with a ::Time on the
-right, as time's +SystemTime+ impls do. Ruby's own ::Time is not
-changed; its <tt><=></tt> already asks the other value when that value is
-not a ::Time, so <tt>time == offset_date_time</tt> and
-<tt>time < offset_date_time</tt> work as well, while <tt>time - offset_date_time</tt>
-stays Ruby's +TypeError+. Timestamp converts to and from UtcDateTime and
-OffsetDateTime as well, and compares and subtracts with both. Nothing converts to or from Ruby's ::Date,
+#to_time (a UTC ::Time), and <tt>==</tt>, <tt><=></tt>, and <tt>-</tt>
+with a ::Time on the right, as time's +SystemTime+ impls do. Ruby's own
+::Time is not changed; its <tt><=></tt> already asks the other value
+when that value is not a ::Time, so <tt>time == offset_date_time</tt> and
+<tt>time < offset_date_time</tt> work as well, while
+<tt>time - offset_date_time</tt> stays Ruby's +TypeError+. Timestamp
+converts to and from UtcDateTime and OffsetDateTime as well, and compares
+and subtracts with both. Nothing converts to or from Ruby's ::Date,
 because time has no conversion for it.
 
 == How it maps time
@@ -115,32 +209,24 @@ The API is time's, translated where Rust has no Ruby meaning:
   are frozen constants.
 * Every value is frozen and immutable, as Rust's +Copy+ values are, and
   compares, orders, and hashes as time's +PartialEq+, +Ord+, and +Hash+ do.
-  +debug+ answers time's +Debug+ text, formatted by Rust; +inspect+ is
-  Ruby's own.
+  +debug+ answers time's +Debug+ text, formatted by Rust, on every value
+  but the errors (see below); +inspect+ is Ruby's own.
 * Rust's operators are Ruby's: <tt>date + duration</tt>,
   <tt>datetime - other</tt>, <tt>duration * 3</tt>, <tt>-offset</tt>.
-  Multiplying uses time's <tt>i32</tt> impl, Rust's type for an integer
-  literal, from either side: <tt>2 * duration</tt> reaches time's
+  Multiplying by an Integer uses time's <tt>i32</tt> impl, Rust's type
+  for an integer literal, and by a Float its <tt>f64</tt> one, from either
+  side: <tt>2 * duration</tt> reaches time's
   reflexive impl through SignedDuration#coerce.
-* Where time takes or returns Rust's unsigned <tt>std::time::Duration</tt>,
-  the gem takes any Numeric number of seconds and returns a Rational, exact
-  to the nanosecond: <tt>date + 86_400</tt>, <tt>duration + 1.5</tt>,
-  <tt>2 - duration</tt>, <tt>duration == 60</tt>,
-  <tt>SignedDuration.try_from(1.5)</tt>, <tt>duration.to_r</tt>,
-  <tt>duration.unsigned_abs</tt>. As in Rust, the operator picks the impl:
-  <tt>*</tt> and <tt>/</tt> by a number take a count, while <tt>+</tt>,
-  <tt>-</tt>, and the comparisons take seconds, so <tt>date + 1</tt> adds
-  the whole days of one second, none, where Ruby's ::Date adds a day.
-* time's extension traits are refinements, in effect only where you bring
-  them in, as Rust's are only where you +use+ them:
-
-    using Ferro::Time::Ext::NumericalDuration
-    5.seconds + 500.milliseconds # => a SignedDuration of 5.5 s
-
-  Ext::NumericalStdDuration answers Rationals (<tt>5.std_minutes</tt>),
-  and Ext::SystemTimeExt adds <tt>checked_add_signed</tt>,
-  <tt>checked_sub_signed</tt>, and <tt>signed_duration_since</tt> to
-  Ruby's ::Time.
+* Rust's <tt>std::time::Duration</tt> is Numeric seconds in and a Rational
+  out, exact to the nanosecond (see Durations above): <tt>date + 86_400</tt>,
+  <tt>2 - duration</tt>, <tt>SignedDuration.try_from(1.5)</tt>,
+  <tt>duration.unsigned_abs</tt>. The collision with Ruby is yours to
+  mind: <tt>date + 1</tt> adds the whole days of one second, none, where
+  Ruby's ::Date adds a day.
+* The extension traits are Ext::NumericalDuration (Integer and Float),
+  Ext::NumericalStdDuration (answering Rationals), and Ext::SystemTimeExt,
+  which adds <tt>checked_add_signed</tt>, <tt>checked_sub_signed</tt>, and
+  <tt>signed_duration_since</tt> to Ruby's ::Time.
 * A description is a FormatDescriptionV3, the classes Rfc2822 and
   Rfc3339, an Iso8601 with any Config, or format items: a
   BorrowedFormatItem, an OwnedFormatItem, or an Array of either, as
@@ -193,8 +279,10 @@ What differs from calling time from Rust:
 * time panics on arithmetic that leaves its range, on a NaN or
   overflowing float, and on integer division by zero. The gem checks the
   same conditions first and raises +RangeError+ with the panic's message
-  instead. Any other panic raises Ferro::Time::Error
-  with <tt>time panicked: ...</tt> rather than ending your Ruby process.
+  instead (<tt>duration / 0</tt> is "attempt to divide by zero"), or
+  +ArgumentError+ for a failed assertion, such as a negative Float's
+  +std_seconds+. Any other panic raises Ferro::Time::Error with
+  <tt>time panicked: ...</tt> rather than ending your Ruby process.
 * Formatting a type with a well-known format that needs more than the type
   holds, such as RFC 3339 for a Date, is a compile-time error in Rust. The
   gem raises +TypeError+ with time's assertion.
@@ -208,38 +296,80 @@ What differs from calling time from Rust:
   with time's formatters and joining them as time does; a test checks the
   result against time's own formatter.
 
-Not bound: <tt>Div<std::time::Duration> for SignedDuration</tt>, since
-<tt>/</tt> by a number is a count (its value is
-<tt>duration / SignedDuration.try_from(seconds)</tt>); +InstantExt+, since
-no Ruby class stands for std's +Instant+; and time's hidden items.
-SignedDuration#to_s takes Rust's precision, <tt>duration.to_s(3)</tt> for
-<tt>{:.3}</tt>, but not its width or fill. time's +macros+ feature is built
-and adds no Ruby API; its +serde+ features are not built, as they serve
-only Rust.
+Not bound, or bound differently, each for a reason:
+
+* <tt>Div<std::time::Duration> for SignedDuration</tt> has no operator,
+  since <tt>/</tt> by a number is a count; its value is
+  <tt>duration / SignedDuration.try_from(seconds)</tt>.
+* The <tt>*Assign</tt> operators are Ruby's <tt>+=</tt> and <tt>-=</tt>,
+  an operator and an assignment, so <tt>x += duration</tt> leaves a
+  SignedDuration in +x+ where Rust's <tt>AddAssign<SignedDuration> for
+  std::time::Duration</tt> keeps std's type.
+* +InstantExt+, since no Ruby class stands for std's +Instant+.
+* time's hidden items.
+* Rust's trait machinery that has no Ruby meaning, such as the width and
+  fill of <tt>{:>8}</tt>: SignedDuration#to_s takes Rust's precision,
+  <tt>duration.to_s(3)</tt> for <tt>{:.3}</tt>, and nothing else.
+
+Four rulings of ADR 001 are not applied to ferro-time yet, so it differs
+from the Rust API's shape in these ways (plan 007's follow-up has the
+reasons):
+
+* The errors do not answer +debug+. time's error types derive +Debug+
+  with fields the Ruby classes do not keep, such as a ComponentRange's
+  minimum, maximum, and value.
+* time's iterators are consumed by <tt>rev</tt>, <tt>count</tt>,
+  <tt>last</tt>, and <tt>is_sorted</tt> in Rust. Here each runs on a copy
+  and leaves the iterator usable, where a consumed one should raise
+  +IOError+.
+* time's deprecated items are bound, and warn in Ruby's +:deprecated+
+  category: <tt>FormatDescription.parse</tt>,
+  <tt>Util.days_in_year_month</tt>, <tt>Convert</tt>, <tt>FormatItem</tt>,
+  six deprecated +Component+ variants, the
+  deprecated +Literal+ items, and the deprecated modifier enums. Tauri
+  uses none of them, so a later release removes them.
+* The format items and components that are tuple variants in Rust, such
+  as BorrowedFormatItem, OwnedFormatItem, and +Component+, are +Data+
+  classes with named readers (+literal+, +component+, +compound+, +item+,
+  +items+, and each component's modifier) that time does not name, where a
+  later release makes them positional. The error variants that are tuple
+  variants in Rust, such as Error::Format::InvalidComponent, are
+  positional already: they answer +deconstruct+ and +to_a+.
 
 time's +large-dates+ feature is off, as Tauri and its plugins build time,
-so years run from -9999 to 9999. The +rand+, +quickcheck+, and
+so years run from -9999 to 9999. The +serde+, +rand+, +quickcheck+, and
 +wasm-bindgen+ features are off: they serve Rust callers only.
 
 The local offset (UtcOffset.current_local_offset,
 OffsetDateTime.now_local) comes from the system's time-zone rules and is
 safe in a multi-threaded process, as time guarantees. Util.refresh_tz
 refreshes those rules only where time can prove the call sound: on macOS
-it runs, and on Linux, where a Ruby process is never single-threaded, it
-returns +nil+. On Windows, where time has nothing to refresh, it returns
-+true+ and does nothing.
+it runs and returns +true+, and on Linux, where a Ruby process is never
+single-threaded, it returns +nil+. On Windows, where time has nothing to
+refresh, it returns +true+ and does nothing.
 
-The extension is Ractor-safe, and every value the gem makes is frozen and
-shareable, but for Parsing::Parsed and the iterators of Iter, which are
-mutable and stay in the Ractor that made them. On Windows, Ruby 4.0.9 can hang when a Ractor starts a garbage
-collection while the main Ractor has another thread asleep; the bug is
-Ruby's (ferro-arboard's README says more).
+The extension is Ractor-safe, and every value of time's types the gem
+makes is frozen and shareable, but for Parsing::Parsed and the iterators
+of Iter, which are mutable and stay in the Ractor that made them. The
+errors it raises and the Arrays it returns, such as a version 1
+description from FormatDescription.parse_borrowed, are not frozen, as
+Ruby leaves exceptions and Arrays. One caveat belongs to Ruby, not to the
+gem: on Windows, Ruby 4.0.9's scheduler can hang when a Ractor starts a
+garbage collection while the main Ractor has another thread asleep (in
++sleep+ or Queue#pop) and its main thread waits in Ractor#value. It
+happens without ferro-time, and Ruby 4.1 replaces the Windows scheduler
+involved. ferro-arboard's README says more.
 
-ferro-time binds time 0.3.55. The gem's version follows its
-own API; its +time_version+ metadata names the time release.
+== Links
+
+* Source: https://github.com/setdef/Ferro/tree/trunk/gems/time
+* Changelog: https://github.com/setdef/Ferro/blob/trunk/gems/time/CHANGELOG.md
+* The translation rules every Ferro gem follows (ADR 001):
+  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/adr/001.md
+* time: https://github.com/time-rs/time
 
 == License
 
 ferro-time's code is MIT OR Apache-2.0, as time's is. This README is
-CC-BY-SA-4.0, and its code examples are MIT-0, so paste them freely. The
-lockfile is CC0-1.0. The license texts are in LICENSES/.
+CC-BY-SA-4.0. Its code examples are the gem's own, and MIT-0, so paste
+them freely. The lockfile is CC0-1.0. The license texts are in LICENSES/.
