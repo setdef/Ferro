@@ -26,7 +26,12 @@ require_relative "gem_version"
 # only on a clean trunk. That workflow also cuts a release branch for each
 # minor version from 1.0 on; Ferro has no gem near 1.0 and no branch
 # policy for a repository of many gems yet, so a bump to a stable 1.0 or
-# later is refused until it does (plan 001).
+# later is refused until it does (plan 001). Every version before 1.0.0
+# carries a prerelease label, so a 0.x version without one is refused too.
+#
+# Versions are written as SemVer, <tt>1.0.0-beta.1</tt>, in version.rb, the
+# CHANGELOG, and the tag; Gemfile.lock holds RubyGems' form,
+# <tt>1.0.0.pre.beta.1</tt> (GemVersion).
 class Bump
   # Raised when the bump must not proceed; the message says why.
   class Failure < StandardError; end
@@ -70,9 +75,11 @@ class Bump
 
   # Releases the version the gem has now, without moving it.
   #
-  # A new gem starts at <tt>0.1.0.pre.1</tt> with its changes under
-  # Unreleased. #run! only moves forward, so without this the first release
-  # would skip to <tt>0.1.0.pre.2</tt>, as ferro-arboard's and ferro-rfd's
+  # A new gem starts at <tt>0.1.0-pre.1</tt> with its changes under
+  # Unreleased (a gem already on dotted <tt>0.1.0.pre.N</tt> stays dotted
+  # for that release with <tt>exact[0.1.0.pre.N+1]</tt>, or moves to a later
+  # release in SemVer form; that choice is the maintainer's). #run! only moves forward, so without this the first release
+  # would skip to <tt>0.1.0-pre.2</tt>, as ferro-arboard's and ferro-rfd's
   # did. Releasing the current version is safe only while nobody has it,
   # so this refuses when the gem's tag exists here or on origin (asking
   # origin, so a missing remote is a failure, not a pass), when the
@@ -161,9 +168,13 @@ class Bump
   end
 
   # Refuses a +target+ that does not follow +from+ (+nil+ when the version
-  # stays), or a stable one.
+  # stays), a 0.x one without a prerelease label, or a stable one.
   private def check_target!(from, target)
     raise Failure, "#{target} does not come after #{from}" if from && !(target > from)
+    if target.unlabelled_zero?
+      raise Failure, "#{target} is a 0.x version without a prerelease label. RubyGems treats it as stable, which SemVer " \
+        "does not (plan 011, Versioning). Give it a label, like patch[pre] or exact[#{target}-pre.1]"
+    end
     return unless target.stable?
 
     raise Failure, "#{target} is 1.0 or later, which needs a release-branch policy Ferro does not have yet (plan 001)"
@@ -177,10 +188,10 @@ class Bump
       %(\\1"#{target.cargo}"), "#{@gem.extension_name} #{from.cargo}")
     gemfile_lock = File.join(@root, "Gemfile.lock")
     text = File.read(gemfile_lock)
-    pattern = /^(\s+#{Regexp.escape(@gem.name)}) \(#{Regexp.escape(from.to_s)}\)$/
-    raise Failure, "Gemfile.lock does not list #{@gem.name} #{from}" unless text.match?(pattern)
+    pattern = /^(\s+#{Regexp.escape(@gem.name)}) \(#{Regexp.escape(from.rubygems)}\)$/
+    raise Failure, "Gemfile.lock does not list #{@gem.name} #{from.rubygems}" unless text.match?(pattern)
 
-    File.write(gemfile_lock, text.gsub(pattern, "\\1 (#{target})"))
+    File.write(gemfile_lock, text.gsub(pattern, "\\1 (#{target.rubygems})"))
   end
 
   # Replaces +pattern+ in the gem's file at +relative+, failing when the

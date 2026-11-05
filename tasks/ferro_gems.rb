@@ -58,6 +58,13 @@ class FerroGem < Data.define(:short_name, :name, :crate, :extension, :packaged, 
     File.join(File.dirname(extension), "version.rb")
   end
 
+  # The version as version.rb writes it, such as <tt>1.0.0-beta.1</tt>:
+  # what tags and CHANGELOG headings use. The loaded gemspec's version is
+  # RubyGems' spelling of it.
+  def written_version
+    File.read(File.join(dir, version_file))[/(?<=VERSION = ")[^"]+(?=")/] or raise "#{dir}/#{version_file} has no VERSION"
+  end
+
   # The gem's changelog, relative to the gem.
   def changelog
     "CHANGELOG.md"

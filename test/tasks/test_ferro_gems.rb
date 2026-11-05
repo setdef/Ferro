@@ -7,7 +7,10 @@
 
 require "test_helper"
 require_relative "../../tasks/changelog"
+require "fileutils"
+require "tmpdir"
 require_relative "../../tasks/ferro_gems"
+require_relative "../../tasks/gem_version"
 
 # Tests what the root tasks read from a FerroGem: where its version lives,
 # whatever its name, and which signature files belong to other platforms.
@@ -62,6 +65,21 @@ class TestFerroGems < Minitest::Test
   # not the gem name with the hyphen turned into a slash (plan 003).
   def test_the_version_file_sits_beside_the_extension
     assert_equal "lib/ferro/notify_rust/version.rb", gem.version_file
+  end
+
+  def test_the_written_version_is_the_string_version_rb_holds
+    Dir.mktmpdir do |root|
+      FileUtils.mkdir_p(File.join(root, "gems/notify-rust/lib/ferro/notify_rust"))
+      File.write(File.join(root, "gems/notify-rust/lib/ferro/notify_rust/version.rb"), %(VERSION = "1.0.0-beta.1"\n))
+
+      assert_equal "1.0.0-beta.1", Dir.chdir(root) { gem.written_version }
+    end
+  end
+
+  def test_every_registered_gem_has_a_written_version_that_parses
+    Dir.chdir(ROOT) do
+      FERRO_GEMS.each { |ferro_gem| refute_nil GemVersion.parse(ferro_gem.written_version) }
+    end
   end
 
   def test_every_registered_gem_has_its_version_file

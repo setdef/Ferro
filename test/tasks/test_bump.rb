@@ -87,26 +87,28 @@ class TestBump < Minitest::Test
     git("push", "--quiet", "origin", "trunk")
   end
 
-  def test_a_prerelease_bump_rewrites_every_version_runs_the_gate_and_commits
-    version = bump { |current| current.next(:patch, "pre") }
+  def test_a_prerelease_bump_writes_semver_and_rubygems_forms_where_each_belongs
+    version = bump { |current| current.next(:major, "beta") }
 
-    assert_equal "0.1.0.pre.2", version.to_s
-    assert_includes read("gems/demo/lib/ferro/demo/version.rb"), %(VERSION = "0.1.0.pre.2")
-    assert_includes read("gems/demo/ext/ferro_demo/Cargo.toml"), %(version = "0.1.0-pre.2")
+    assert_equal "1.0.0-beta.1", version.to_s
+    assert_includes read("gems/demo/lib/ferro/demo/version.rb"), %(VERSION = "1.0.0-beta.1")
+    assert_includes read("gems/demo/ext/ferro_demo/Cargo.toml"), %(version = "1.0.0-beta.1")
     assert_includes read("gems/demo/ext/ferro_demo/Cargo.toml"), %(magnus = { version = "0.9.3" })
-    assert_includes read("gems/demo/Cargo.lock"), %(name = "ferro_demo"\nversion = "0.1.0-pre.2")
+    assert_includes read("gems/demo/Cargo.lock"), %(name = "ferro_demo"\nversion = "1.0.0-beta.1")
     assert_includes read("gems/demo/Cargo.lock"), %(name = "magnus"\nversion = "0.9.3")
-    assert_equal 2, read("Gemfile.lock").scan("ferro-demo (0.1.0.pre.2)").size
-    assert_includes read("gems/demo/CHANGELOG.md"), "## [Unreleased]\n\n## [0.1.0.pre.2] - 2026-10-25\n\n### Added\n\n- A thing.\n"
+    assert_equal 2, read("Gemfile.lock").scan("ferro-demo (1.0.0.pre.beta.1)").size
+    assert_includes read("gems/demo/CHANGELOG.md"), "## [Unreleased]\n\n## [1.0.0-beta.1] - 2026-10-25\n\n### Added\n\n- A thing.\n"
+    assert_includes read("gems/demo/CHANGELOG.md"),
+      "[1.0.0-beta.1]: https://github.com/setdef/Ferro/releases/tag/ferro-demo/v1.0.0-beta.1"
     assert_equal 1, @gate_runs
-    assert_equal ["chore(demo): release 0.1.0.pre.2", "init"], log
+    assert_equal ["chore(demo): release 1.0.0-beta.1", "init"], log
     assert_equal <<~MESSAGE, IO.popen(["git", "log", "-1", "--format=%B", chdir: @root], &:read).chomp
-      chore(demo): release 0.1.0.pre.2
+      chore(demo): release 1.0.0-beta.1
 
-      Release ferro-demo 0.1.0.pre.2. The entries that were under Unreleased
-      in its CHANGELOG are now the 0.1.0.pre.2 section, dated 2026-10-25, and
+      Release ferro-demo 1.0.0-beta.1. The entries that were under Unreleased
+      in its CHANGELOG are now the 1.0.0-beta.1 section, dated 2026-10-25, and
       version.rb, the crate's Cargo.toml, its Cargo.lock, and the root
-      Gemfile.lock name 0.1.0.pre.2. Tag it with rake release:demo:tag.
+      Gemfile.lock name 1.0.0-beta.1. Tag it with rake release:demo:tag.
 
       Generated with Claude Code (https://claude.com/claude-code)
 
@@ -115,19 +117,67 @@ class TestBump < Minitest::Test
     assert_empty IO.popen(["git", "status", "--porcelain", chdir: @root], &:read)
   end
 
+  def test_a_hyphenated_version_bumps_to_the_next_prerelease
+    write("gems/demo/lib/ferro/demo/version.rb", %(module Ferro\n  module Demo\n    VERSION = "0.2.0-pre.1"\n  end\nend\n))
+    write("gems/demo/ext/ferro_demo/Cargo.toml", %([package]\nname = "ferro_demo"\nversion = "0.2.0-pre.1"\n))
+    write("gems/demo/Cargo.lock", %([[package]]\nname = "ferro_demo"\nversion = "0.2.0-pre.1"\n))
+    write("Gemfile.lock", "PATH\n  specs:\n    ferro-demo (0.2.0.pre.pre.1)\n")
+    commit_all("hyphenated")
+
+    version = bump { |current| current.next(:patch, "pre") }
+
+    assert_equal "0.2.0-pre.2", version.to_s
+    assert_includes read("gems/demo/lib/ferro/demo/version.rb"), %(VERSION = "0.2.0-pre.2")
+    assert_includes read("Gemfile.lock"), "ferro-demo (0.2.0.pre.pre.2)"
+    assert_includes read("gems/demo/CHANGELOG.md"), "## [0.2.0-pre.2] - 2026-10-25"
+  end
+
+  def test_a_prerelease_cannot_follow_a_dotted_one_of_the_same_release_in_hyphens
+    error = assert_raises(Bump::Failure) { bump { |current| current.next(:patch, "pre") } }
+
+    assert_equal "0.1.0-pre.2 would come before 0.1.0.pre.1, and no label changes that: RubyGems sorts every hyphenated 0.1.0 prerelease below the dotted 0.1.0.pre.1. Stay dotted with exact[0.1.0.pre.2], or move to a later release in SemVer form, like exact[0.1.1-pre.1], or a minor or major bump with a label", error.message
+    assert_equal ["init"], log
+  end
+
+  def test_an_unlabelled_zero_version_is_refused_with_how_to_label_it
+    error = assert_raises(Bump::Failure) { bump { |current| current.next(:patch) } }
+
+    assert_equal "0.1.0 is a 0.x version without a prerelease label. RubyGems treats it as stable, which SemVer does not " \
+      "(plan 011, Versioning). Give it a label, like patch[pre] or exact[0.1.0-pre.1]", error.message
+    assert_equal 0, @gate_runs
+    assert_equal ["init"], log
+  end
+
+  def test_exact_to_an_unlabelled_zero_version_is_refused_and_a_labelled_one_accepted
+    assert_raises(Bump::Failure) { bump { GemVersion.parse("0.3.0") } }
+
+    assert_equal "0.3.0-pre.1", bump { GemVersion.parse("0.3.0-pre.1") }.to_s
+  end
+
+  def test_current_is_refused_for_an_unlabelled_zero_version
+    write("gems/demo/lib/ferro/demo/version.rb", %(module Ferro\n  module Demo\n    VERSION = "0.4.0"\n  end\nend\n))
+    commit_all("unlabelled")
+    with_origin
+
+    error = assert_raises(Bump::Failure) { release_current }
+
+    assert_includes error.message, "0.4.0 is a 0.x version without a prerelease label"
+    assert_equal 0, @gate_runs
+  end
+
   def test_a_failing_gate_leaves_the_bump_uncommitted
-    error = assert_raises(Bump::Failure) { bump(gate: false) { |current| current.next(:patch) } }
+    error = assert_raises(Bump::Failure) { bump(gate: false) { |current| current.next(:major, "beta") } }
 
     assert_includes error.message, "the gate failed"
     assert_equal ["init"], log
-    assert_includes read("gems/demo/lib/ferro/demo/version.rb"), %(VERSION = "0.1.0")
+    assert_includes read("gems/demo/lib/ferro/demo/version.rb"), %(VERSION = "1.0.0-beta.1")
   end
 
   def test_a_version_file_out_of_step_restores_everything
     write("gems/demo/ext/ferro_demo/Cargo.toml", %([package]\nname = "ferro_demo"\nversion = "0.0.9"\n))
     commit_all("drift")
 
-    error = assert_raises(Bump::Failure) { bump { |current| current.next(:patch) } }
+    error = assert_raises(Bump::Failure) { bump { |current| current.next(:major, "beta") } }
 
     assert_includes error.message, "has no version 0.1.0-pre.1"
     assert_equal 0, @gate_runs

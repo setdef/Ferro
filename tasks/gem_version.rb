@@ -9,21 +9,29 @@ require "rubygems"
 
 # A gem's version, and the version a bump moves it to.
 #
-# Ferro writes versions as RubyGems does: <tt>0.1.0</tt>, or a prerelease
-# such as <tt>0.1.0.pre.2</tt>. Working out the next one by hand invites
-# mistakes: which segments reset, whether a bump finishes a prerelease or
-# starts another, how the crate's Cargo.toml spells it.
+# Ferro writes versions as SemVer: <tt>0.1.0</tt>, or a prerelease such as
+# <tt>1.0.0-beta.1</tt>, in version.rb, in tags, and in CHANGELOG headings
+# (plan 011, Versioning). RubyGems stores that version as
+# <tt>1.0.0.pre.beta.1</tt>, which is how Gemfile.lock and the built
+# package's file name spell it. Versions released before that rule, such
+# as <tt>0.1.0.pre.4</tt>, were written in RubyGems' form, and still are
+# wherever they are tagged. This class reads either form, remembers which
+# one it was given, and writes it back unchanged with #to_s; #rubygems and
+# #cargo write the other two spellings. Ordering is RubyGems', which is
+# what users' Bundler applies: it reads the hyphen of <tt>0.1.0-pre.5</tt>
+# as <tt>.pre.</tt>, giving <tt>0.1.0.pre.pre.5</tt>, which sorts before
+# <tt>0.1.0.pre.4</tt>, because a text segment sorts before a number.
 #
-# The bump rules are ported from ratatui_ruby-devtools 0.4.1
+# A bump always writes the SemVer form. The bump rules are ported from
+# ratatui_ruby-devtools 0.4.1
 # (<tt>lib/ratatui_ruby/devtools/tasks/bump/sem_ver.rb</tt>, by the same
-# author under the same license), which writes SemVer's
-# <tt>1.0.0-rc.1</tt>. This class reads and writes RubyGems' form instead
-# and lets Gem::Version order them.
+# author under the same license).
 #
 # === Example
 #
-#   GemVersion.parse("0.1.0.pre.1").next(:patch, "pre").to_s  # => "0.1.0.pre.2"
-#   GemVersion.parse("0.1.0.pre.2").next(:patch).to_s         # => "0.1.0"
+#   GemVersion.parse("0.1.0-pre.1").next(:patch, "pre").to_s  # => "0.1.0-pre.2"
+#   GemVersion.parse("0.1.0-pre.2").next(:patch).to_s         # => "0.1.0"
+#   GemVersion.parse("1.0.0-beta.1").rubygems                 # => "1.0.0.pre.beta.1"
 #   GemVersion.parse("0.1.0.pre.2").cargo                     # => "0.1.0-pre.2"
 class GemVersion
   include Comparable
@@ -34,27 +42,48 @@ class GemVersion
   # A prerelease label: a letter, then letters or digits.
   LABEL = /\A[a-zA-Z][a-zA-Z0-9]*\z/
 
-  # Parses +string+, such as <tt>"0.1.0"</tt> or <tt>"0.1.0.pre.2"</tt>.
-  # Raises ArgumentError for anything else, including SemVer's hyphenated
-  # prerelease, which RubyGems would read as a different version.
+  # SemVer's hyphenated form: three release numbers and a prerelease that
+  # starts with a label, with no leading zeros in a numeric identifier.
+  SEMVER = /\A(?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*)){2}-[a-zA-Z][a-zA-Z0-9]*(?:\.(?:0|[1-9][0-9]*|[0-9]*[a-zA-Z][a-zA-Z0-9]*))*\z/
+
+  # Parses +string+, such as <tt>"0.1.0"</tt>, <tt>"1.0.0-beta.1"</tt>, or
+  # RubyGems' <tt>"0.1.0.pre.2"</tt>. Raises ArgumentError for anything
+  # else. A hyphenated version must be SemVer: three release numbers, a
+  # prerelease that starts with a label (RubyGems would read
+  # <tt>1.0.0-1</tt> as a different version than it looks), and no leading
+  # zeros. The result writes the string back exactly as given with #to_s.
   def self.parse(string)
-    raise ArgumentError, "#{string} has a hyphen. Write prereleases as RubyGems does, like 0.1.0.pre.2." if string.include?("-")
     raise ArgumentError, "#{string.inspect} is not a version" unless Gem::Version.correct?(string)
 
-    segments = Gem::Version.new(string).segments
-    release = segments.take_while { |segment| segment.is_a?(Integer) }
-    prerelease = segments.drop(release.size)
+    hyphenated = string.include?("-")
+    raise ArgumentError, "#{string} is not SemVer. Write a prerelease like 1.0.0-beta.1." if hyphenated && !string.match?(SEMVER)
+
+    if hyphenated
+      base, label = string.split("-", 2)
+      release = Gem::Version.new(base).segments
+      prerelease = label.split(".").map { |identifier| identifier.match?(/\A\d+\z/) ? identifier.to_i : identifier }
+    else
+      segments = Gem::Version.new(string).segments
+      release = segments.take_while { |segment| segment.is_a?(Integer) }
+      prerelease = segments.drop(release.size)
+    end
     raise ArgumentError, "#{string} has more than three release segments" if release.size > 3
 
-    new((release + [0, 0, 0]).first(3), prerelease)
+    new((release + [0, 0, 0]).first(3), prerelease, semver: hyphenated || prerelease.empty?, text: (string unless hyphenated))
   end
 
   # [release] Three Integers: major, minor, patch.
   # [prerelease] The prerelease identifiers, such as <tt>["pre", 2]</tt>, or
   #   none.
-  def initialize(release, prerelease = [])
+  # [semver] Whether #to_s writes a prerelease with a hyphen (SemVer) rather
+  #   than RubyGems' <tt>.pre.</tt> dots.
+  # [text] The exact string a dotted version was parsed from, which #to_s
+  #   returns unchanged, or nil.
+  def initialize(release, prerelease = [], semver: true, text: nil)
+    @text = text
     @release = release
     @prerelease = prerelease
+    @semver = semver
   end
 
   # The major segment.
@@ -73,6 +102,12 @@ class GemVersion
     major >= 1 && !prerelease?
   end
 
+  # Whether this is a 0.x version with no prerelease label, which RubyGems
+  # treats as stable and SemVer does not (plan 011, Versioning).
+  def unlabelled_zero?
+    major.zero? && !prerelease?
+  end
+
   # The version after bumping +segment+, which resets the segments after
   # it. A prerelease comes before its release, so bumping it to a segment
   # it already leads up to releases it: <tt>0.1.0.pre.2</tt> becomes
@@ -81,13 +116,17 @@ class GemVersion
   # With a +label+, the result is a prerelease of that version instead.
   # Its number counts up from the prerelease you are on when that leads to
   # the same version under the same label, and starts at 1 otherwise:
-  # <tt>0.1.0.pre.1</tt> becomes <tt>0.1.0.pre.2</tt> on <tt>:patch</tt>
-  # with <tt>"pre"</tt>, and <tt>0.1.0.beta.3</tt> becomes
-  # <tt>0.1.0.rc.1</tt> with <tt>"rc"</tt>.
+  # <tt>0.1.0-pre.1</tt> becomes <tt>0.1.0-pre.2</tt> on <tt>:patch</tt>
+  # with <tt>"pre"</tt>, and <tt>0.1.0-beta.3</tt> becomes
+  # <tt>0.1.0-rc.1</tt> with <tt>"rc"</tt>.
+  #
+  # The result is always written as SemVer.
   #
   # Raises ArgumentError for an unknown segment, an invalid label, or a
-  # labelled version that would come before this one (RubyGems orders labels
-  # as text, so <tt>beta</tt> cannot follow <tt>rc</tt>).
+  # labelled version that would come before this one in RubyGems' order
+  # (labels sort as text, so <tt>beta</tt> cannot follow <tt>rc</tt>, and no
+  # hyphenated prerelease can follow a dotted one of the same release, like
+  # <tt>0.1.0.pre.4</tt>).
   def next(segment, label = nil)
     release = release_after(segment)
     return release unless label
@@ -95,6 +134,8 @@ class GemVersion
 
     candidate = GemVersion.new(release.release, [label, count_toward(release, label) + 1])
     return candidate if candidate > self
+
+    raise ArgumentError, dotted_conflict(candidate) if !@semver && @release == release.release
 
     raise ArgumentError, "#{candidate} would come before #{self}; pick a label that sorts after #{@prerelease.first}"
   end
@@ -109,17 +150,38 @@ class GemVersion
     Gem::Version.new(to_s)
   end
 
-  # The version as RubyGems writes it: <tt>0.1.0.pre.2</tt>.
+  # The version as it was written: SemVer's <tt>1.0.0-beta.1</tt>, or
+  # RubyGems' <tt>0.1.0.pre.2</tt> if it was parsed in that form. This is
+  # what version.rb, tags, and CHANGELOG headings hold.
   def to_s
-    [*@release, *@prerelease].join(".")
+    @text || (@semver ? cargo : [*@release, *@prerelease].join("."))
   end
 
-  # The version as Cargo writes it: <tt>0.1.0-pre.2</tt>.
+  # The version as RubyGems stores it: <tt>1.0.0.pre.beta.1</tt>. This is
+  # what Gemfile.lock and the built package's file name hold. RubyGems
+  # reads a hyphen as <tt>.pre.</tt> whatever follows it, so the label
+  # <tt>pre</tt> becomes <tt>0.1.0.pre.pre.2</tt>.
+  def rubygems
+    to_gem_version.to_s
+  end
+
+  # The version as Cargo writes it, which is SemVer: <tt>0.1.0-pre.2</tt>.
   def cargo
     prerelease? ? "#{@release.join('.')}-#{@prerelease.join('.')}" : @release.join(".")
   end
 
   protected attr_reader :release
+
+  # Why no label helps a dotted prerelease reach a hyphenated one of its
+  # own release, and the choices the maintainer has.
+  private def dotted_conflict(candidate)
+    counted = @prerelease.last.is_a?(Integer) ? [*@prerelease[0...-1], @prerelease.last + 1] : [*@prerelease, 1]
+    stay = GemVersion.new(@release, counted, semver: false)
+    later = GemVersion.new([@release[0], @release[1], @release[2] + 1], ["pre", 1])
+    "#{candidate} would come before #{self}, and no label changes that: RubyGems sorts every hyphenated " \
+      "#{candidate.release.join('.')} prerelease below the dotted #{self}. Stay dotted with exact[#{stay}], " \
+      "or move to a later release in SemVer form, like exact[#{later}], or a minor or major bump with a label"
+  end
 
   private def release_after(segment)
     index = SEGMENTS.index(segment) or raise ArgumentError, "#{segment.inspect} is not one of #{SEGMENTS.join(', ')}"

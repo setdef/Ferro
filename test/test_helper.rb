@@ -22,3 +22,10 @@ ENV["GIT_CONFIG_KEY_0"] = "maintenance.auto"
 ENV["GIT_CONFIG_VALUE_0"] = "false"
 ENV["GIT_CONFIG_KEY_1"] = "gc.auto"
 ENV["GIT_CONFIG_VALUE_1"] = "0"
+
+# The gate runs as a pre-commit hook, where git sets GIT_INDEX_FILE to the
+# relative path .git/index of the commit being made. A git the tests run in
+# their own repositories would resolve it there; in a worktree, whose .git
+# is a file, it fails ("index file open failed: Not a directory"). The
+# tests' repositories use their own indexes.
+ENV.delete("GIT_INDEX_FILE")
