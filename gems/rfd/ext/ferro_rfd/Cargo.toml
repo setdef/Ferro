@@ -17,7 +17,7 @@ crate-type = ["cdylib"]
 rfd = { version = "=0.17.2", features = ["file-handle-inner"] }
 # rfd's own, to hand rfd a parent window (plan 002, decision 6).
 raw-window-handle = "0.6.2"
-magnus = { version = "0.9.3", features = ["bytes"] }
+magnus = { version = "0.9.3", features = ["bytes", "rb-sys"] }
 rb-sys = "0.9.130"
 
 # rfd's own Objective-C crate, to check the thread and NSApp before rfd

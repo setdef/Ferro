@@ -223,10 +223,9 @@ impl Parent {
     }
 
     /// The parent `spec` describes, looking an `AppKit` window up, which
-    /// only the main thread may do. The error is the message
-    /// `Ferro::Rfd::Error` carries.
+    /// only the main thread may do.
     #[cfg(target_os = "macos")]
-    fn build(spec: ParentSpec) -> Result<Self, String> {
+    fn build(spec: ParentSpec) -> Result<Self, platform::Refusal> {
         let Some(WindowSpec::AppKit { window_number }) = spec.window else {
             return Ok(Self::without_lookup(spec));
         };
@@ -240,10 +239,10 @@ impl Parent {
 }
 
 /// Runs `job` with the parent `spec` describes, and returns its value,
-/// or the message of the `Ferro::Rfd::Error` to raise, or the panic it
-/// caught. A parent that looks a window up runs, with `job`, on the main
-/// thread: here when this is it, else through the running app's main
-/// thread, as rfd hops there for a sync dialog (rfd
+/// or why the parent was refused, or the panic it caught. A parent that
+/// looks a window up runs, with `job`, on the main thread: here when this
+/// is it, else through the running app's main thread, as rfd hops there
+/// for a sync dialog (rfd
 /// `src/backend/macos/utils.rs:20-27`); with no running app it is
 /// refused (plan 008, decision 3). The parent lives until `job` returns,
 /// and both run before any Ruby value is made. Run it with the GVL
@@ -251,7 +250,7 @@ impl Parent {
 pub fn with_parent<T: Send>(
     spec: Option<ParentSpec>,
     job: impl FnOnce(Option<&Parent>) -> T + Send,
-) -> Result<Result<T, String>, Panic> {
+) -> Result<Result<T, platform::Refusal>, Panic> {
     let work = move || {
         capture(move || {
             #[cfg(target_os = "macos")]
@@ -264,7 +263,7 @@ pub fn with_parent<T: Send>(
     };
     #[cfg(target_os = "macos")]
     if spec.is_some_and(|spec| spec.needs_main_thread()) {
-        return platform::on_main(work).unwrap_or_else(|refusal| Ok(Err(refusal.to_owned())));
+        return platform::on_main(work).unwrap_or_else(|refusal| Ok(Err(refusal)));
     }
     work()
 }
@@ -471,17 +470,17 @@ mod tests {
         let outcome = with_parent(Some(appkit(7)), |parent| {
             parent.map(|parent| parent.window_handle().is_ok())
         });
-        let expected = if !cfg!(target_os = "macos") {
-            Ok(Ok(Some(false)))
-        } else if crate::platform::is_main_thread() {
+        #[cfg(not(target_os = "macos"))]
+        let expected = Ok(Ok(Some(false)));
+        #[cfg(target_os = "macos")]
+        let expected = if crate::platform::is_main_thread() {
             // One test thread runs tests on the main thread, where the
             // lookup runs, and with no app finds no window.
-            Ok(Err("no window of this app has window number 7".to_owned()))
+            Ok(Err(crate::platform::Refusal::Unknown(
+                "no window of this app has window number 7".to_owned(),
+            )))
         } else {
-            Ok(Err(
-                "an AppKitWindowHandle is looked up on the main thread, and no NSApplication runs to reach it from this one"
-                    .to_owned(),
-            ))
+            Ok(Err(crate::platform::Refusal::OffMain))
         };
         assert_eq!(outcome, expected);
         assert_eq!(appkit(7).needs_main_thread(), cfg!(target_os = "macos"));

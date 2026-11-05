@@ -22,8 +22,11 @@ module Ferro
     # - On macOS, a dialog started off the main thread while no
     #   application runs its event loop. rfd would panic; ferro-rfd refuses
     #   first, with rfd's message.
-    # - On macOS, Future#value on the main thread while a sheet needs the
-    #   main thread's run loop to finish. That wait would never end.
+    #
+    # A wrong argument raises +ArgumentError+ instead, as a window number
+    # that names none of your app's windows does, and a wait that could
+    # never end raises +ThreadError+, as Future#value does on macOS for a
+    # sheet that needs the main thread it would block.
     #
     # rfd has no error type, so this class is ferro-rfd's own.
     #

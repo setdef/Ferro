@@ -131,10 +131,13 @@ fn async_file_dialog_of(settings: &FileSettings, parent: Option<&Parent>) -> Asy
     dialog
 }
 
-/// The value of a job `handles::with_parent` ran, or `Ferro::Rfd::Error`
-/// for its refusal or panic, made now that the job is done.
-fn finish<T>(ruby: &Ruby, outcome: Result<Result<T, String>, Panic>) -> Result<T, Error> {
-    settle(ruby, outcome)?.map_err(|message| rfd_error(ruby, message))
+/// The value of a job `handles::with_parent` ran, or the exception for
+/// its refusal or panic, made now that the job is done.
+fn finish<T>(
+    ruby: &Ruby,
+    outcome: Result<Result<T, platform::Refusal>, Panic>,
+) -> Result<T, Error> {
+    settle(ruby, outcome)?.map_err(|refusal| platform::refusal_error(ruby, refusal))
 }
 
 /// Runs `job` with `parent`, for `inspect`: with the GVL released only
@@ -146,7 +149,7 @@ fn describe(
     job: impl FnOnce(Option<&Parent>) -> String + Send,
 ) -> Result<String, Error> {
     let outcome = if parent.is_some_and(|parent| parent.needs_main_thread()) {
-        gvl::without_gvl(ruby, |_| handles::with_parent(parent, job))?
+        gvl::without_gvl(ruby, || handles::with_parent(parent, job))?
             .unwrap_or_else(|payload| Err(crate::panic_of(&payload)))
     } else {
         handles::with_parent(parent, job)
@@ -268,7 +271,7 @@ fn show<T: Send>(
     dialog: impl FnOnce(Option<&Parent>) -> T + Send,
 ) -> Result<T, Error> {
     refuse(ruby, platform::refuse_sync())?;
-    let outcome = gvl::without_gvl(ruby, |_| handles::with_parent(parent, dialog))?;
+    let outcome = gvl::without_gvl(ruby, || handles::with_parent(parent, dialog))?;
     finish(
         ruby,
         outcome.unwrap_or_else(|payload| Err(crate::panic_of(&payload))),
@@ -314,7 +317,7 @@ fn make(
     starter: impl FnOnce(Option<&Parent>) -> crate::future::Pending + Send,
 ) -> Result<crate::future::Pending, Error> {
     let pending = if platform::CREATION_BLOCKS {
-        gvl::without_gvl(ruby, |_| handles::with_parent(parent, starter))?
+        gvl::without_gvl(ruby, || handles::with_parent(parent, starter))?
             .unwrap_or_else(|payload| Err(crate::panic_of(&payload)))
     } else {
         handles::with_parent(parent, starter)

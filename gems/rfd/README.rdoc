@@ -85,7 +85,9 @@ SPDX-SnippetEnd
 
 Every dialog waits for the user and releases Ruby's global VM lock while
 it does, so your other threads keep running. rfd cannot close a dialog
-early, so Ctrl-C and <tt>Thread#kill</tt> wait until the user does.
+early, so Ctrl-C, <tt>Thread#raise</tt>, and <tt>Thread#kill</tt> wait
+until the user does, and then raise, losing the user's answer, as an
+interrupt does to Ruby's own blocking calls.
 
 === Async dialogs
 
@@ -176,13 +178,13 @@ crash your process when wrong:
         the window's content view, which an Integer could fake, so
         ferro-rfd asks AppKit for the window with that number, on the main
         thread, when the dialog runs, and hands rfd its content view. A
-        number that names none of your app's windows raises Error. From
-        another thread, the dialog and the lookup run on the main thread
-        through your running app, as rfd runs any dialog from another
-        thread. That waits for the main thread's run loop: if the main
-        thread is blocked in Ruby instead, say joining this thread, the
-        call never returns and cannot be interrupted, as with rfd's own
-        hop.
+        number that names none of your app's windows raises
+        +ArgumentError+. From another thread, the dialog and the lookup
+        run on the main thread through your running app, as rfd runs any
+        dialog from another thread. That waits for the main thread's run
+        loop: if the main thread is blocked in Ruby instead, say joining
+        this thread, the call never returns and cannot be interrupted, as
+        with rfd's own hop.
 
 --
 SPDX-SnippetBegin

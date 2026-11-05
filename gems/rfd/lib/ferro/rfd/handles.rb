@@ -205,7 +205,7 @@ module Ferro
     # <tt>-[NSApplication windowWithWindowNumber:]</tt>, on the main
     # thread, and hands rfd that window's content view: the same handle a
     # Rust caller would pass. A number that names none of your app's
-    # windows raises Error instead of reaching rfd. From another thread,
+    # windows raises +ArgumentError+ instead of reaching rfd. From another thread,
     # the lookup and the dialog run on the main thread through your running
     # app, as rfd runs any dialog from another thread; FileDialog#set_parent
     # says more.

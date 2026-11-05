@@ -207,9 +207,17 @@ fn drive<W: FnMut() -> Option<G>, F: FnOnce(G) -> T, G, T, E>(
 ///
 /// `wait` returns `None` to give up after `unblock` ran; Ruby then runs
 /// the interrupt, and unless it raised, `wait` runs again. An interrupt
-/// raised after `work` returned discards its value, as Ruby's own blocking
-/// calls do (`thread.c:1694-1699`); without this release it would fire as
-/// the method returned and discard it all the same.
+/// raised after `work` returned discards its value, as Ruby's own IO does:
+/// `rb_thread_io_blocking_call` checks interrupts after a read or write
+/// returns (`thread.c:1986-1999` at Ruby v4.0.9). The passage on
+/// `rb_thread_call_without_gvl` calls that check harmful for work that has
+/// finished and recommends `rb_thread_call_without_gvl2` for such work
+/// (`thread.c:1685-1699`). This module rejects that function on purpose:
+/// it skips the work while any interrupt is pending (`thread.c:320-327`),
+/// and an interrupt Ruby holds back stays pending, which led the gem's
+/// previous design to run the work with the GVL held, stalling every
+/// other thread. Without this release the interrupt would fire as the
+/// method returned and discard the value all the same.
 pub fn without_gvl<W, F, G, T, U>(
     ruby: &Ruby,
     unblock: &U,

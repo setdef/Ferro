@@ -21,9 +21,13 @@ own API. Releases are tagged `ferro-rfd/vX.Y.Z`.
 
 - `MessageButtons` and `MessageDialogResult` are modules, so `MessageButtons::OkCustom` and its siblings are `MessageButtons`, and `MessageDialogResult::Custom` is a `MessageDialogResult`. Breaking: both were classes, which code could subclass, and `MessageButtons::Ok.class` and `MessageDialogResult::Ok.instance_of?(MessageDialogResult)` no longer answer the enum, as the constants are instances of a private class that includes the module.
 - `set_can_create_directories` takes only `true` or `false`, and raises `TypeError` for anything else, as rfd's `bool` does. Breaking: it took any truthy value.
+- On macOS, an `AppKitWindowHandle` parent whose window number names no window of the app, or a window without a content view, raises `ArgumentError` with the same message. Breaking: it raised `Ferro::Rfd::Error`.
+- On macOS, `Future#value` on the main thread for a sheet that finishes on the main run loop raises `ThreadError` with the same message. Breaking: it raised `Ferro::Rfd::Error`.
 
 ### Fixed
 
+- A dialog no longer stalls every Ruby thread until the user answers, and `Future#value` no longer stalls them forever, when started with an interrupt pending that Ruby holds back (as inside a custom `Exception#backtrace`): the gem never runs a dialog or a wait with the GVL held.
+- An interrupt that raises from `Future#value` just as the future finishes no longer loses its answer: the next `#value` returns it, where it raised `Ferro::Rfd::Error`.
 - On macOS, an `AsyncMessageDialog` whose parent answers `nil` for `window_handle` shows rfd's own alert from any thread, as rfd does, instead of raising `Ferro::Rfd::Error`.
 - `MessageDialogResult::Ok.dup`, `.clone`, and a `Marshal` copy equal `MessageDialogResult::Ok`, as rfd's `Clone` and `PartialEq` do.
 - `set_buttons` takes a subclass of `MessageButtons::OkCustom`, `OkCancelCustom`, or `YesNoCancelCustom` as the variant it inherits, instead of raising `ArgumentError` when the dialog shows.

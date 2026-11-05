@@ -95,8 +95,8 @@ class TestAppkitParent < Minitest::Test
     def refusal
       yield
       nil
-    rescue Ferro::Rfd::Error => error
-      error.message
+    rescue Ferro::Rfd::Error, ArgumentError => error
+      "\#{error.class}: \#{error.message}"
     end
   RUBY
 
@@ -187,6 +187,9 @@ class TestAppkitParent < Minitest::Test
     assert_includes debug, "AppKitWindowHandle { ns_view: 0x#{view.to_s(16)} }"
   end
 
+  # A number that names no window is a wrong argument, as a dangling
+  # NSView would be in Rust, so it raises ArgumentError (ADR 001,
+  # 2026-11-05 amendment).
   def test_a_number_that_names_no_window_is_refused_before_any_dialog
     messages, = in_child(<<~RUBY)
       #{APPKIT}
@@ -205,8 +208,8 @@ class TestAppkitParent < Minitest::Test
     RUBY
     number = messages.pop
 
-    assert_equal (["no window of this app has window number #{number}"] * 5) +
-      ["no window of this app has window number 0"], messages
+    assert_equal (["ArgumentError: no window of this app has window number #{number}"] * 5) +
+      ["ArgumentError: no window of this app has window number 0"], messages
   end
 
   def test_a_window_without_a_content_view_is_refused
@@ -219,7 +222,7 @@ class TestAppkitParent < Minitest::Test
         AppKit.number(window)]
     RUBY
 
-    assert_equal "window number #{number} has no content view", message
+    assert_equal "ArgumentError: window number #{number} has no content view", message
   end
 
   # Without an NSApplication there is no window to find, and the lookup
@@ -230,7 +233,7 @@ class TestAppkitParent < Minitest::Test
       [refusal { Ferro::Rfd::FileDialog.new.set_parent(appkit_parent(1)).inspect }, AppKit.app_exists?]
     RUBY
 
-    assert_equal "no window of this app has window number 1", message
+    assert_equal "ArgumentError: no window of this app has window number 1", message
     refute app_exists
   end
 
@@ -245,8 +248,8 @@ class TestAppkitParent < Minitest::Test
       end.value
     RUBY
 
-    assert_equal "an AppKitWindowHandle is looked up on the main thread, " \
+    assert_equal "Ferro::Rfd::Error: an AppKitWindowHandle is looked up on the main thread, " \
       "and no NSApplication runs to reach it from this one", inspect_message
-    assert_match(/\AYou are running RFD in NonWindowed environment/, pick_message)
+    assert_match(/\AFerro::Rfd::Error: You are running RFD in NonWindowed environment/, pick_message)
   end
 end

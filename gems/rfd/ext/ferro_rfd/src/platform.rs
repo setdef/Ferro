@@ -46,7 +46,9 @@ pub const FALLBACK_OFF_MAIN: &str = "Fallback Sync Dialog Must Be Spawned On Mai
 
 /// What `Future#value` raises on the main thread when the dialog it waits
 /// for finishes on the main thread's run loop. rfd has no such message:
-/// it would deadlock.
+/// it would deadlock. The class is `ThreadError`, Ruby's own for a thread
+/// that would wait on itself, as `Thread#join` of the current thread and
+/// a second `Mutex#lock` raise (ADR 001, 2026-11-05 amendment).
 pub const WAIT_ON_MAIN: &str = "waiting on the main thread would deadlock: this dialog finishes on the main thread's run loop, so start it on the main thread and wait for it on another (rfd src/lib.rs:79-86)";
 
 /// What rfd panics with for a window handle it cannot use here: on
@@ -142,12 +144,35 @@ mod apple {
     /// runs to reach the main thread through (plan 008, decision 5).
     pub const LOOKUP_OFF_MAIN: &str = "an AppKitWindowHandle is looked up on the main thread, and no NSApplication runs to reach it from this one";
 
-    fn no_window(window_number: isize) -> String {
-        format!("no window of this app has window number {window_number}")
+    /// Why a parent's window cannot be looked up.
+    #[derive(Debug, PartialEq, Eq)]
+    pub enum Refusal {
+        /// The window number names none of the app's windows, or a window
+        /// without a content view: the argument is wrong, so Ruby's
+        /// `ArgumentError`, with this message (ADR 001, 2026-11-05
+        /// amendment). In Rust the parent would be a dangling `NSView`.
+        Unknown(String),
+        /// No thread can reach the main thread: `Ferro::Rfd::Error`, with
+        /// [`LOOKUP_OFF_MAIN`].
+        OffMain,
     }
 
-    fn no_content_view(window_number: isize) -> String {
-        format!("window number {window_number} has no content view")
+    /// The exception Ruby raises for `refusal`.
+    pub fn refusal_error(ruby: &magnus::Ruby, refusal: Refusal) -> magnus::Error {
+        match refusal {
+            Refusal::Unknown(message) => magnus::Error::new(ruby.exception_arg_error(), message),
+            Refusal::OffMain => crate::rfd_error(ruby, LOOKUP_OFF_MAIN),
+        }
+    }
+
+    fn no_window(window_number: isize) -> Refusal {
+        Refusal::Unknown(format!(
+            "no window of this app has window number {window_number}"
+        ))
+    }
+
+    fn no_content_view(window_number: isize) -> Refusal {
+        Refusal::Unknown(format!("window number {window_number} has no content view"))
     }
 
     /// A window `AppKit` found by its number, and its content view, both
@@ -172,9 +197,9 @@ mod apple {
     /// thread may ask (objc2-app-kit marks `NSApplication` and `NSWindow`
     /// `MainThreadOnly`). With no application, no number names a window,
     /// and none is created.
-    pub fn look_up(window_number: isize) -> Result<LookedUp, String> {
+    pub fn look_up(window_number: isize) -> Result<LookedUp, Refusal> {
         if MainThreadMarker::new().is_none() {
-            return Err(LOOKUP_OFF_MAIN.to_owned());
+            return Err(Refusal::OffMain);
         }
         let app = application().ok_or_else(|| no_window(window_number))?;
         autoreleasepool(|_| {
@@ -210,19 +235,29 @@ mod apple {
     /// (`utils.rs:26-27`), and `AppKit` offers no atomic "run on main if
     /// running". The wait cannot be interrupted, since the GVL is released
     /// with no unblocking function (`gvl.rs`, `without_gvl`).
-    pub fn on_main<R: Send>(work: impl FnOnce() -> R + Send) -> Result<R, &'static str> {
+    pub fn on_main<R: Send>(work: impl FnOnce() -> R + Send) -> Result<R, Refusal> {
         if is_main_thread() {
             Ok(work())
         } else if app_running() {
             Ok(dispatch2::run_on_main(|_| work()))
         } else {
-            Err(LOOKUP_OFF_MAIN)
+            Err(Refusal::OffMain)
         }
     }
 }
 
 #[cfg(target_os = "macos")]
-pub use apple::{look_up, on_main, LookedUp};
+pub use apple::{look_up, on_main, refusal_error, LookedUp, Refusal};
+
+/// Off macOS nothing is looked up, so no parent is refused.
+#[cfg(not(target_os = "macos"))]
+pub type Refusal = std::convert::Infallible;
+
+/// The exception Ruby raises for `refusal`, which off macOS cannot exist.
+#[cfg(not(target_os = "macos"))]
+pub const fn refusal_error(_ruby: &magnus::Ruby, refusal: Refusal) -> magnus::Error {
+    match refusal {}
+}
 
 /// Off macOS, rfd has no thread rules, and these answers refuse nothing.
 #[cfg(not(target_os = "macos"))]
@@ -236,7 +271,7 @@ mod apple {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 pub use apple::is_main_thread;
 
 /// rfd's sync dialogs on macOS leave the main thread only for a running

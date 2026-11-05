@@ -40,7 +40,7 @@ module Ferro
     # Setters return the dialog, and #show may run again; #inspect shows
     # rfd's +Debug+ text. The dialog releases Ruby's global VM lock while
     # it is open, and rfd cannot close it early, so Ctrl-C waits for the
-    # user.
+    # user, and then raises with the user's answer lost.
     #
     # On macOS, without a parent, rfd shows a system alert that runs on any
     # thread with no application; but MessageDialog asks for the main

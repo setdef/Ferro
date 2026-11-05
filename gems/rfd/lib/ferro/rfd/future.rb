@@ -33,8 +33,10 @@ module Ferro
     # Like <tt>Thread#value</tt>, #value returns the same value, or raises
     # the same exception, every time, and one thread waits at a time.
     # Waiting releases Ruby's global VM lock, and an interrupt (Ctrl-C,
-    # <tt>Thread#raise</tt>, +Timeout+) ends the wait without closing the
-    # dialog; call #value again to keep waiting.
+    # <tt>Thread#raise</tt>, <tt>Thread#kill</tt>, +Timeout+) ends the
+    # wait without closing the dialog; call #value again to keep waiting.
+    # An interrupt that arrives just as the answer does still raises, but
+    # the answer is kept: the next #value returns it without waiting.
     #
     # Nothing waits for a Future you drop. On Windows and Linux its dialog
     # never opens unless #value runs; on macOS a sheet already open stays
@@ -72,8 +74,9 @@ module Ferro
       # Raises what the work raised: Error for a panic inside rfd (such as
       # FileHandle#read of a file that cannot be read), or a
       # +SystemCallError+ or +IOError+ for FileHandle#write. On macOS,
-      # waiting on the main thread for a sheet raises Error at once, since
-      # the sheet finishes on that thread's event loop.
+      # waiting on the main thread for a sheet raises +ThreadError+ at
+      # once, since the sheet finishes on that thread's event loop, and
+      # the thread would be waiting on itself.
       #
       # === Example
       #
@@ -86,7 +89,10 @@ module Ferro
         @value
       end
 
-      # Waits for the native layer's tagged outcome and keeps it.
+      # Waits for the native layer's tagged outcome and keeps it. An
+      # interrupt can raise before this keeps it, even as the native call
+      # returns; the native layer keeps the outcome too, and hands it over
+      # again on the next call.
       private def settle
         tag, payload = @native.__send__(:native_value)
         case tag

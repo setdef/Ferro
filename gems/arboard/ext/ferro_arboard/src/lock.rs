@@ -125,7 +125,8 @@ impl<T> Waiter<'_, T> {
     /// function has run since the last time this returned `None`: Ruby
     /// then handles the interrupt and, unless it raises, waits again. An
     /// interrupt wins over a free lock, so an interrupted call does not
-    /// start its work (`thread.c:1694-1699` at Ruby v4.0.9 asks for that).
+    /// start its work, as the (a) case of `thread.c:1685-1699` at Ruby
+    /// v4.0.9 describes: an interrupt before the work cancels it.
     pub fn lock(&self) -> Option<Guard<'_, T>> {
         let mut busy = recover(self.lock.busy.lock());
         loop {

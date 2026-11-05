@@ -23,6 +23,7 @@ class TestLinuxDialogs < Minitest::Test
   FAKE_ZENITY = <<~SH
     #!/bin/sh
     printf '%s\\n' "$@" > "$FAKE_ZENITY_LOG"
+    [ -z "$FAKE_ZENITY_GATE" ] || cat "$FAKE_ZENITY_GATE" > /dev/null
     sleep "${FAKE_ZENITY_SLEEP:-0}"
     printf '%s' "$FAKE_ZENITY_OUTPUT"
     exit "${FAKE_ZENITY_STATUS:-0}"
@@ -43,9 +44,11 @@ class TestLinuxDialogs < Minitest::Test
   end
 
   # Runs +script+ in a child whose zenity is the fake, first on +path+,
-  # which prints +output+ and exits with +status+ after +sleep+ seconds. Returns the script's value and the
-  # arguments rfd passed zenity (nil if it never ran).
-  private def answer(script, output: "", status: 0, sleep: 0, path: "#{@bin}:/usr/bin:/bin")
+  # which prints +output+ and exits with +status+ after +sleep+ seconds,
+  # and, given a +gate+ FIFO, only once something writes to it. Returns
+  # the script's value and the arguments rfd passed zenity (nil if it
+  # never ran).
+  private def answer(script, output: "", status: 0, sleep: 0, gate: "", path: "#{@bin}:/usr/bin:/bin")
     env = {
       "PATH" => path,
       "DBUS_SESSION_BUS_ADDRESS" => "unix:path=#{File.join(@dir, 'no-bus')}",
@@ -53,6 +56,7 @@ class TestLinuxDialogs < Minitest::Test
       "FAKE_ZENITY_OUTPUT" => output,
       "FAKE_ZENITY_STATUS" => status.to_s,
       "FAKE_ZENITY_SLEEP" => sleep.to_s,
+      "FAKE_ZENITY_GATE" => gate,
     }
     value, = in_child(script, env)
     [value, File.exist?(@log) ? File.read(@log).lines(chomp: true) : nil]
@@ -178,5 +182,30 @@ class TestLinuxDialogs < Minitest::Test
     RUBY
 
     assert_operator ticks, :>=, 20
+  end
+
+  # A dialog begun with an interrupt pending that Ruby will not run yet
+  # still runs with the GVL released (RfdSuite::WHILE_RAISING). zenity
+  # answers only once the opener writes to its gate, and the opener writes
+  # only once the picking thread sleeps in the dialog, so the answer
+  # proves the opener ran while the dialog was open; a dialog that held
+  # the GVL would never end, and the child would be killed.
+  def test_a_dialog_begun_while_raising_with_an_interrupt_pending_releases_the_gvl
+    gate = File.join(@dir, "gate")
+    File.mkfifo(gate)
+    path, args = answer(<<~RUBY, output: "/picked\n", gate:)
+      #{WHILE_RAISING}
+      picker = Thread.current
+      opener = Thread.new do
+        Thread.pass until picker.status == "sleep"
+        File.write(#{gate.dump}, "open")
+      end
+      path = WhileRaising.run { Thread.current.wakeup; Ferro::Rfd::FileDialog.new.pick_file }
+      opener.join
+      path
+    RUBY
+
+    assert_equal "/picked", path
+    assert_equal %w[--no-markup --file-selection], args
   end
 end

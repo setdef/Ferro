@@ -8,8 +8,8 @@
 //! so this type keeps rfd's future as it is and polls it when Ruby asks
 //! for its value: once with the GVL held, in case it is ready, then with
 //! the GVL released until rfd's waker wakes the thread (`gvl::wait`).
-//! Ruby's `Future#value` keeps the outcome, so this polls each future to
-//! completion at most once.
+//! Once rfd's future finishes, this keeps what it finished with in its
+//! place and never polls it again: every later call returns that.
 
 use std::io;
 use std::path::PathBuf;
@@ -20,9 +20,7 @@ use std::task::{Context, Poll, Waker};
 use magnus::{method, prelude::*, Error, Exception, RArray, RModule, Ruby, Value};
 use rfd::{FileHandle, MessageDialogResult};
 
-use crate::{
-    capture, error_class, gvl, panic_of, panic_text, path_to_ruby, platform, rfd_error, Panic,
-};
+use crate::{capture, error_class, gvl, panic_text, path_to_ruby, platform, rfd_error, Panic};
 
 /// What one of rfd's futures finishes with.
 pub enum Output {
@@ -69,7 +67,7 @@ impl Output {
     /// `[:handle, path]`, `[:handles, paths]`, `[:result, result]`,
     /// `[:bytes, bytes]`, `[:written, nil]`, or, for a failed write,
     /// `[:raise, exception]` (plan 002, decision 10).
-    fn into_ruby(self, ruby: &Ruby) -> Result<RArray, Error> {
+    fn to_ruby(&self, ruby: &Ruby) -> Result<RArray, Error> {
         let path = |handle: &FileHandle| path_to_ruby(ruby, handle.path()).as_value();
         Ok(match self {
             Self::Handle(handle) => tagged(
@@ -80,7 +78,7 @@ impl Output {
             Self::Handles(handles) => tagged(
                 ruby,
                 "handles",
-                handles.map_or_else(
+                handles.as_ref().map_or_else(
                     || ruby.qnil().as_value(),
                     |handles| ruby.ary_from_iter(handles.iter().map(path)).as_value(),
                 ),
@@ -88,12 +86,12 @@ impl Output {
             Self::Result(result) => tagged(
                 ruby,
                 "result",
-                crate::dialogs::result_to_ruby(ruby, result).as_value(),
+                crate::dialogs::result_to_ruby(ruby, result.clone()).as_value(),
             ),
-            Self::Bytes(bytes) => tagged(ruby, "bytes", ruby.str_from_slice(&bytes).as_value()),
+            Self::Bytes(bytes) => tagged(ruby, "bytes", ruby.str_from_slice(bytes).as_value()),
             Self::Written(_, Ok(())) => tagged(ruby, "written", ruby.qnil().as_value()),
             Self::Written(target, Err(error)) => {
-                tagged(ruby, "raise", io_error(ruby, &target, &error)?.as_value())
+                tagged(ruby, "raise", io_error(ruby, target, error)?.as_value())
             }
         })
     }
@@ -119,11 +117,76 @@ fn io_error(ruby: &Ruby, path: &std::path::Path, error: &io::Error) -> Result<Ex
     ruby.exception_io_error().new_instance((error.to_string(),))
 }
 
-/// What a `Future` holds: rfd's future until it finishes, and whether it
-/// finishes on the main thread's run loop.
-struct Slot {
-    pending: Option<Pending>,
-    needs_main_loop: bool,
+/// What rfd's future finished with, or the panic that ended it.
+type Outcome = Result<Output, Panic>;
+
+/// `outcome` as the tagged Array Ruby's `Future#value` reads: a panic is
+/// `[:raise, Ferro::Rfd::Error]`, so Ruby keeps it as the outcome.
+fn outcome_to_ruby(ruby: &Ruby, outcome: &Outcome) -> Result<RArray, Error> {
+    match outcome {
+        Ok(output) => output.to_ruby(ruby),
+        Err(panic) => {
+            let error = error_class(ruby)?.new_instance((panic_text(panic),))?;
+            Ok(tagged(ruby, "raise", error.as_value()))
+        }
+    }
+}
+
+/// What a `Future` holds: rfd's future until it finishes, with whether it
+/// finishes on the main thread's run loop, then what it finished with.
+enum Slot {
+    Pending(Pending, bool),
+    Finished(Outcome),
+}
+
+/// An exception raised while waiting, and what rfd's future finished with
+/// if it finished before the exception was raised.
+struct Raised {
+    error: Error,
+    finished: Option<Outcome>,
+}
+
+/// Polls `pending` until it finishes. Returns what it finished with, or
+/// the exception an interrupt raised or the refusal to wait, together
+/// with what it finished with if it finished first.
+///
+/// An interrupt that arrives while rfd's future finishes raises after
+/// `poll` was ready (`gvl::wait`). The poll stores rfd's output here, in
+/// this function's frame, which the interrupt's jump does not skip, so
+/// the output survives the exception instead of being dropped with the
+/// work's.
+fn wait_for(ruby: &Ruby, pending: &mut Pending, needs_main_loop: bool) -> Result<Outcome, Raised> {
+    let first = capture(|| {
+        pending
+            .as_mut()
+            .poll(&mut Context::from_waker(Waker::noop()))
+    });
+    match first {
+        Ok(Poll::Ready(output)) => return Ok(Ok(output)),
+        Err(panic) => return Ok(Err(panic)),
+        Ok(Poll::Pending) => {}
+    }
+    if let Some(message) = platform::refuse_wait(needs_main_loop) {
+        return Err(Raised {
+            error: Error::new(ruby.exception_thread_error(), message),
+            finished: None,
+        });
+    }
+    let mut finished = None;
+    let waited = gvl::wait(ruby, |context| {
+        match capture(|| pending.as_mut().poll(context)) {
+            Ok(Poll::Pending) => return Poll::Pending,
+            Ok(Poll::Ready(output)) => finished = Some(Ok(output)),
+            Err(panic) => finished = Some(Err(panic)),
+        }
+        Poll::Ready(())
+    });
+    match waited {
+        Err(error) => Err(Raised { error, finished }),
+        // The poll catches its own panics, and is ready only once it has
+        // stored what rfd's future finished with.
+        Ok(_) => Ok(finished.unwrap_or_else(|| Err(Panic("the wait ended unfinished".to_owned())))),
+    }
 }
 
 /// The Ruby `Ferro::Rfd::Native::Future`, which `Ferro::Rfd::Future` holds.
@@ -136,15 +199,11 @@ pub struct Future(Mutex<Slot>);
 
 impl Future {
     pub const fn new(pending: Pending, needs_main_loop: bool) -> Self {
-        Self(Mutex::new(Slot {
-            pending: Some(pending),
-            needs_main_loop,
-        }))
+        Self(Mutex::new(Slot::Pending(pending, needs_main_loop)))
     }
 
     /// The slot, recovering a lock a panic poisoned: the slot holds no
-    /// invariant a panic could break, and a panicked future is dropped
-    /// below before the lock is released.
+    /// invariant a panic could break, since every poll catches its own.
     fn lock(&self, ruby: &Ruby) -> Result<MutexGuard<'_, Slot>, Error> {
         match self.0.try_lock() {
             Ok(slot) => Ok(slot),
@@ -156,39 +215,41 @@ impl Future {
     }
 
     /// `Native::Future#native_value` (private): waits for rfd's future and
-    /// returns its tagged output. A panic drops the future and comes back
-    /// as `[:raise, Ferro::Rfd::Error]`, so Ruby keeps it as the outcome;
-    /// an exception raised here is an interrupt's, or a refusal, and leaves
-    /// the future pending.
+    /// returns its tagged output, and returns the same output on every
+    /// later call. A panic is kept as `[:raise, Ferro::Rfd::Error]`. An
+    /// exception raised here is an interrupt's, or a refusal: rfd's future
+    /// stays pending, unless it finished as the interrupt arrived, and
+    /// then what it finished with is kept for the next call.
+    ///
+    /// Ruby checks for interrupts as this method returns (`vm_pop_frame`,
+    /// `vm_insnhelper.c:452` at Ruby v4.0.9, from
+    /// `vm_call_cfunc_with_frame_`, `:3914`), so an interrupt may also
+    /// discard the Array before Ruby stores it. The output stays here, and
+    /// the next call builds the Array again.
     fn native_value(ruby: &Ruby, rb_self: &Self) -> Result<RArray, Error> {
-        let mut slot = rb_self.lock(ruby)?;
-        let needs_main_loop = slot.needs_main_loop;
-        let Some(pending) = slot.pending.as_mut() else {
-            return Err(rfd_error(ruby, "this future has already finished"));
+        rb_self.lock(ruby)?.value(ruby)
+    }
+}
+
+impl Slot {
+    /// What [`Future::native_value`] returns, waiting for rfd's future if
+    /// it has not finished.
+    fn value(&mut self, ruby: &Ruby) -> Result<RArray, Error> {
+        let (pending, needs_main_loop) = match self {
+            Self::Finished(outcome) => return outcome_to_ruby(ruby, outcome),
+            Self::Pending(pending, needs_main_loop) => (pending, *needs_main_loop),
         };
-        let first = capture(|| {
-            pending
-                .as_mut()
-                .poll(&mut Context::from_waker(Waker::noop()))
-        });
-        let outcome: Result<Output, Panic> = match first {
-            Ok(Poll::Ready(output)) => Ok(output),
-            Err(panic) => Err(panic),
-            Ok(Poll::Pending) => {
-                if let Some(message) = platform::refuse_wait(needs_main_loop) {
-                    return Err(rfd_error(ruby, message));
-                }
-                gvl::wait(ruby, |context| pending.as_mut().poll(context))?
-                    .map_err(|payload| panic_of(&payload))
+        match wait_for(ruby, pending, needs_main_loop) {
+            Ok(outcome) => {
+                let tagged = outcome_to_ruby(ruby, &outcome);
+                *self = Self::Finished(outcome);
+                tagged
             }
-        };
-        slot.pending = None;
-        drop(slot);
-        match outcome {
-            Ok(output) => output.into_ruby(ruby),
-            Err(panic) => {
-                let error = error_class(ruby)?.new_instance((panic_text(&panic),))?;
-                Ok(tagged(ruby, "raise", error.as_value()))
+            Err(Raised { error, finished }) => {
+                if let Some(outcome) = finished {
+                    *self = Self::Finished(outcome);
+                }
+                Err(error)
             }
         }
     }

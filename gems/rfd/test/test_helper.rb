@@ -40,6 +40,39 @@ module RfdSuite
   # not a default one, so an unbundled child finds it only if told where.
   BUNDLED_PATHS = %w[fiddle].flat_map { |name| Gem.loaded_specs[name]&.full_require_paths || [] }.freeze
 
+  # Defines WhileRaising in a child: an exception that runs a block from
+  # its own #backtrace, and keeps what the block returned. Ruby asks an
+  # exception for its backtrace while raising it, with the thread marked
+  # as raising (setup_exception, eval.c:542-543, and rb_get_backtrace,
+  # error.c:1929, at v4.0.9), and a thread so marked runs no interrupts
+  # (thread.c:2625), so one the block makes pending stays pending.
+  # rb_thread_call_without_gvl2 skips its work while any interrupt is
+  # pending (thread.c:320-327), so the gem used to give up and run the
+  # work with the GVL held, stalling every other thread. The child keeps
+  # Ruby's raising state out of the test run.
+  WHILE_RAISING = <<~RUBY
+    class WhileRaising < StandardError
+      attr_reader :value
+
+      def self.run(&block)
+        raise new(&block)
+      rescue WhileRaising => e
+        e.value
+      end
+
+      def initialize(&block)
+        super("raising")
+        @block = block
+      end
+
+      def backtrace
+        block, @block = @block, nil
+        @value = block.call if block
+        super
+      end
+    end
+  RUBY
+
   # How long a child may run before it is killed, in seconds: well under
   # the watchdog's limit, so a dialog left open never outlives the test.
   CHILD_LIMIT = 30
@@ -59,7 +92,11 @@ module RfdSuite
     RUBY
     Open3.popen3(UNBUNDLED.merge(env), RbConfig.ruby, "-I", LIB, *BUNDLED_PATHS.flat_map { |path| ["-I", path] }, "-e", child) do |stdin, stdout, stderr, thread|
       stdin.close
+      # When a killed child fails the test, popen3 closes standard output
+      # under this reader, which raises IOError; the test fails on the
+      # kill, so the reader stays quiet.
       output = Thread.new { stdout.binmode.read }
+      output.report_on_exception = false
       errors = Thread.new { stderr.read }
       unless thread.join(CHILD_LIMIT)
         Process.kill(:KILL, thread.pid)

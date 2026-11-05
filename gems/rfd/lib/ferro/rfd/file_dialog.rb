@@ -46,8 +46,10 @@ module Ferro
     #
     # The dialog waits for a person, so it releases Ruby's global VM lock
     # while it is open: other Ruby threads run meanwhile. rfd cannot cancel
-    # a dialog, so Ctrl-C and <tt>Thread#kill</tt> take effect when it
-    # closes, and the process does not exit until it does.
+    # a dialog, so Ctrl-C, <tt>Thread#raise</tt>, and <tt>Thread#kill</tt>
+    # take effect when it closes, and the process does not exit until it
+    # does. One that arrives while the dialog is open raises as it closes,
+    # and the user's answer is lost, as with Ruby's own blocking calls.
     #
     # On macOS, a dialog runs on the main thread. From another thread rfd
     # hands it to the main thread, which works only while an application
@@ -217,7 +219,7 @@ module Ferro
       # instead, say joining this thread, the call never returns, and
       # neither Ctrl-C nor Thread#kill reaches it, as with rfd's own hop. A number that names none of
       # your app's windows, or a window without a content view, raises
-      # Error, where rfd would crash.
+      # +ArgumentError+, where rfd would crash.
       #
       # The parent counts only while its window exists. Keep it open until
       # the dialog closes.
@@ -345,7 +347,7 @@ module Ferro
       #
       # On macOS, with an AppKitWindowHandle parent, it looks the window up
       # as the dialog would, to show the content view rfd gets, and raises
-      # the Error the dialog would. From another thread it waits for the
+      # what the dialog would. From another thread it waits for the
       # main thread's run loop, uninterruptibly, as #set_parent explains.
       #
       # === Example
