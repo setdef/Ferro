@@ -10,7 +10,9 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use magnus::{function, prelude::*, Error, RArray, RModule, RString, Ruby, Symbol, Value};
+use magnus::{
+    function, prelude::*, typed_data::Obj, Error, RArray, RModule, RString, Ruby, Symbol, Value,
+};
 use url::{Position, Url};
 
 use crate::form::{self, Encodings};
@@ -69,6 +71,16 @@ impl NativeUrl {
         let mut url = self.lock();
         change_or_restore(&mut url, change).unwrap_or_else(|panic| Err(Failure::Panic(panic)))
     }
+}
+
+/// The native URL `url` wraps, or `FrozenError` if `url` is frozen, through
+/// magnus 0.9.3's `check_frozen` (`value.rs:1064-1072`), which works like
+/// Ruby's `rb_check_frozen` but sets no `FrozenError#receiver`.
+/// A frozen `Ferro::Url::Url` freezes its native URL, so this refuses a
+/// change however the native URL is reached (plan 005, decision 3).
+pub fn writable(url: &Obj<NativeUrl>) -> Result<&NativeUrl, Error> {
+    url.check_frozen()?;
+    Ok(url)
 }
 
 /// `Err(())` as a `Failure` naming `function` (plan 005, decision 6).
@@ -430,10 +442,11 @@ fn gvl_sleep(ruby: &Ruby, seconds: f64) -> Result<f64, Error> {
 /// `set_fragment`, `set_query` (`src/lib.rs:1559-1667`).
 fn url_set_option_str(
     ruby: &Ruby,
-    url: &NativeUrl,
+    url: Obj<NativeUrl>,
     name: Symbol,
     value: Option<String>,
 ) -> Result<(), Error> {
+    let url = writable(&url)?;
     let name = name.name()?.into_owned();
     if !matches!(name.as_str(), "set_fragment" | "set_query") {
         return Err(unknown(ruby, "Url setter", &name));
@@ -450,7 +463,8 @@ fn url_set_option_str(
 }
 
 /// `set_path` (`src/lib.rs:1732-1790`).
-fn url_set_path(ruby: &Ruby, url: &NativeUrl, path: String) -> Result<(), Error> {
+fn url_set_path(ruby: &Ruby, url: Obj<NativeUrl>, path: String) -> Result<(), Error> {
+    let url = writable(&url)?;
     url.mutate(move |url| {
         url.set_path(&path);
         Ok(())
@@ -459,20 +473,28 @@ fn url_set_path(ruby: &Ruby, url: &NativeUrl, path: String) -> Result<(), Error>
 }
 
 /// `set_port` (`src/lib.rs:1819-1898`).
-fn url_set_port(ruby: &Ruby, url: &NativeUrl, port: Option<u16>) -> Result<(), Error> {
+fn url_set_port(ruby: &Ruby, url: Obj<NativeUrl>, port: Option<u16>) -> Result<(), Error> {
+    let url = writable(&url)?;
     url.mutate(|url| unit(url.set_port(port), "url::Url::set_port"))
         .map_err(|failure| failure.into_error(ruby))
 }
 
 /// `set_host` (`src/lib.rs:1939-2083`).
-fn url_set_host(ruby: &Ruby, url: &NativeUrl, host: Option<String>) -> Result<(), Error> {
+fn url_set_host(ruby: &Ruby, url: Obj<NativeUrl>, host: Option<String>) -> Result<(), Error> {
+    let url = writable(&url)?;
     url.mutate(move |url| url.set_host(host.as_deref()).map_err(Failure::Parse))
         .map_err(|failure| failure.into_error(ruby))
 }
 
 /// `set_ip_host` (`src/lib.rs:2128-2177`), with the address as its family
 /// (4 or 6) and number.
-fn url_set_ip_host(ruby: &Ruby, url: &NativeUrl, family: u8, number: u128) -> Result<(), Error> {
+fn url_set_ip_host(
+    ruby: &Ruby,
+    url: Obj<NativeUrl>,
+    family: u8,
+    number: u128,
+) -> Result<(), Error> {
+    let url = writable(&url)?;
     let address = match family {
         4 => IpAddr::V4(Ipv4Addr::from(u32::try_from(number).map_err(|_| {
             Error::new(ruby.exception_range_error(), "an IPv4 address is 32 bits")
@@ -490,7 +512,12 @@ fn url_set_ip_host(ruby: &Ruby, url: &NativeUrl, family: u8, number: u128) -> Re
 }
 
 /// `set_password` (`src/lib.rs:2179-2262`).
-fn url_set_password(ruby: &Ruby, url: &NativeUrl, password: Option<String>) -> Result<(), Error> {
+fn url_set_password(
+    ruby: &Ruby,
+    url: Obj<NativeUrl>,
+    password: Option<String>,
+) -> Result<(), Error> {
+    let url = writable(&url)?;
     url.mutate(move |url| {
         unit(
             url.set_password(password.as_deref()),
@@ -501,7 +528,8 @@ fn url_set_password(ruby: &Ruby, url: &NativeUrl, password: Option<String>) -> R
 }
 
 /// `set_username` and `set_scheme` (`src/lib.rs:2264-2511`).
-fn url_set_str(ruby: &Ruby, url: &NativeUrl, name: Symbol, value: String) -> Result<(), Error> {
+fn url_set_str(ruby: &Ruby, url: Obj<NativeUrl>, name: Symbol, value: String) -> Result<(), Error> {
+    let url = writable(&url)?;
     let name = name.name()?.into_owned();
     if !matches!(name.as_str(), "set_username" | "set_scheme") {
         return Err(unknown(ruby, "Url setter", &name));
@@ -520,7 +548,8 @@ fn url_set_str(ruby: &Ruby, url: &NativeUrl, name: Symbol, value: String) -> Res
 /// `PathSegmentsMut` operation (`src/path_segments.rs:77-267`), dropped
 /// at once, which puts back the rest of the URL (plan 005, decision 8).
 /// `[:none]` only asks for it, raising `Error` for a cannot-be-a-base URL.
-fn url_path_segments_mut(ruby: &Ruby, url: &NativeUrl, operation: RArray) -> Result<(), Error> {
+fn url_path_segments_mut(ruby: &Ruby, url: Obj<NativeUrl>, operation: RArray) -> Result<(), Error> {
+    let url = writable(&url)?;
     let name: Symbol = operation.entry(0)?;
     let name = name.name()?.into_owned();
     let segment: Option<String> = if name == "push" {
@@ -571,10 +600,11 @@ fn url_path_segments_mut(ruby: &Ruby, url: &NativeUrl, operation: RArray) -> Res
 /// fragment back (plan 005, decision 8).
 fn url_query_pairs_mut(
     ruby: &Ruby,
-    url: &NativeUrl,
+    url: Obj<NativeUrl>,
     operation: RArray,
     encodings: Option<RArray>,
 ) -> Result<(), Error> {
+    let url = writable(&url)?;
     let operation = form::Operation::from_ruby(ruby, operation)?;
     let encodings = Encodings::from_ruby(encodings)?;
     url.mutate(|url| {

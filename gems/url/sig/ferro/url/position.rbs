@@ -4,8 +4,6 @@
 module Ferro
   module Url
     class Position
-      include Comparable
-
       BeforeScheme: Position
       AfterScheme: Position
       BeforeUsername: Position

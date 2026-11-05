@@ -62,11 +62,13 @@ module Ferro
       alias eql? ==
       def <=>: (Object other) -> Integer?
       def hash: () -> Integer
+      def freeze: () -> self
 
       private
 
       def initialize_native: (Native::Url native) -> void
       def initialize_copy: (Url source) -> void
+      def initialize_clone: (Url source, ?freeze: bool?) -> void
       attr_reader native: Native::Url
       def writable!: () -> void
     end

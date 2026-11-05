@@ -520,6 +520,10 @@ module Ferro
       # wait at once, and the lookup finishes alone, as Ruby's own
       # <tt>Addrinfo.getaddrinfo</tt> leaves its resolver thread.
       #
+      # The URL is read once, before the block runs, as url reads it under
+      # one borrow, so the lookup uses the URL as it was when this was
+      # called, even if the block changes it.
+      #
       # A failure raises the +Errno+ class of its OS error on Unix, or
       # +IOError+ with Rust's message, such as url's
       # <tt>No host name in the URL</tt>. An IPv6 address keeps its scope
@@ -533,8 +537,9 @@ module Ferro
       #   url = Ferro::Url::Url.parse("socks5://127.0.0.1")
       #   url.socket_addrs { url.scheme == "socks5" ? 1080 : nil } # => [#<Addrinfo: 127.0.0.1:1080>]
       def socket_addrs(&default_port_number)
-        port = (default_port_number&.call if Native.url_socket_addrs_asks_for_port(@native))
-        Native.url_socket_addrs(@native, port).map do |ip, number, scope_id|
+        copy = Native.url_clone(@native)
+        port = (default_port_number&.call if Native.url_socket_addrs_asks_for_port(copy))
+        Native.url_socket_addrs(copy, port).map do |ip, number, scope_id|
           Addrinfo.new(Socket.pack_sockaddr_in(number, scope_id.zero? ? ip : "#{ip}%#{scope_id}"))
         end
       end
@@ -872,9 +877,10 @@ module Ferro
       # (<tt>url[Position::BeforeHost...Position::AfterPort]</tt>), or
       # <tt>url[nil..nil]</tt> for the whole serialization.
       #
-      # url implements no inclusive range, so a bounded <tt>..</tt> range
-      # raises +TypeError+. A range whose start falls after its end in the
-      # serialization, where Rust's slicing would panic, raises Error.
+      # url implements no inclusive range, so a bounded or beginless
+      # <tt>..</tt> range raises +TypeError+. A range whose start falls
+      # after its end in the serialization, where Rust's slicing would
+      # panic, raises Error.
       #
       # [range] Range of Position values, either end +nil+.
       #
@@ -891,8 +897,9 @@ module Ferro
         unless [first, last].all? { |position| position.nil? || position.is_a?(Position) }
           raise TypeError, "a Url slices by Position, not #{[first, last].reject(&:nil?).map(&:class).uniq.join(', ')}"
         end
-        if first && last && !range.exclude_end?
-          raise TypeError, "url has no Index<RangeInclusive<Position>>; use an exclusive range (...)"
+        if last && !range.exclude_end?
+          inclusive = first ? "RangeInclusive" : "RangeToInclusive"
+          raise TypeError, "url has no Index<#{inclusive}<Position>>; use an exclusive range (...)"
         end
 
         Native.url_slice(@native, first&.__send__(:name), last&.__send__(:name))
@@ -934,6 +941,17 @@ module Ferro
         [Url, as_str].hash
       end
 
+      # Freezes this Url and its native URL, so the native URL refuses
+      # every change, even when reached through another Url.
+      #
+      # === Example
+      #
+      #   Ferro::Url::Url.parse("https://example.net").freeze.frozen? # => true
+      def freeze
+        @native.freeze
+        super
+      end
+
       # Holds +native+, a native URL.
       private def initialize_native(native)
         @native = native
@@ -943,6 +961,13 @@ module Ferro
       private def initialize_copy(source)
         super
         @native = Native.url_clone(source.__send__(:native))
+      end
+
+      # +clone+ freezes the copy's native URL when the copy will be frozen,
+      # which Ruby does without calling #freeze.
+      private def initialize_clone(source, freeze: nil)
+        super
+        @native.freeze if freeze || (freeze.nil? && source.frozen?)
       end
 
       # The native URL, for the native layer.

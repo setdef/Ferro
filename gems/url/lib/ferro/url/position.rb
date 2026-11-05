@@ -55,9 +55,10 @@ module Ferro
     # <tt>url[...x]</tt> and <tt>url[x...AfterFragment]</tt> is the same as
     # <tt>url[x..]</tt>.
     #
-    # Ruby builds a bounded Range only from values that compare, so
-    # positions compare in the order url declares them, which is also the
-    # order they appear in a URL. url itself derives no ordering.
+    # Ruby builds a bounded Range only from values whose <tt><=></tt>
+    # answers, so positions have <tt><=></tt>, in the order url declares
+    # them, which is also the order they appear in a URL. That is all they
+    # have: url itself derives no ordering, so there is no +Comparable+.
     #
     # Mirrors url's +Position+ (<tt>src/slicing.rs:64-122</tt>).
     #
@@ -67,8 +68,6 @@ module Ferro
     #   url[Ferro::Url::Position::BeforeUsername...Ferro::Url::Position::AfterPort]
     #   # => "user:pass@example.com:8080"
     class Position
-      include Comparable
-
       private_class_method :new
 
       # Creates the variant named +name+. The constants are the only
@@ -92,13 +91,14 @@ module Ferro
       end
 
       # Orders positions as url declares them, which is the order they
-      # appear in a URL. +nil+ for anything but a Position.
+      # appear in a URL. +nil+ for anything but a Position. It exists only
+      # because Ruby's Range needs it.
       #
       # [other] Object.
       #
       # === Example
       #
-      #   Ferro::Url::Position::BeforeHost < Ferro::Url::Position::AfterHost # => true
+      #   Ferro::Url::Position::BeforeHost <=> Ferro::Url::Position::AfterHost # => -1
       def <=>(other)
         @index <=> other.index if other.is_a?(Position)
       end

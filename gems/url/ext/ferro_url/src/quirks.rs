@@ -4,10 +4,10 @@
 //! url's `quirks` module, the WHATWG URL API's getters and setters (url
 //! 2.5.8 `src/quirks.rs`; plan 005, decision 7).
 
-use magnus::{function, prelude::*, Error, RModule, Ruby, Symbol};
+use magnus::{function, prelude::*, typed_data::Obj, Error, RModule, Ruby, Symbol};
 use url::quirks;
 
-use crate::native_url::{unit, NativeUrl};
+use crate::native_url::{unit, writable, NativeUrl};
 use crate::{guarded, Failure};
 
 /// `quirks::domain_to_ascii` (`src/quirks.rs:62-68`).
@@ -63,8 +63,10 @@ const SETTERS: [&str; 10] = [
 ];
 
 /// One of the setters, by name (`src/quirks.rs:86-328`). `set_href` raises
-/// `ParseError`; the setters that return `Result<(), ()>` raise `Error`.
-fn quirks_set(ruby: &Ruby, url: &NativeUrl, name: Symbol, value: String) -> Result<(), Error> {
+/// `ParseError`; the setters that return `Result<(), ()>` raise `Error`. A
+/// frozen `url` raises `FrozenError`.
+fn quirks_set(ruby: &Ruby, url: Obj<NativeUrl>, name: Symbol, value: String) -> Result<(), Error> {
+    let url = writable(&url)?;
     let name = name.name()?.into_owned();
     if !SETTERS.contains(&name.as_str()) {
         return Err(Error::new(

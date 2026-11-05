@@ -134,6 +134,47 @@ class TestValues < Minitest::Test
     assert_equal "http://x/?", live.as_str
   end
 
+  def test_a_frozen_urls_native_value_refuses_every_change_by_any_route
+    [
+      url("http://a/").freeze,
+      Ractor.make_shareable(url("http://a/")),
+      url("http://a/").freeze.clone,
+      url("http://a/").clone(freeze: true),
+    ].each do |shared|
+      thief = url("http://b/")
+      thief.__send__(:initialize_native, shared.__send__(:native))
+      [
+        -> { thief.set_path("/x") },
+        -> { thief.set_query("q") },
+        -> { thief.set_fragment("f") },
+        -> { thief.set_port(1) },
+        -> { thief.set_host("y") },
+        -> { thief.set_ip_host(IPAddr.new("::1")) },
+        -> { thief.set_password("p") },
+        -> { thief.set_username("u") },
+        -> { thief.set_scheme("https") },
+        -> { thief.query_pairs_mut },
+        -> { thief.path_segments_mut },
+        -> { U::Quirks.set_hash(thief, "g") },
+      ].each do |change|
+        error = assert_raises(FrozenError) { change.call }
+
+        assert_equal "can't modify frozen Ferro::Url::Native::Url", error.message
+      end
+      assert_equal "http://a/", shared.as_str
+    end
+  end
+
+  def test_an_unfrozen_copy_of_a_frozen_url_changes
+    frozen = url("http://a/").freeze
+    [frozen.dup, frozen.clone(freeze: false)].each do |copy|
+      copy.set_path("/x")
+
+      assert_equal "http://a/x", copy.as_str
+    end
+    assert_equal "http://a/", frozen.as_str
+  end
+
   def test_url_new_is_private
     assert_raises(NoMethodError) { Url.new }
   end
@@ -229,7 +270,8 @@ class TestValues < Minitest::Test
 
   def test_positions_order_as_url_declares_them
     assert_equal Position.constants.min_by { |name| Position.const_get(name) }, :BeforeScheme
-    assert_operator Position::AfterPath, :<, Position::BeforeQuery
+    assert_equal(-1, Position::AfterPath <=> Position::BeforeQuery)
+    refute_respond_to Position::AfterPath, :<
     assert_equal "Ferro::Url::Position::BeforePath", Position::BeforePath.inspect
     assert_nil Position::BeforePath <=> 1
   end
@@ -240,7 +282,13 @@ class TestValues < Minitest::Test
     assert_equal "/a?b", target[Position::BeforePath...Position::AfterQuery]
     assert_equal "/a?b#c", target[Position::BeforePath..]
     assert_equal "https://example.com/a?b", target[...Position::AfterQuery]
-    assert_raises(TypeError) { target[Position::BeforePath..Position::AfterQuery] }
+    error = assert_raises(TypeError) { target[Position::BeforePath..Position::AfterQuery] }
+
+    assert_equal "url has no Index<RangeInclusive<Position>>; use an exclusive range (...)", error.message
+    error = assert_raises(TypeError) { target[..Position::AfterQuery] }
+
+    assert_equal "url has no Index<RangeToInclusive<Position>>; use an exclusive range (...)", error.message
+    assert_equal "https://example.com/a?b#c", target[nil..nil]
     assert_raises(TypeError) { target[0...3] }
     assert_raises(TypeError) { target[Position::BeforePath] }
     error = assert_raises(U::Error) { target[Position::AfterPath...Position::BeforePath] }
@@ -383,6 +431,17 @@ class TestValues < Minitest::Test
     assert_equal "http://10.0.0.1/", target.as_str
   end
 
+  def test_socket_addrs_resolves_the_url_as_it_was_when_called
+    target = url("custom://127.0.0.1/")
+    addresses = target.socket_addrs do
+      target.set_port(80)
+      9743
+    end
+
+    assert_equal 9743, addresses.first.ip_port
+    assert_equal "custom://127.0.0.1:80/", target.as_str
+  end
+
   def test_socket_addrs_errors
     error = assert_raises(IOError) { url("data:text/plain,hi").socket_addrs }
 
@@ -410,5 +469,24 @@ class TestValues < Minitest::Test
       "#c",
 ],
       %i[href origin protocol username password host hostname port pathname search hash].map { |name| q.public_send(name, target) }
+  end
+
+  def test_the_quirks_setters_take_only_a_url
+    %i[
+      set_href
+      set_protocol
+      set_username
+      set_password
+      set_host
+      set_hostname
+      set_port
+      set_pathname
+      set_search
+      set_hash
+].each do |name|
+      error = assert_raises(TypeError, name.to_s) { U::Quirks.public_send(name, "http://x/", "y") }
+
+      assert_equal "wrong argument type String (expected Ferro::Url::Url)", error.message, name.to_s
+    end
   end
 end

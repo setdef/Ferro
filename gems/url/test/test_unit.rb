@@ -13,11 +13,16 @@ require "socket"
 # SPDX-SnippetBegin
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-SnippetCopyrightText: 2013-2025 The rust-url developers
-# SPDX-SnippetComment: ported from url 2.5.8 tests/unit.rs
+# SPDX-SnippetComment: ported from url 2.5.8 tests/unit.rs, and the
+#   doctests of Url::is_special and Url::has_host, src/lib.rs:907-922
+#   and 1110-1121
 #++
 
-# url's unit tests, ported. Left out: +size+ (Rust's memory layout) and
-# +serde_error_message+ (serde). Windows' path tests run only on Windows.
+# url's unit tests, ported, with the doctests of +is_special+
+# (<tt>src/lib.rs:907-922</tt>) and +has_host+
+# (<tt>src/lib.rs:1110-1121</tt>). Left out: +size+ (Rust's memory
+# layout) and +serde_error_message+ (serde). Windows' path tests run only
+# on Windows.
 class TestUnit < Minitest::Test
   include UrlSuite
 
@@ -28,6 +33,21 @@ class TestUnit < Minitest::Test
     true
   rescue U::Error, U::ParseError
     false
+  end
+
+  def test_is_special
+    assert url("http:///tmp/foo").is_special
+    assert url("file:///tmp/foo").is_special
+    refute url("moz:///tmp/foo").is_special
+  end
+
+  def test_has_host
+    assert url("ftp://rms@example.com").has_host
+    refute url("unix:/run/foo.socket").has_host
+    refute url("data:text/plain,Stuff").has_host
+    # A file URL with an empty host has an authority but no host
+    # (parser.rs:1063-1070), which tells has_host from has_authority.
+    refute url("file:///tmp/foo").has_host
   end
 
   def test_relative

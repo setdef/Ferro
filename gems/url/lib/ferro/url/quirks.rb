@@ -253,8 +253,9 @@ module Ferro
       #   url = Ferro::Url::Url.parse("https://example.com/a")
       #   quirks.set_href(url, "http://example.org/")
       def self.set_href(url, value)
+        native = Arguments.native(url)
         url.__send__(:writable!)
-        Native.quirks_set(Arguments.native(url), :set_href, value)
+        Native.quirks_set(native, :set_href, value)
       end
 
       # Setter for https://url.spec.whatwg.org/#dom-url-protocol: the
@@ -272,8 +273,9 @@ module Ferro
       #   url = Ferro::Url::Url.parse("https://example.com/a")
       #   quirks.set_protocol(url, "http:")
       def self.set_protocol(url, value)
+        native = Arguments.native(url)
         url.__send__(:writable!)
-        Native.quirks_set(Arguments.native(url), :set_protocol, value)
+        Native.quirks_set(native, :set_protocol, value)
       end
 
       # Setter for https://url.spec.whatwg.org/#dom-url-username. Raises
@@ -289,8 +291,9 @@ module Ferro
       #   url = Ferro::Url::Url.parse("https://example.com/a")
       #   quirks.set_username(url, "admin")
       def self.set_username(url, value)
+        native = Arguments.native(url)
         url.__send__(:writable!)
-        Native.quirks_set(Arguments.native(url), :set_username, value)
+        Native.quirks_set(native, :set_username, value)
       end
 
       # Setter for https://url.spec.whatwg.org/#dom-url-password: the
@@ -307,8 +310,9 @@ module Ferro
       #   url = Ferro::Url::Url.parse("https://example.com/a")
       #   quirks.set_password(url, "")
       def self.set_password(url, value)
+        native = Arguments.native(url)
         url.__send__(:writable!)
-        Native.quirks_set(Arguments.native(url), :set_password, value)
+        Native.quirks_set(native, :set_password, value)
       end
 
       # Setter for https://url.spec.whatwg.org/#dom-url-host: a host and
@@ -326,8 +330,9 @@ module Ferro
       #   url = Ferro::Url::Url.parse("https://example.com/a")
       #   quirks.set_host(url, "example.org:81")
       def self.set_host(url, value)
+        native = Arguments.native(url)
         url.__send__(:writable!)
-        Native.quirks_set(Arguments.native(url), :set_host, value)
+        Native.quirks_set(native, :set_host, value)
       end
 
       # Setter for https://url.spec.whatwg.org/#dom-url-hostname: a host
@@ -344,8 +349,9 @@ module Ferro
       #   url = Ferro::Url::Url.parse("https://example.com/a")
       #   quirks.set_hostname(url, "example.org")
       def self.set_hostname(url, value)
+        native = Arguments.native(url)
         url.__send__(:writable!)
-        Native.quirks_set(Arguments.native(url), :set_hostname, value)
+        Native.quirks_set(native, :set_hostname, value)
       end
 
       # Setter for https://url.spec.whatwg.org/#dom-url-port: the leading
@@ -363,8 +369,9 @@ module Ferro
       #   url = Ferro::Url::Url.parse("https://example.com/a")
       #   quirks.set_port(url, "8443")
       def self.set_port(url, value)
+        native = Arguments.native(url)
         url.__send__(:writable!)
-        Native.quirks_set(Arguments.native(url), :set_port, value)
+        Native.quirks_set(native, :set_port, value)
       end
 
       # Setter for https://url.spec.whatwg.org/#dom-url-pathname: does
@@ -381,8 +388,9 @@ module Ferro
       #   url = Ferro::Url::Url.parse("https://example.com/a")
       #   quirks.set_pathname(url, "b/c")
       def self.set_pathname(url, value)
+        native = Arguments.native(url)
         url.__send__(:writable!)
-        Native.quirks_set(Arguments.native(url), :set_pathname, value)
+        Native.quirks_set(native, :set_pathname, value)
       end
 
       # Setter for https://url.spec.whatwg.org/#dom-url-search: the empty
@@ -399,8 +407,9 @@ module Ferro
       #   url = Ferro::Url::Url.parse("https://example.com/a")
       #   quirks.set_search(url, "?q=1")
       def self.set_search(url, value)
+        native = Arguments.native(url)
         url.__send__(:writable!)
-        Native.quirks_set(Arguments.native(url), :set_search, value)
+        Native.quirks_set(native, :set_search, value)
       end
 
       # Setter for https://url.spec.whatwg.org/#dom-url-hash: the empty
@@ -417,8 +426,9 @@ module Ferro
       #   url = Ferro::Url::Url.parse("https://example.com/a")
       #   quirks.set_hash(url, "#top")
       def self.set_hash(url, value)
+        native = Arguments.native(url)
         url.__send__(:writable!)
-        Native.quirks_set(Arguments.native(url), :set_hash, value)
+        Native.quirks_set(native, :set_hash, value)
       end
 
       # The internal components and offsets of a URL, which can be useful

@@ -12,6 +12,17 @@ own API. Releases are tagged `ferro-url/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Removed
+
+- `Position` no longer includes `Comparable`; only `<=>`, which Range needs, remains.
+
+### Fixed
+
+- `Url#socket_addrs` applies the block's port to the URL as it was when called, even if the block changes the URL.
+- `Url#[]` refuses an inclusive beginless range (`..Position::X`) with `TypeError`, as url implements no `RangeToInclusive` index.
+- A frozen `Url`'s native value refuses every change, so private methods can no longer change a frozen or Ractor-shared `Url` through another `Url`.
+- `Quirks` setters given anything but a `Url` raise `TypeError` instead of `NoMethodError`.
+
 ## [0.1.0.pre.1] - 2026-10-27
 
 ### Added
