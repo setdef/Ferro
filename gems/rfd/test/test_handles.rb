@@ -34,14 +34,15 @@ class TestHandles < Minitest::Test
 
   # What rfd panics with for a handle it cannot use here
   # (src/backend/win_cid/file_dialog/dialog_ffi.rs:157,
-  # src/backend/macos/utils.rs:43).
+  # src/backend/macos/utils.rs:43), verbatim, as std's unreachable! words
+  # it; a Rust test in handles.rs drives the real panic.
   # SPDX-SnippetBegin
   # SPDX-SnippetCopyrightText: 2022 Bartłomiej Maryńczak
   # SPDX-License-Identifier: MIT
   # SPDX-SnippetComment: rfd 0.17.2's unreachable! messages, verbatim
   REFUSED = {
-    windows: "unsupported window handle, expected: Windows",
-    macos: "unsupported window handle, expected: MacOS",
+    windows: "internal error: entered unreachable code: unsupported window handle, expected: Windows",
+    macos: "internal error: entered unreachable code: unsupported window handle, expected: MacOS",
   }.freeze
   # SPDX-SnippetEnd
 
@@ -77,11 +78,11 @@ class TestHandles < Minitest::Test
     skip "rfd takes no Win32 handle on macOS" if PLATFORM == :macos
     parent = Parent.new(Ferro::Rfd::Win32WindowHandle.new(hwnd: 7, hinstance: 9), Ferro::Rfd::WindowsDisplayHandle.new)
 
-    debug = Ferro::Rfd::FileDialog.new.set_parent(parent).inspect
+    debug = Ferro::Rfd::FileDialog.new.set_parent(parent).debug
 
     assert_includes debug, "parent: Some(Win32(Win32WindowHandle { hwnd: 7, hinstance: Some(9) })), " \
       "parent_display: Some(Windows(WindowsDisplayHandle))"
-    assert_includes Ferro::Rfd::FileDialog.new.set_parent(Parent.new(Ferro::Rfd::Win32WindowHandle.new(7), nil)).inspect,
+    assert_includes Ferro::Rfd::FileDialog.new.set_parent(Parent.new(Ferro::Rfd::Win32WindowHandle.new(7), nil)).debug,
       "parent: Some(Win32(Win32WindowHandle { hwnd: 7, hinstance: None }))"
   end
 
@@ -90,14 +91,14 @@ class TestHandles < Minitest::Test
     xlib = Parent.new(XLIB, Ferro::Rfd::XlibDisplayHandle.new(display: nil, screen: 0))
     xcb = Parent.new(XCB, Ferro::Rfd::XcbDisplayHandle.new(connection: 0x10, screen: 1))
 
-    assert_includes Ferro::Rfd::FileDialog.new.set_parent(xlib).inspect,
+    assert_includes Ferro::Rfd::FileDialog.new.set_parent(xlib).debug,
       "parent: Some(Xlib(XlibWindowHandle { window: 60817415, visual_id: 0 })), " \
         "parent_display: Some(Xlib(XlibDisplayHandle { display: None, screen: 0 }))"
-    assert_includes Ferro::Rfd::MessageDialog.new.set_parent(xcb).inspect,
+    assert_includes Ferro::Rfd::MessageDialog.new.set_parent(xcb).debug,
       "parent: Some(Xcb(XcbWindowHandle { window: 60817415, visual_id: Some(33) }))"
-    assert_includes Ferro::Rfd::FileDialog.new.set_parent(Parent.new(Ferro::Rfd::XlibWindowHandle.new(5), nil)).inspect,
+    assert_includes Ferro::Rfd::FileDialog.new.set_parent(Parent.new(Ferro::Rfd::XlibWindowHandle.new(5), nil)).debug,
       "parent: Some(Xlib(XlibWindowHandle { window: 5, visual_id: 0 }))"
-    assert_includes Ferro::Rfd::FileDialog.new.set_parent(Parent.new(Ferro::Rfd::XcbWindowHandle.new(5), nil)).inspect,
+    assert_includes Ferro::Rfd::FileDialog.new.set_parent(Parent.new(Ferro::Rfd::XcbWindowHandle.new(5), nil)).debug,
       "parent: Some(Xcb(XcbWindowHandle { window: 5, visual_id: None }))"
   end
 
@@ -121,7 +122,7 @@ class TestHandles < Minitest::Test
 
   # A nil handle is rfd's None, which every platform takes.
   def test_a_parent_without_handles_leaves_rfd_with_none
-    debug = Ferro::Rfd::FileDialog.new.set_parent(Parent.new(nil, nil)).inspect
+    debug = Ferro::Rfd::FileDialog.new.set_parent(Parent.new(nil, nil)).debug
 
     assert_includes debug, "parent: None, parent_display: None"
   end
@@ -151,7 +152,7 @@ class TestHandles < Minitest::Test
   # nothing looks it up (plan 008, decision 6).
   def test_an_appkit_window_is_no_parent_on_linux
     skip_unless_platform(:linux)
-    debug = Ferro::Rfd::FileDialog.new.set_parent(Parent.new(APPKIT, Ferro::Rfd::AppKitDisplayHandle.new)).inspect
+    debug = Ferro::Rfd::FileDialog.new.set_parent(Parent.new(APPKIT, Ferro::Rfd::AppKitDisplayHandle.new)).debug
 
     assert_includes debug, "parent: None, parent_display: Some(AppKit(AppKitDisplayHandle))"
   end
@@ -166,10 +167,10 @@ class TestHandles < Minitest::Test
 
     case PLATFORM
     when :windows
-      assert_includes Ferro::Rfd::FileDialog.new.set_parent(win32).inspect,
+      assert_includes Ferro::Rfd::FileDialog.new.set_parent(win32).debug,
         "parent: Some(Win32(Win32WindowHandle { hwnd: 7, hinstance: None })), " \
           "parent_display: Some(Windows(WindowsDisplayHandle))"
-      assert_includes Ferro::Rfd::FileDialog.new.set_parent(subclass).inspect,
+      assert_includes Ferro::Rfd::FileDialog.new.set_parent(subclass).debug,
         "Win32WindowHandle { hwnd: 8, hinstance: Some(9) }"
     when :macos
       [win32, subclass, xcb].each do |parent|
@@ -177,10 +178,10 @@ class TestHandles < Minitest::Test
         assert_equal REFUSED[:macos], error.message
       end
     else
-      assert_includes Ferro::Rfd::FileDialog.new.set_parent(xcb).inspect,
+      assert_includes Ferro::Rfd::FileDialog.new.set_parent(xcb).debug,
         "parent: Some(Xcb(XcbWindowHandle { window: 5, visual_id: None })), " \
           "parent_display: Some(Xlib(XlibDisplayHandle { display: None, screen: 2 }))"
-      assert_includes Ferro::Rfd::FileDialog.new.set_parent(subclass).inspect,
+      assert_includes Ferro::Rfd::FileDialog.new.set_parent(subclass).debug,
         "parent: Some(Win32(Win32WindowHandle { hwnd: 8, hinstance: Some(9) })), parent_display: None"
     end
   end
@@ -207,5 +208,38 @@ class TestHandles < Minitest::Test
 
   def test_a_parent_must_answer_both_handles
     assert_raises(NoMethodError) { Ferro::Rfd::FileDialog.new.set_parent(Object.new) }
+  end
+
+  # raw-window-handle derives Debug for each struct (src/windows.rs:11,
+  # :51, src/unix.rs:7, :47, :81, :121, src/appkit.rs:8), and debug is
+  # that text, formatted by Rust, on every platform; inspect stays Data's.
+  def test_handles_debug_as_raw_window_handle_derives
+    {
+      WIN32 => "Win32WindowHandle { hwnd: 264748, hinstance: None }",
+      Ferro::Rfd::Win32WindowHandle.new(7, 9) => "Win32WindowHandle { hwnd: 7, hinstance: Some(9) }",
+      XLIB => "XlibWindowHandle { window: 60817415, visual_id: 0 }",
+      XCB => "XcbWindowHandle { window: 60817415, visual_id: Some(33) }",
+      Ferro::Rfd::XcbWindowHandle.new(5) => "XcbWindowHandle { window: 5, visual_id: None }",
+      MyWin32.new(hwnd: 8, hinstance: nil) => "Win32WindowHandle { hwnd: 8, hinstance: None }",
+      Ferro::Rfd::WindowsDisplayHandle.new => "WindowsDisplayHandle",
+      Ferro::Rfd::XlibDisplayHandle.new(display: nil, screen: 0) => "XlibDisplayHandle { display: None, screen: 0 }",
+      Ferro::Rfd::XcbDisplayHandle.new(connection: 0x10, screen: 1) =>
+        "XcbDisplayHandle { connection: Some(0x10), screen: 1 }",
+      Ferro::Rfd::AppKitDisplayHandle.new => "AppKitDisplayHandle",
+    }.each do |handle, debug|
+      assert_equal debug, handle.debug
+      assert_match(/\A#<data /, handle.inspect)
+    end
+  end
+
+  # The AppKit window's Debug shows the content view, which only macOS can
+  # look up (test_appkit_parent.rb); elsewhere the value has no debug.
+  def test_an_appkit_window_has_debug_only_on_macos
+    assert_equal PLATFORM == :macos, APPKIT.respond_to?(:debug)
+  end
+
+  def test_a_handle_debugs_only_what_its_struct_can_hold
+    assert_raises(RangeError) { Ferro::Rfd::Win32WindowHandle.new(0).debug }
+    assert_raises(TypeError) { Ferro::Rfd::XlibDisplayHandle.new(display: nil, screen: "0").debug }
   end
 end

@@ -176,14 +176,16 @@ FERRO_GEMS = [
       require "ferro/rfd"
       # Every dialog waits for a person, so the smoke test shows none. It
       # replays a builder through rfd (its Debug text), which proves the
-      # extension loads and reaches the crate, and refuses a filter rfd's
-      # portal backend would panic on.
+      # extension loads and reaches the crate, and on Linux refuses a
+      # filter rfd's portal backend would panic on.
       dialog = Ferro::Rfd::FileDialog.new.add_filter("Text", ["txt"]).set_title("Smoke")
-      abort "rfd did not see the builder: \#{dialog.inspect}" unless dialog.inspect.include?('title: Some("Smoke")')
-      begin
-        Ferro::Rfd::FileDialog.new.add_filter("bad\\0name", ["txt"])
-        abort "a NUL byte reached rfd"
-      rescue ArgumentError
+      abort "rfd did not see the builder: \#{dialog.debug}" unless dialog.debug.include?('title: Some("Smoke")')
+      if Ferro::Rfd.const_get(:PLATFORM) == :linux
+        begin
+          Ferro::Rfd::FileDialog.new.add_filter("bad\\0name", ["txt"])
+          abort "a NUL byte reached rfd"
+        rescue ArgumentError
+        end
       end
       puts "ferro-rfd \#{Ferro::Rfd::VERSION} loads its extension (\#{dialog.class})"
     RUBY

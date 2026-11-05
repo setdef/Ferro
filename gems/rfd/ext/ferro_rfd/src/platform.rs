@@ -19,6 +19,10 @@ pub const NAME: &str = if cfg!(target_os = "macos") {
     "linux"
 };
 
+/// Whether rfd's XDG desktop portal backend serves this platform: Linux
+/// and the BSDs, as `NAME` has it (rfd `src/backend.rs:8-18`).
+pub const PORTAL: bool = cfg!(not(any(target_os = "macos", windows)));
+
 /// Whether making a future can block. On macOS it can run a whole modal,
 /// or wait for the main thread (rfd `src/backend/macos/modal_future.rs:79-119`).
 /// Elsewhere it starts nothing: the backends run the dialog on a thread
@@ -56,6 +60,9 @@ pub const WAIT_ON_MAIN: &str = "waiting on the main thread would deadlock: this 
 /// `:169`, `win_cid/message_dialog.rs:56`); on macOS, any but `AppKit`
 /// (`src/backend/macos/utils.rs:43`). The portal backend ignores a handle
 /// it cannot use (`window_identifier/mod.rs:41`), so Linux refuses none.
+/// The text is the panic's verbatim, `unreachable!`'s prefix included, as
+/// ADR 001's error rule asks of an `ArgumentError` refusal; the tests in
+/// `handles.rs` drive rfd's real panic and compare.
 pub const fn refused_handle(window: &WindowSpec) -> Option<&'static str> {
     if cfg!(target_os = "macos") && !matches!(window, WindowSpec::AppKit { .. }) {
         Some(UNSUPPORTED_MACOS)
@@ -70,13 +77,16 @@ pub const fn refused_handle(window: &WindowSpec) -> Option<&'static str> {
 // SPDX-SnippetCopyrightText: 2022 Bartłomiej Maryńczak
 // SPDX-License-Identifier: MIT
 // SPDX-SnippetComment: rfd 0.17.2's unreachable! messages, verbatim, from
-//   src/backend/macos/utils.rs:43, win_cid/file_dialog/dialog_ffi.rs:157
+//   src/backend/macos/utils.rs:43, win_cid/file_dialog/dialog_ffi.rs:157,
+//   as std's unreachable! words the panic
 
 /// rfd's panic for a handle other than `AppKit` on macOS.
-const UNSUPPORTED_MACOS: &str = "unsupported window handle, expected: MacOS";
+const UNSUPPORTED_MACOS: &str =
+    "internal error: entered unreachable code: unsupported window handle, expected: MacOS";
 
 /// rfd's panic for a handle other than Win32 on Windows.
-const UNSUPPORTED_WINDOWS: &str = "unsupported window handle, expected: Windows";
+const UNSUPPORTED_WINDOWS: &str =
+    "internal error: entered unreachable code: unsupported window handle, expected: Windows";
 
 // SPDX-SnippetEnd
 
@@ -140,8 +150,10 @@ mod apple {
         running
     }
 
-    /// What `inspect` or a lookup raises from another thread when no app
-    /// runs to reach the main thread through (plan 008, decision 5).
+    /// What `debug` raises from another thread when no app runs to reach
+    /// the main thread through (plan 008, decision 5): `ThreadError`, Ruby's
+    /// class for a wait that could never finish, since nothing would drain
+    /// the main queue (ADR 001's error rule).
     pub const LOOKUP_OFF_MAIN: &str = "an AppKitWindowHandle is looked up on the main thread, and no NSApplication runs to reach it from this one";
 
     /// Why a parent's window cannot be looked up.
@@ -152,7 +164,7 @@ mod apple {
         /// `ArgumentError`, with this message (ADR 001, 2026-11-05
         /// amendment). In Rust the parent would be a dangling `NSView`.
         Unknown(String),
-        /// No thread can reach the main thread: `Ferro::Rfd::Error`, with
+        /// No thread can reach the main thread: `ThreadError`, with
         /// [`LOOKUP_OFF_MAIN`].
         OffMain,
     }
@@ -161,7 +173,7 @@ mod apple {
     pub fn refusal_error(ruby: &magnus::Ruby, refusal: Refusal) -> magnus::Error {
         match refusal {
             Refusal::Unknown(message) => magnus::Error::new(ruby.exception_arg_error(), message),
-            Refusal::OffMain => crate::rfd_error(ruby, LOOKUP_OFF_MAIN),
+            Refusal::OffMain => magnus::Error::new(ruby.exception_thread_error(), LOOKUP_OFF_MAIN),
         }
     }
 
@@ -333,8 +345,12 @@ mod tests {
     // SPDX-SnippetComment: rfd 0.17.2's unreachable! messages, pinned
     #[test]
     fn each_platform_refuses_what_rfd_panics_on() {
-        let windows = Some("unsupported window handle, expected: Windows");
-        let macos = Some("unsupported window handle, expected: MacOS");
+        let windows = Some(
+            "internal error: entered unreachable code: unsupported window handle, expected: Windows",
+        );
+        let macos = Some(
+            "internal error: entered unreachable code: unsupported window handle, expected: MacOS",
+        );
         let expected = match NAME {
             "windows" => [None, windows, windows],
             "macos" => [macos, macos, None],
@@ -369,6 +385,33 @@ mod tests {
         assert_eq!(
             refuse_wait(true).is_some(),
             super::apple::is_main_thread() && NAME == "macos"
+        );
+    }
+
+    /// rfd's own panics, off the main thread with no running app, carry the
+    /// texts the refusals copy (`src/backend/macos/utils.rs:29`,
+    /// `modal_future.rs:117`). Both panic before any dialog is built: the
+    /// sync one in `run_on_main`, the async one after its `isRunning` check
+    /// fails with no window. The side effect is rfd's `NSApplication` made
+    /// in this test process, which `cargo test` keeps apart from Ruby.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn rfds_real_off_main_panics_carry_the_refusals_texts() {
+        let panics = std::thread::spawn(|| {
+            (
+                crate::capture(|| rfd::FileDialog::new().pick_file()),
+                crate::capture(|| drop(rfd::AsyncFileDialog::new().pick_file())),
+            )
+        })
+        .join()
+        .expect("the panics are caught");
+        assert_eq!(
+            panics.0.err().map(|panic| panic.0),
+            Some(super::NON_WINDOWED.to_owned())
+        );
+        assert_eq!(
+            panics.1.err().map(|panic| panic.0),
+            Some(super::FALLBACK_OFF_MAIN.to_owned())
         );
     }
 }

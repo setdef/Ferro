@@ -12,7 +12,7 @@ module Ferro
       def inner: () -> String
       def read: () -> Future
       def write: (String data) -> Future
-      def inspect: () -> String
+      def debug: () -> String
       def to_path: () -> String
     end
   end

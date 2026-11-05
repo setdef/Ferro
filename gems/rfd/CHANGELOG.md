@@ -16,9 +16,17 @@ own API. Releases are tagged `ferro-rfd/vX.Y.Z`.
 
 - `FileDialog.default`, `AsyncFileDialog.default`, `MessageDialog.default`, and `AsyncMessageDialog.default`, rfd's derived `Default`.
 - `Win32WindowHandle.new(hwnd)`, `XlibWindowHandle.new(window)`, and `XcbWindowHandle.new(window)` default `hinstance` to `nil` and `visual_id` to 0 and `nil`, as raw-window-handle's `new` does.
+- `debug` on `MessageLevel`, `MessageButtons`, `MessageDialogResult`, `FileHandle`, and the handle values (`AppKitWindowHandle`'s on macOS only, looking its window up), answering rfd's or raw-window-handle's `Debug` text as Rust formats it.
 
 ### Changed
 
+- **Breaking:** the four dialogs' `inspect` is Ruby's own; rfd's `Debug` text moved to `debug`, which on macOS still looks an `AppKitWindowHandle` parent's window up. `inspect` on `MessageLevel`, `MessageButtons`, `MessageDialogResult`, and `FileHandle` is Ruby's too, instead of a constant path or rfd's text.
+- **Breaking:** a dialog works once, as rfd's builders do: its terminal method (`pick_file`, `show`, and the rest) uses it up, even when it raises, and any later call on it, setters and `debug` included, raises `IOError`. A frozen dialog's terminal method raises `FrozenError`; `dup` one first.
+- **Breaking:** a `Future` works once, as `.await` takes a Rust future: the `value` that returns its answer, or raises the exception it finished with, uses it up, and a later `value` raises `IOError`. An interrupted wait still leaves it pending.
+- **Breaking:** a NUL byte in a filter is refused only on Linux, where rfd's portal backend panics on it, with that panic's text (`called \`Result::unwrap()\` on an \`Err\` value: NulError(...)`); elsewhere it reaches rfd. It raised `ArgumentError` ("string contains null byte") on every platform.
+- **Breaking:** a window handle rfd cannot use here raises `ArgumentError` with rfd's whole panic text, `internal error: entered unreachable code: ` included.
+- **Breaking:** on macOS, a dialog started off the main thread with no running app raises `Ferro::Rfd::Error` as rfd's caught panic would, `rfd panicked: ` before rfd's message.
+- **Breaking:** on macOS, `debug` with an `AppKitWindowHandle` parent, from another thread with no running app, raises `ThreadError`; `inspect` raised `Ferro::Rfd::Error`.
 - `MessageButtons` and `MessageDialogResult` are modules, so `MessageButtons::OkCustom` and its siblings are `MessageButtons`, and `MessageDialogResult::Custom` is a `MessageDialogResult`. Breaking: both were classes, which code could subclass, and `MessageButtons::Ok.class` and `MessageDialogResult::Ok.instance_of?(MessageDialogResult)` no longer answer the enum, as the constants are instances of a private class that includes the module.
 - `set_can_create_directories` takes only `true` or `false`, and raises `TypeError` for anything else, as rfd's `bool` does. Breaking: it took any truthy value.
 - On macOS, an `AppKitWindowHandle` parent whose window number names no window of the app, or a window without a content view, raises `ArgumentError` with the same message. Breaking: it raised `Ferro::Rfd::Error`.

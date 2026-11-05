@@ -20,7 +20,7 @@ use std::task::{Context, Poll, Waker};
 use magnus::{method, prelude::*, Error, Exception, RArray, RModule, Ruby, Value};
 use rfd::{FileHandle, MessageDialogResult};
 
-use crate::{capture, error_class, gvl, panic_text, path_to_ruby, platform, rfd_error, Panic};
+use crate::{capture, error_class, gvl, panic_text, path_to_ruby, platform, Panic};
 
 /// What one of rfd's futures finishes with.
 pub enum Output {
@@ -204,13 +204,20 @@ impl Future {
 
     /// The slot, recovering a lock a panic poisoned: the slot holds no
     /// invariant a panic could break, since every poll catches its own.
+    /// Another thread's wait holds the lock with the GVL released, and a
+    /// blocking `lock()` here would hold the GVL that wait needs back to
+    /// return, so the two would wait on each other forever: that raises
+    /// `ThreadError`, Ruby's class for a wait that could never finish
+    /// (ADR 001's error rule). Only a `__send__` past the Ruby `Future`'s
+    /// own lock reaches it.
     fn lock(&self, ruby: &Ruby) -> Result<MutexGuard<'_, Slot>, Error> {
         match self.0.try_lock() {
             Ok(slot) => Ok(slot),
             Err(TryLockError::Poisoned(poisoned)) => Ok(poisoned.into_inner()),
-            Err(TryLockError::WouldBlock) => {
-                Err(rfd_error(ruby, "another thread is waiting on this future"))
-            }
+            Err(TryLockError::WouldBlock) => Err(Error::new(
+                ruby.exception_thread_error(),
+                "another thread is waiting on this future",
+            )),
         }
     }
 

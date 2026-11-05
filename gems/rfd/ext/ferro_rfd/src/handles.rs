@@ -94,10 +94,7 @@ impl ParentSpec {
     pub const fn has_window(&self) -> bool {
         self.window.is_some()
     }
-}
 
-#[cfg(test)]
-impl ParentSpec {
     /// A parent that answers this window and no display.
     pub const fn of_window(window: WindowSpec) -> Self {
         Self {
@@ -105,7 +102,10 @@ impl ParentSpec {
             display: None,
         }
     }
+}
 
+#[cfg(test)]
+impl ParentSpec {
     /// A parent that answers an `AppKit` display and no window.
     pub const fn display_only() -> Self {
         Self {
@@ -376,9 +376,62 @@ pub fn check_parent(ruby: &Ruby, pair: (Option<RArray>, Option<RArray>)) -> Resu
     parent(ruby, pair).map(|_| ())
 }
 
+/// raw-window-handle's derived `Debug` of the struct inside `raw`
+/// (`src/windows.rs:51`, `src/unix.rs:47`, `:121`, `src/appkit.rs:87`):
+/// the struct's own text, without the enum variant around it.
+fn window_struct_debug(raw: RawWindowHandle) -> String {
+    match raw {
+        RawWindowHandle::Win32(handle) => format!("{handle:?}"),
+        RawWindowHandle::Xlib(handle) => format!("{handle:?}"),
+        RawWindowHandle::Xcb(handle) => format!("{handle:?}"),
+        RawWindowHandle::AppKit(handle) => format!("{handle:?}"),
+        other => format!("{other:?}"),
+    }
+}
+
+/// raw-window-handle's derived `Debug` of the struct inside `raw`
+/// (`src/windows.rs:11`, `src/unix.rs:7`, `:81`, `src/appkit.rs:8`).
+fn display_struct_debug(raw: RawDisplayHandle) -> String {
+    match raw {
+        RawDisplayHandle::Windows(handle) => format!("{handle:?}"),
+        RawDisplayHandle::Xlib(handle) => format!("{handle:?}"),
+        RawDisplayHandle::Xcb(handle) => format!("{handle:?}"),
+        RawDisplayHandle::AppKit(handle) => format!("{handle:?}"),
+        other => format!("{other:?}"),
+    }
+}
+
+/// `Native.window_handle_debug`: raw-window-handle's `Debug` of the window
+/// handle a tagged Array describes. An `AppKit` window is looked up, as a
+/// dialog's would be, for the content view its `ns_view` holds (plan 008,
+/// decisions 1-3); Ruby asks for that only on macOS, and elsewhere there
+/// is no view to show.
+pub fn window_debug(ruby: &Ruby, tuple: RArray) -> Result<String, Error> {
+    let spec = ParentSpec::of_window(window(ruby, tuple)?);
+    crate::dialogs::describe(ruby, Some(spec), |parent| {
+        parent
+            .and_then(|parent| parent.window)
+            .map(window_struct_debug)
+    })?
+    .ok_or_else(|| {
+        Error::new(
+            ruby.exception_arg_error(),
+            "an AppKitWindowHandle names a view only on macOS",
+        )
+    })
+}
+
+/// `Native.display_handle_debug`: raw-window-handle's `Debug` of the
+/// display handle a tagged Array describes.
+pub fn display_debug(ruby: &Ruby, tuple: RArray) -> Result<String, Error> {
+    display(ruby, tuple).map(|spec| display_struct_debug(spec.raw()))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{with_parent, Parent, ParentSpec, WindowSpec};
+    use super::{
+        display_struct_debug, window_struct_debug, with_parent, Parent, ParentSpec, WindowSpec,
+    };
     use raw_window_handle::{
         HandleError, HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle,
         WindowsDisplayHandle, XlibWindowHandle,
@@ -497,5 +550,77 @@ mod tests {
         assert!(appkit(7).has_window());
         let dialog = rfd::MessageDialog::new().set_parent(&Parent::without_lookup(display_only));
         assert!(format!("{dialog:?}").contains("parent: None, parent_display: Some(AppKit("));
+    }
+
+    /// The texts `debug` answers are raw-window-handle's derived `Debug` of
+    /// the struct, without the enum variant around it.
+    #[test]
+    fn handles_debug_as_raw_window_handle_derives() {
+        use raw_window_handle::{
+            AppKitDisplayHandle, Win32WindowHandle, XcbDisplayHandle, XcbWindowHandle,
+            XlibDisplayHandle,
+        };
+        use std::num::NonZeroIsize;
+        let hwnd = NonZeroIsize::new(7).expect("non-zero");
+        assert_eq!(
+            window_struct_debug(RawWindowHandle::Win32(Win32WindowHandle::new(hwnd))),
+            "Win32WindowHandle { hwnd: 7, hinstance: None }"
+        );
+        assert_eq!(
+            window_struct_debug(RawWindowHandle::Xlib(XlibWindowHandle::new(5))),
+            "XlibWindowHandle { window: 5, visual_id: 0 }"
+        );
+        let window = NonZeroU32::new(5).expect("non-zero");
+        assert_eq!(
+            window_struct_debug(RawWindowHandle::Xcb(XcbWindowHandle::new(window))),
+            "XcbWindowHandle { window: 5, visual_id: None }"
+        );
+        assert_eq!(
+            display_struct_debug(RawDisplayHandle::Windows(WindowsDisplayHandle::new())),
+            "WindowsDisplayHandle"
+        );
+        assert_eq!(
+            display_struct_debug(RawDisplayHandle::AppKit(AppKitDisplayHandle::new())),
+            "AppKitDisplayHandle"
+        );
+        assert_eq!(
+            display_struct_debug(RawDisplayHandle::Xlib(XlibDisplayHandle::new(None, 1))),
+            "XlibDisplayHandle { display: None, screen: 1 }"
+        );
+        let connection = super::pointer(std::num::NonZeroUsize::new(0x10).expect("non-zero"));
+        assert_eq!(
+            display_struct_debug(RawDisplayHandle::Xcb(XcbDisplayHandle::new(
+                Some(connection),
+                2
+            ))),
+            "XcbDisplayHandle { connection: Some(0x10), screen: 2 }"
+        );
+    }
+
+    /// rfd's own panic for a window handle it cannot use is the text the
+    /// gem refuses with (`platform::refused_handle`). On macOS rfd's async
+    /// dialog converts its parent on the calling thread before it builds
+    /// anything (`src/backend/macos/file_dialog.rs:50-51`); on Windows the
+    /// sync dialog converts it after creating the COM dialog object and
+    /// before showing it (`win_cid/file_dialog/dialog_ffi.rs:151-161`). So
+    /// neither opens a dialog. The portal backend panics on none.
+    #[cfg(any(target_os = "macos", windows))]
+    #[test]
+    fn rfd_panics_on_a_refused_handle_with_the_refusals_text() {
+        let spec = WindowSpec::Xlib {
+            window: 42,
+            visual_id: 0,
+        };
+        let parent = Parent::without_lookup(ParentSpec::of_window(spec));
+        #[cfg(target_os = "macos")]
+        let panicked = crate::capture(|| {
+            drop(rfd::AsyncFileDialog::new().set_parent(&parent).pick_file());
+        });
+        #[cfg(windows)]
+        let panicked = crate::capture(|| rfd::FileDialog::new().set_parent(&parent).pick_file());
+        assert_eq!(
+            panicked.err().map(|panic| panic.0),
+            crate::platform::refused_handle(&spec).map(str::to_owned)
+        );
     }
 }

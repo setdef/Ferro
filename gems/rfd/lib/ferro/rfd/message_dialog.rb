@@ -6,6 +6,7 @@
 #++
 
 require_relative "ferro_rfd"
+require_relative "builder"
 require_relative "handles"
 require_relative "message_level"
 require_relative "message_buttons"
@@ -37,15 +38,18 @@ module Ferro
     #
     # === Behavior
     #
-    # Setters return the dialog, and #show may run again; #inspect shows
-    # rfd's +Debug+ text. The dialog releases Ruby's global VM lock while
+    # Setters return the dialog. rfd's #show takes the builder, so a dialog
+    # works once: any call on a dialog #show has used, even one that
+    # raised, raises +IOError+, as a closed IO does; +dup+ an unused dialog
+    # to show it again. #debug shows rfd's +Debug+ text; +inspect+ is
+    # Ruby's. The dialog releases Ruby's global VM lock while
     # it is open, and rfd cannot close it early, so Ctrl-C waits for the
     # user, and then raises with the user's answer lost.
     #
     # On macOS, without a parent, rfd shows a system alert that runs on any
     # thread with no application; but MessageDialog asks for the main
     # thread, or a running application, as FileDialog does, and raises
-    # Error otherwise. AsyncMessageDialog runs the alert from any thread.
+    # Error otherwise, as rfd's panic would. AsyncMessageDialog runs the alert from any thread.
     #
     # On Linux, rfd runs +zenity+ for every message: OK-only dialogs as
     # <tt>zenity --info</tt> (or <tt>--warning</tt>, <tt>--error</tt>) and
@@ -70,6 +74,8 @@ module Ferro
     #
     #   Ferro::Rfd::MessageDialog.new.set_description("Export finished.").show
     class MessageDialog
+      include Builder
+
       # Creates a dialog with rfd's defaults: an empty title and
       # description, MessageLevel::Info, MessageButtons::Ok, and no parent.
       #
@@ -80,6 +86,7 @@ module Ferro
       #
       #   dialog = Ferro::Rfd::MessageDialog.new
       def initialize
+        @consumed_by = nil
         @level = MessageLevel.default
         @title = nil
         @description = nil
@@ -113,6 +120,7 @@ module Ferro
       #
       #   Ferro::Rfd::MessageDialog.new.set_level(Ferro::Rfd::MessageLevel::Warning)
       def set_level(level)
+        live!
         MessageLevel.__send__(:variant, level)
         @level = level
         self
@@ -127,6 +135,7 @@ module Ferro
       #
       #   Ferro::Rfd::MessageDialog.new.set_title("Unsaved changes")
       def set_title(text)
+        live!
         @title = Rfd.__send__(:string, text)
         self
       end
@@ -140,6 +149,7 @@ module Ferro
       #
       #   Ferro::Rfd::MessageDialog.new.set_description("Save before closing?")
       def set_description(text)
+        live!
         @description = Rfd.__send__(:string, text)
         self
       end
@@ -160,6 +170,7 @@ module Ferro
       #
       #   Ferro::Rfd::MessageDialog.new.set_buttons(Ferro::Rfd::MessageButtons::YesNoCancel)
       def set_buttons(btn)
+        live!
         MessageButtons.__send__(:variant, btn)
         @buttons = btn
         self
@@ -178,6 +189,7 @@ module Ferro
       #
       #   Ferro::Rfd::MessageDialog.new.set_parent(window)
       def set_parent(parent)
+        live!
         @parent = Rfd.__send__(:parent_pair, parent)
         self
       end
@@ -193,19 +205,23 @@ module Ferro
       #   Ferro::Rfd::MessageDialog.new.set_description("Hello!").show
       #   # => Ferro::Rfd::MessageDialogResult::Ok
       def show
+        consume("MessageDialog#show")
         MessageDialogResult.__send__(:from_native, Native.message_dialog(settings))
       end
 
-      # rfd's +Debug+ text for this dialog. On macOS, with an
-      # AppKitWindowHandle parent, it looks the window up as the dialog
-      # would, and from another thread waits for the main thread's run
-      # loop, uninterruptibly (FileDialog#set_parent).
+      # rfd's +Debug+ text for this dialog, formatted by Rust. +inspect+
+      # stays Ruby's. On macOS, with an AppKitWindowHandle parent, it looks
+      # the window up as the dialog would, and from another thread waits
+      # for the main thread's run loop, uninterruptibly (FileDialog#debug).
+      #
+      # Mirrors rfd's derived +Debug+ (<tt>src/message_dialog.rs:14</tt>).
       #
       # === Example
       #
-      #   Ferro::Rfd::MessageDialog.new.inspect
+      #   Ferro::Rfd::MessageDialog.new.debug
       #   # => "MessageDialog { title: \"\", description: \"\", level: Info, buttons: Ok, ... }"
-      def inspect
+      def debug
+        live!
         Native.message_dialog_debug(settings)
       end
 

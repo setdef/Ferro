@@ -109,6 +109,25 @@ class TestLinuxDialogs < Minitest::Test
     assert_equal "Cancel", answer("Ferro::Rfd::MessageDialog.new.show.to_s", path: empty).first
   end
 
+  # rfd's terminal methods take self (src/file_dialog.rs:121-174,
+  # src/message_dialog.rs:81-84), so a dialog works once: the second call
+  # raises IOError, and zenity runs once.
+  def test_a_terminal_method_uses_the_dialog_up
+    messages, = answer(<<~RUBY, output: "/a\n")
+      [Ferro::Rfd::FileDialog.new, Ferro::Rfd::MessageDialog.new].map do |dialog|
+        dialog.is_a?(Ferro::Rfd::FileDialog) ? dialog.pick_file : dialog.show
+        dialog.debug
+      rescue IOError => e
+        e.message
+      end
+    RUBY
+
+    assert_equal [
+      "Ferro::Rfd::FileDialog consumed by FileDialog#pick_file",
+      "Ferro::Rfd::MessageDialog consumed by MessageDialog#show",
+], messages
+  end
+
   def test_a_message_passes_its_level_title_and_text
     result, args = answer(<<~RUBY)
       Ferro::Rfd::MessageDialog.new.set_level(Ferro::Rfd::MessageLevel::Warning)

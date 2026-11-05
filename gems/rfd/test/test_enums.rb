@@ -28,7 +28,8 @@ class TestEnums < Minitest::Test
 
         assert_kind_of enum, value
         assert_predicate value, :frozen?
-        assert_equal "#{enum}::#{name}", value.inspect
+        assert_equal name.to_s, value.debug
+        refute_equal "#{enum}::#{name}", value.inspect
       end
       assert_raises(NoMethodError) { enum.new(:Other) }
     end
@@ -95,5 +96,33 @@ class TestEnums < Minitest::Test
     end
     refute_equal result::Ok, result::Cancel.dup
     refute_equal result::Ok, Object.new
+  end
+
+  # rfd derives Debug for its enums (src/message_dialog.rs:153, :161,
+  # :179), and Rust formats the labels, quotes and escapes included.
+  def test_variants_with_data_debug_as_rfd_derives
+    buttons = Ferro::Rfd::MessageButtons
+    result = Ferro::Rfd::MessageDialogResult
+
+    assert_equal 'OkCustom("Got it")', buttons::OkCustom.new("Got it").debug
+    assert_equal 'OkCancelCustom("Save", "Don\'t \\"Save\\"")',
+      buttons::OkCancelCustom.new("Save", "Don't \"Save\"").debug
+    assert_equal 'YesNoCancelCustom("a", "b\\n", "c")', buttons::YesNoCancelCustom.new("a", "b\n", "c").debug
+    assert_equal 'OkCustom("x")', Class.new(buttons::OkCustom).new("x").debug
+    assert_equal 'Custom("Save")', result::Custom.new("Save").debug
+    assert_equal "Ok", result::Ok.dup.debug
+  end
+
+  def test_inspect_stays_rubys
+    assert_match(/\A#<Ferro::Rfd::MessageLevel:0x\h+ @name=:Info>\z/, Ferro::Rfd::MessageLevel::Info.inspect)
+    assert_equal '#<data Ferro::Rfd::MessageButtons::OkCustom ok_text="Got it">',
+      Ferro::Rfd::MessageButtons::OkCustom.new("Got it").inspect
+    assert_equal '#<data Ferro::Rfd::MessageDialogResult::Custom custom="Save">',
+      Ferro::Rfd::MessageDialogResult::Custom.new("Save").inspect
+  end
+
+  def test_a_label_that_is_no_string_has_no_debug
+    assert_raises(TypeError) { Ferro::Rfd::MessageButtons::OkCustom.new(:label).debug }
+    assert_raises(TypeError) { Ferro::Rfd::MessageDialogResult::Custom.new(nil).debug }
   end
 end

@@ -4,6 +4,9 @@
 module Ferro
   module Rfd
     class AsyncFileDialog
+      include Builder
+
+      @consumed_by: String?
       @file_dialog: FileDialog
 
       def self.default: () -> AsyncFileDialog
@@ -20,7 +23,7 @@ module Ferro
       def pick_folder: () -> Future
       def pick_folders: () -> Future
       def save_file: () -> Future
-      def inspect: () -> String
+      def debug: () -> String
 
       private
 

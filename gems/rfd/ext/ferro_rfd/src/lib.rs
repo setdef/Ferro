@@ -60,8 +60,8 @@ pub(crate) fn panic_text(panic: &Panic) -> String {
     format!("rfd panicked: {}", panic.0)
 }
 
-/// `Ferro::Rfd::Error`, the class for rfd's panics and for the calls the
-/// gem refuses because rfd would panic or deadlock on them.
+/// `Ferro::Rfd::Error`, the class for rfd's panics, caught or, on macOS
+/// off the main thread, refused before rfd's side effects.
 pub(crate) fn error_class(ruby: &Ruby) -> Result<ExceptionClass, Error> {
     ruby.class_object()
         .const_get::<_, RModule>("Ferro")?
@@ -163,7 +163,22 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         "async_message_dialog",
         function!(dialogs::async_message_dialog, 1),
     )?;
+    native.define_singleton_method(
+        "message_level_debug",
+        function!(dialogs::message_level_debug, 1),
+    )?;
+    native.define_singleton_method(
+        "message_buttons_debug",
+        function!(dialogs::message_buttons_debug, 1),
+    )?;
+    native.define_singleton_method(
+        "message_dialog_result_debug",
+        function!(dialogs::message_dialog_result_debug, 1),
+    )?;
+    native.define_singleton_method("check_filter", function!(dialogs::check_filter, 2))?;
     native.define_singleton_method("check_parent", function!(handles::check_parent, 1))?;
+    native.define_singleton_method("window_handle_debug", function!(handles::window_debug, 1))?;
+    native.define_singleton_method("display_handle_debug", function!(handles::display_debug, 1))?;
     native.define_singleton_method("file_name", function!(file_handle::file_name, 1))?;
     native.define_singleton_method("file_handle_debug", function!(file_handle::debug, 1))?;
     native.define_singleton_method("read", function!(file_handle::read, 1))?;

@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: MIT
 #++
 
+require_relative "ferro_rfd"
+
 module Ferro
   module Rfd
     #--
@@ -63,15 +65,6 @@ module Ferro
         def initialize(name)
           @name = name
           freeze
-        end
-
-        # The constant that holds this result.
-        #
-        # === Example
-        #
-        #   Ferro::Rfd::MessageDialogResult::Yes.inspect # => "Ferro::Rfd::MessageDialogResult::Yes"
-        def inspect
-          "Ferro::Rfd::MessageDialogResult::#{@name}"
         end
 
         # The result's name, as rfd displays it: <tt>"Yes"</tt>,
@@ -148,6 +141,20 @@ module Ferro
         end
       end
 
+      # rfd's derived +Debug+ text for this result, formatted by Rust: the
+      # variant's name, or <tt>Custom("Save")</tt> with the label as Rust
+      # quotes it. +inspect+ stays Ruby's.
+      #
+      # Mirrors rfd's derived +Debug+ (<tt>src/message_dialog.rs:179</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Rfd::MessageDialogResult::Yes.debug # => "Yes"
+      #   Ferro::Rfd::MessageDialogResult::Custom.new("Save").debug # => "Custom(\"Save\")"
+      def debug
+        Native.message_dialog_result_debug(MessageDialogResult.__send__(:to_native, self))
+      end
+
       # The result rfd uses when a dialog reports none: Cancel. Mirrors
       # rfd's derived +Default+.
       #
@@ -157,6 +164,16 @@ module Ferro
       def self.default
         Cancel
       end
+
+      # The tagged Array the native layer takes for +result+:
+      # <tt>[:Yes]</tt>, or <tt>[:Custom, label]</tt>.
+      def self.to_native(result) # :nodoc:
+        case result
+        when Custom then [:Custom, Rfd.__send__(:string, result.custom)]
+        else [result.to_s.to_sym]
+        end
+      end
+      private_class_method :to_native
 
       # The result the native layer's <tt>[:Yes]</tt> or
       # <tt>[:Custom, label]</tt> names.

@@ -8,6 +8,7 @@ module Ferro
 
       @native: Native::Future
       @lock: Thread::Mutex
+      @consumed: bool
       @done: bool
       @value: value
       @error: Exception?
@@ -15,6 +16,7 @@ module Ferro
       private def self.new: (Native::Future native) -> Future
 
       def initialize: (Native::Future native) -> void
+      def initialize_copy: (Future original) -> bot
       def value: () -> value
 
       private

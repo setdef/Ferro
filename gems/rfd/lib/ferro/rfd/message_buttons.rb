@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: MIT
 #++
 
+require_relative "ferro_rfd"
+
 module Ferro
   module Rfd
     #--
@@ -67,15 +69,6 @@ module Ferro
         def initialize(name)
           @name = name
           freeze
-        end
-
-        # The constant that holds this set.
-        #
-        # === Example
-        #
-        #   Ferro::Rfd::MessageButtons::YesNo.inspect # => "Ferro::Rfd::MessageButtons::YesNo"
-        def inspect
-          "Ferro::Rfd::MessageButtons::#{@name}"
         end
 
         # The variant's name, which the native layer takes.
@@ -144,6 +137,20 @@ module Ferro
         ##
         # :attr_reader: cancel_text
         # The third button's label, a String.
+      end
+
+      # rfd's derived +Debug+ text for this set, formatted by Rust: the
+      # variant's name, and a custom set's labels as Rust quotes them, such
+      # as <tt>OkCustom("Got it")</tt>. +inspect+ stays Ruby's.
+      #
+      # Mirrors rfd's derived +Debug+ (<tt>src/message_dialog.rs:161</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Rfd::MessageButtons::YesNo.debug # => "YesNo"
+      #   Ferro::Rfd::MessageButtons::OkCustom.new("Got it").debug # => "OkCustom(\"Got it\")"
+      def debug
+        Native.message_buttons_debug(MessageButtons.__send__(:variant, self))
       end
 
       # The set a dialog has until you choose one: Ok. Mirrors rfd's derived

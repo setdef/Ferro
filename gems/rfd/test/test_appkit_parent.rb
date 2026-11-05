@@ -95,7 +95,7 @@ class TestAppkitParent < Minitest::Test
     def refusal
       yield
       nil
-    rescue Ferro::Rfd::Error, ArgumentError => error
+    rescue Ferro::Rfd::Error, ArgumentError, ThreadError => error
       "\#{error.class}: \#{error.message}"
     end
   RUBY
@@ -105,13 +105,14 @@ class TestAppkitParent < Minitest::Test
   end
 
   def test_the_dialog_gets_the_windows_content_view_on_the_main_thread
-    (debug, view, async_debug), = in_child(<<~RUBY)
+    (debug, view, async_debug, handle_debug), = in_child(<<~RUBY)
       #{APPKIT}
       AppKit.app
       window = AppKit.window
       parent = appkit_parent(AppKit.number(window))
-      [Ferro::Rfd::FileDialog.new.set_parent(parent).inspect, AppKit.content_view(window),
-        Ferro::Rfd::AsyncMessageDialog.new.set_parent(parent).inspect]
+      [Ferro::Rfd::FileDialog.new.set_parent(parent).debug, AppKit.content_view(window),
+        Ferro::Rfd::AsyncMessageDialog.new.set_parent(parent).debug,
+        Ferro::Rfd::AppKitWindowHandle.new(window_number: AppKit.number(window)).debug]
     RUBY
 
     handle = "parent: Some(AppKit(AppKitWindowHandle { ns_view: 0x#{view.to_s(16)} })), " \
@@ -119,6 +120,7 @@ class TestAppkitParent < Minitest::Test
 
     assert_includes debug, handle
     assert_includes async_debug, "parent: Some(AppKit(AppKitWindowHandle { ns_view: 0x#{view.to_s(16)} }))"
+    assert_equal "AppKitWindowHandle { ns_view: 0x#{view.to_s(16)} }", handle_debug
   end
 
   # Another thread reaches the window through the running app's main
@@ -132,7 +134,7 @@ class TestAppkitParent < Minitest::Test
       window = AppKit.window
       Thread.new do
         sleep 0.1 until AppKit.running?
-        debug = Ferro::Rfd::FileDialog.new.set_parent(appkit_parent(AppKit.number(window))).inspect
+        debug = Ferro::Rfd::FileDialog.new.set_parent(appkit_parent(AppKit.number(window))).debug
         $stdout.binmode.write(Marshal.dump([AppKit.running?, debug, AppKit.content_view(window)]))
         $stdout.flush
         exit!(0)
@@ -144,11 +146,11 @@ class TestAppkitParent < Minitest::Test
     assert_includes debug, "AppKitWindowHandle { ns_view: 0x#{view.to_s(16)} }"
   end
 
-  # While inspect waits for the main queue, it holds no GVL, so another
+  # While debug waits for the main queue, it holds no GVL, so another
   # Ruby thread runs (plan 008, decision 3). The proof is by order, not
   # by rate: the main queue stays blocked until a second Ruby thread
-  # unlocks a mutex, and that thread waits to do so until inspect has
-  # started. inspect can finish only if that thread ran meanwhile; a wait
+  # unlocks a mutex, and that thread waits to do so until debug has
+  # started. debug can finish only if that thread ran meanwhile; a wait
   # that held the GVL would never end, and the child would be killed.
   def test_waiting_for_the_main_thread_releases_the_gvl
     (order, debug, view), = in_child(<<~RUBY)
@@ -172,7 +174,7 @@ class TestAppkitParent < Minitest::Test
         locked.pop
         AppKit.block_main_queue_on(mutex)
         inspecting << true
-        debug = Ferro::Rfd::FileDialog.new.set_parent(appkit_parent(AppKit.number(window))).inspect
+        debug = Ferro::Rfd::FileDialog.new.set_parent(appkit_parent(AppKit.number(window))).debug
         order << :inspected
         releaser.join
         result = [[order.pop, order.pop], debug, AppKit.content_view(window)]
@@ -197,7 +199,8 @@ class TestAppkitParent < Minitest::Test
       number = AppKit.number(AppKit.window) + 1000
       parent = appkit_parent(number)
       [
-        refusal { Ferro::Rfd::FileDialog.new.set_parent(parent).inspect },
+        refusal { Ferro::Rfd::FileDialog.new.set_parent(parent).debug },
+        refusal { Ferro::Rfd::AppKitWindowHandle.new(window_number: number).debug },
         refusal { Ferro::Rfd::FileDialog.new.set_parent(parent).pick_file },
         refusal { Ferro::Rfd::AsyncFileDialog.new.set_parent(parent).pick_file },
         refusal { Ferro::Rfd::MessageDialog.new.set_parent(parent).show },
@@ -208,7 +211,7 @@ class TestAppkitParent < Minitest::Test
     RUBY
     number = messages.pop
 
-    assert_equal (["ArgumentError: no window of this app has window number #{number}"] * 5) +
+    assert_equal (["ArgumentError: no window of this app has window number #{number}"] * 6) +
       ["ArgumentError: no window of this app has window number 0"], messages
   end
 
@@ -230,26 +233,40 @@ class TestAppkitParent < Minitest::Test
   def test_without_an_app_no_number_names_a_window
     (message, app_exists), = in_child(<<~RUBY)
       #{APPKIT}
-      [refusal { Ferro::Rfd::FileDialog.new.set_parent(appkit_parent(1)).inspect }, AppKit.app_exists?]
+      [refusal { Ferro::Rfd::FileDialog.new.set_parent(appkit_parent(1)).debug }, AppKit.app_exists?]
     RUBY
 
     assert_equal "ArgumentError: no window of this app has window number 1", message
     refute app_exists
   end
 
+  # The lookup needs the main thread's run loop, which nothing drains
+  # without a running app, so debug's wait could never finish:
+  # ThreadError. The dialog raises what rfd's panic would.
   def test_another_thread_without_a_running_app_is_refused
-    (inspect_message, pick_message), = in_child(<<~RUBY)
+    (debug_message, pick_message), = in_child(<<~RUBY)
       #{APPKIT}
       AppKit.app
       parent = appkit_parent(AppKit.number(AppKit.window))
       Thread.new do
-        [refusal { Ferro::Rfd::FileDialog.new.set_parent(parent).inspect },
+        [refusal { Ferro::Rfd::FileDialog.new.set_parent(parent).debug },
           refusal { Ferro::Rfd::FileDialog.new.set_parent(parent).pick_file }]
       end.value
     RUBY
 
-    assert_equal "Ferro::Rfd::Error: an AppKitWindowHandle is looked up on the main thread, " \
-      "and no NSApplication runs to reach it from this one", inspect_message
-    assert_match(/\AFerro::Rfd::Error: You are running RFD in NonWindowed environment/, pick_message)
+    assert_equal "ThreadError: an AppKitWindowHandle is looked up on the main thread, " \
+      "and no NSApplication runs to reach it from this one", debug_message
+    assert_match(/\AFerro::Rfd::Error: rfd panicked: You are running RFD in NonWindowed environment/, pick_message)
+  end
+
+  # inspect is Ruby's (ADR 001, 2026-11-05), so it looks nothing up: a
+  # number that names no window, which debug refuses, inspects freely.
+  def test_inspect_looks_no_window_up
+    message, = in_child(<<~RUBY)
+      #{APPKIT}
+      refusal { Ferro::Rfd::FileDialog.new.set_parent(appkit_parent(1)).inspect }
+    RUBY
+
+    assert_nil message
   end
 end

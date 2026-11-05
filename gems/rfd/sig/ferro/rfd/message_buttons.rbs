@@ -12,7 +12,6 @@ module Ferro
         private def self.new: (Symbol name) -> instance
 
         def initialize: (Symbol name) -> void
-        def inspect: () -> String
 
         private
 
@@ -28,6 +27,8 @@ module Ferro
       private def self.labels: (OkCustom | OkCancelCustom | YesNoCancelCustom buttons) -> Array[String]
 
       def self.default: () -> MessageButtons
+
+      def debug: () -> String
 
       class OkCustom < Data
         include MessageButtons

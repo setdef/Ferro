@@ -131,7 +131,8 @@ AppKit runs dialogs on the main thread. From another thread, rfd hands a
 dialog to the main thread, which works only while an application runs its
 event loop there, as in a windowed app. Otherwise rfd would panic (after
 creating the application object on the wrong thread), so ferro-rfd raises
-Ferro::Rfd::Error with rfd's message instead. In a command-line program,
+the Ferro::Rfd::Error a caught panic raises, <tt>rfd panicked: ...</tt>
+with rfd's message, before rfd runs. In a command-line program,
 show dialogs from the main thread. AsyncMessageDialog without a parent is
 the exception: rfd shows it on a thread of its own, from anywhere.
 
@@ -204,15 +205,19 @@ SPDX-SnippetEnd
 Wayland handles are pointers rfd follows, and rfd 0.17.2 takes a Wayland
 parent no other way, so they are not bound and raise +TypeError+. A handle
 rfd would panic on (on Windows anything but Win32, on macOS anything but
-AppKit) raises +ArgumentError+ with rfd's message.
+AppKit) raises +ArgumentError+ with rfd's panic text.
 
 == How it maps rfd
 
 The API is rfd's, translated where Rust has no Ruby meaning:
 
-* Builders return themselves from each setter and keep their options, so
-  a terminal method may run more than once. +dup+ copies one, as rfd's
-  +Clone+ does, and #inspect shows rfd's +Debug+ text.
+* Builders return themselves from each setter. rfd's terminal methods
+  take the builder, so a dialog works once: after its terminal method,
+  even one that raised, any call on it raises +IOError+, as a closed IO
+  does. +dup+ an unused one to show it again, as rfd's +Clone+ lets you.
+* Every type with a Rust +Debug+ answers +debug+ with that text,
+  formatted by Rust: the dialogs, the enums, FileHandle, and the handle
+  values. +inspect+ stays Ruby's.
 * <tt>Option<T></tt> is +T+ or +nil+; paths are Strings (set_directory and
   FileHandle.new also take anything with +to_path+).
 * Enums are constants (MessageLevel::Warning, MessageButtons::YesNo,
@@ -220,7 +225,9 @@ The API is rfd's, translated where Rust has no Ruby meaning:
   (MessageButtons::OkCustom, MessageDialogResult::Custom). MessageButtons
   and MessageDialogResult are modules that every variant includes.
   +Default+ is <tt>.default</tt>.
-* A Rust future is a Future, and <tt>.await</tt> is Future#value.
+* A Rust future is a Future, and <tt>.await</tt> is Future#value, which,
+  as <tt>.await</tt> takes the future, answers once; a later call raises
+  +IOError+. An interrupted wait leaves it pending.
 * FileHandle answers #to_path, so Ruby's file methods take it.
 * +pick_file_or_folder+ and +pick_files_or_folders+ exist only on macOS,
   as in rfd, so <tt>respond_to?</tt> answers.
@@ -228,14 +235,14 @@ The API is rfd's, translated where Rust has no Ruby meaning:
 What differs from calling rfd from Rust:
 
 * rfd reports no errors, but it panics on a few inputs, which would end
-  your Ruby process. ferro-rfd refuses them first: a NUL byte in a filter
-  name or extension raises +ArgumentError+ on every platform (rfd's
-  portal backend panics on one), and so does a window handle rfd cannot
-  use; a dialog off the main thread on macOS without a running app raises
-  Ferro::Rfd::Error. Any other panic, such as FileHandle#read of a file
-  that cannot be read, raises Ferro::Rfd::Error with
-  <tt>rfd panicked: ...</tt>. Rust still prints its usual panic message to
-  stderr first.
+  your Ruby process. ferro-rfd refuses them first, with rfd's panic text:
+  a window handle rfd cannot use, and on Linux a NUL byte in a filter
+  name or extension (rfd's portal backend panics on one; elsewhere rfd
+  takes it), raise +ArgumentError+; a dialog off the main thread on macOS
+  without a running app raises Ferro::Rfd::Error with
+  <tt>rfd panicked: ...</tt>. Any other panic, such as FileHandle#read of
+  a file that cannot be read, raises the same, once caught. Rust still
+  prints its usual panic message to stderr for a caught one.
 * FileHandle#write's <tt>std::io::Error</tt> raises the matching +Errno+
   class on Unix, and +IOError+ on Windows.
 * The extension is Ractor-safe, and a builder, handle value, or FileHandle

@@ -4,6 +4,9 @@
 module Ferro
   module Rfd
     class AsyncMessageDialog
+      include Builder
+
+      @consumed_by: String?
       @message_dialog: MessageDialog
 
       def self.default: () -> AsyncMessageDialog
@@ -15,7 +18,7 @@ module Ferro
       def set_buttons: (MessageButtons btn) -> self
       def set_parent: (_Parent parent) -> self
       def show: () -> Future
-      def inspect: () -> String
+      def debug: () -> String
     end
   end
 end

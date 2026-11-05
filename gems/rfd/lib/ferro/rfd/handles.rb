@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: MIT
 #++
 
+require_relative "ferro_rfd"
+
 module Ferro
   module Rfd
     # A Win32 window, by its +HWND+, for a dialog's +set_parent+.
@@ -55,6 +57,21 @@ module Ferro
       # :attr_reader: hinstance
       # The +HINSTANCE+ of the module that created the window, a non-zero
       # Integer, or +nil+.
+
+      # raw-window-handle's derived +Debug+ text for this handle, formatted
+      # by Rust. +inspect+ stays Data's.
+      # Raises +RangeError+ or +TypeError+ for a field the struct could not
+      # hold, as +set_parent+ does.
+      #
+      # Mirrors raw-window-handle 0.6.2's derived +Debug+
+      # (<tt>src/windows.rs:51</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Rfd::Win32WindowHandle.new(7).debug # => "Win32WindowHandle { hwnd: 7, hinstance: None }"
+      def debug
+        Native.window_handle_debug(Rfd.__send__(:native_window, self))
+      end
     end
 
     # An X11 window, through Xlib, for a dialog's +set_parent+.
@@ -96,6 +113,19 @@ module Ferro
       ##
       # :attr_reader: visual_id
       # The window's X11 visual ID, an Integer; 0 when unknown.
+
+      # raw-window-handle's derived +Debug+ text for this handle, formatted
+      # by Rust. +inspect+ stays Data's.
+      #
+      # Mirrors raw-window-handle 0.6.2's derived +Debug+
+      # (<tt>src/unix.rs:47</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Rfd::XlibWindowHandle.new(5).debug # => "XlibWindowHandle { window: 5, visual_id: 0 }"
+      def debug
+        Native.window_handle_debug(Rfd.__send__(:native_window, self))
+      end
     end
 
     # An X11 window, through XCB, for a dialog's +set_parent+.
@@ -131,6 +161,21 @@ module Ferro
       ##
       # :attr_reader: visual_id
       # The window's visual ID, a non-zero Integer, or +nil+.
+
+      # raw-window-handle's derived +Debug+ text for this handle, formatted
+      # by Rust. +inspect+ stays Data's.
+      # Raises +RangeError+ or +TypeError+ for a field the struct could not
+      # hold, as +set_parent+ does.
+      #
+      # Mirrors raw-window-handle 0.6.2's derived +Debug+
+      # (<tt>src/unix.rs:121</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Rfd::XcbWindowHandle.new(5).debug # => "XcbWindowHandle { window: 5, visual_id: None }"
+      def debug
+        Native.window_handle_debug(Rfd.__send__(:native_window, self))
+      end
     end
 
     # The Windows display, for a parent's +display_handle+.
@@ -145,6 +190,18 @@ module Ferro
     #
     #   Ferro::Rfd::WindowsDisplayHandle.new
     class WindowsDisplayHandle < Data.define
+      # raw-window-handle's derived +Debug+ text for this handle, formatted
+      # by Rust. +inspect+ stays Data's.
+      #
+      # Mirrors raw-window-handle 0.6.2's derived +Debug+
+      # (<tt>src/windows.rs:11</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Rfd::WindowsDisplayHandle.new.debug # => "WindowsDisplayHandle"
+      def debug
+        Native.display_handle_debug(Rfd.__send__(:native_display, self))
+      end
     end
 
     # An X11 display, through Xlib, for a parent's +display_handle+.
@@ -166,6 +223,21 @@ module Ferro
       ##
       # :attr_reader: screen
       # The X11 screen number, an Integer.
+
+      # raw-window-handle's derived +Debug+ text for this handle, formatted
+      # by Rust. +inspect+ stays Data's.
+      # Raises +RangeError+ or +TypeError+ for a field the struct could not
+      # hold, as +set_parent+ does.
+      #
+      # Mirrors raw-window-handle 0.6.2's derived +Debug+
+      # (<tt>src/unix.rs:7</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Rfd::XlibDisplayHandle.new(display: nil, screen: 0).debug # => "XlibDisplayHandle { display: None, screen: 0 }"
+      def debug
+        Native.display_handle_debug(Rfd.__send__(:native_display, self))
+      end
     end
 
     # An X11 display, through XCB, for a parent's +display_handle+.
@@ -188,6 +260,21 @@ module Ferro
       ##
       # :attr_reader: screen
       # The X11 screen number, an Integer.
+
+      # raw-window-handle's derived +Debug+ text for this handle, formatted
+      # by Rust. +inspect+ stays Data's.
+      # Raises +RangeError+ or +TypeError+ for a field the struct could not
+      # hold, as +set_parent+ does.
+      #
+      # Mirrors raw-window-handle 0.6.2's derived +Debug+
+      # (<tt>src/unix.rs:81</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Rfd::XcbDisplayHandle.new(connection: 0x10, screen: 0).debug # => "XcbDisplayHandle { connection: Some(0x10), screen: 0 }"
+      def debug
+        Native.display_handle_debug(Rfd.__send__(:native_display, self))
+      end
     end
 
     # A macOS window, by its window number, for a dialog's +set_parent+.
@@ -208,7 +295,8 @@ module Ferro
     # windows raises +ArgumentError+ instead of reaching rfd. From another thread,
     # the lookup and the dialog run on the main thread through your running
     # app, as rfd runs any dialog from another thread; FileDialog#set_parent
-    # says more.
+    # says more. On macOS its +debug+ looks the window up too, to show the
+    # content view rfd would get; elsewhere it has no +debug+.
     #
     # Translates raw-window-handle's +AppKitWindowHandle+
     # (raw-window-handle 0.6.2, <tt>src/appkit.rs:46-110</tt>): the kind
@@ -238,6 +326,18 @@ module Ferro
     #
     #   Ferro::Rfd::AppKitDisplayHandle.new
     class AppKitDisplayHandle < Data.define
+      # raw-window-handle's derived +Debug+ text for this handle, formatted
+      # by Rust. +inspect+ stays Data's.
+      #
+      # Mirrors raw-window-handle 0.6.2's derived +Debug+
+      # (<tt>src/appkit.rs:8</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Rfd::AppKitDisplayHandle.new.debug # => "AppKitDisplayHandle"
+      def debug
+        Native.display_handle_debug(Rfd.__send__(:native_display, self))
+      end
     end
 
     # The raw-window-handle structs whose values +set_parent+ reads, by

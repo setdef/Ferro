@@ -10,8 +10,10 @@ require "test_helper"
 # On macOS, rfd panics when a dialog starts off the main thread while no
 # application runs its event loop, after creating the NSApplication from
 # that thread (src/backend/macos/utils.rs:20-31, modal_future.rs:104-119).
-# ferro-rfd refuses first, with rfd's message (plan 002, decision 5). The
-# test process runs no application, so a Ruby thread is such a thread.
+# ferro-rfd refuses first, raising what a caught panic of rfd's raises,
+# "rfd panicked: " and rfd's message (plan 002, decision 5; ADR 001's error
+# rule). The test process runs no application, so a Ruby thread is such a
+# thread.
 class TestThreads < Minitest::Test
   include RfdSuite
 
@@ -42,7 +44,7 @@ class TestThreads < Minitest::Test
 
     calls.each do |name, call|
       error = off_the_main_thread { assert_raises(Ferro::Rfd::Error, name.to_s, &call) }
-      assert_equal NON_WINDOWED, error.message
+      assert_equal "rfd panicked: #{NON_WINDOWED}", error.message
     end
   end
 
@@ -50,6 +52,28 @@ class TestThreads < Minitest::Test
     skip_unless_platform(:macos)
 
     error = off_the_main_thread { assert_raises(Ferro::Rfd::Error) { Ferro::Rfd::AsyncFileDialog.new.pick_file } }
-    assert_equal FALLBACK, error.message
+    assert_equal "rfd panicked: #{FALLBACK}", error.message
+  end
+
+  # The refusal's message is the caught panic's, so what tells them apart
+  # is rfd's side effect: rfd makes the NSApplication from the wrong
+  # thread before it panics, and the refusal comes first. A child reads
+  # AppKit's NSApp global, null until an application exists.
+  def test_the_refusals_leave_no_application_behind
+    skip_unless_platform(:macos)
+    app_exists, = in_child(<<~RUBY)
+      require "fiddle"
+      kit = Fiddle.dlopen("/System/Library/Frameworks/AppKit.framework/AppKit")
+      Thread.new do
+        [-> { Ferro::Rfd::FileDialog.new.pick_file }, -> { Ferro::Rfd::AsyncFileDialog.new.pick_file }].each do |call|
+          call.call
+        rescue Ferro::Rfd::Error
+          nil
+        end
+      end.join
+      !Fiddle::Pointer.new(kit["NSApp"]).ptr.null?
+    RUBY
+
+    refute app_exists
   end
 end

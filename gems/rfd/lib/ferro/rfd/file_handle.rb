@@ -30,7 +30,10 @@ module Ferro
     # keep native api in pair with async only web api": each runs on a
     # thread rfd starts and returns a Future.
     #
-    # A handle is frozen, so Ractors may share it.
+    # A handle is frozen, so Ractors may share it. rfd's methods borrow the
+    # handle rather than take it, so it may be read, written, and converted
+    # with #to_path as often as you like; each Future they return works
+    # once, as Future explains.
     #
     # Mirrors rfd's +FileHandle+ (<tt>src/file_handle/native.rs:112-195</tt>).
     #
@@ -132,12 +135,16 @@ module Ferro
         Future.__send__(:new, Native.write(@path, Rfd.__send__(:bytes, data)))
       end
 
-      # rfd's +Debug+ text: the path, quoted.
+      # rfd's +Debug+ text, formatted by Rust: the path's, quoted.
+      # +inspect+ stays Ruby's.
+      #
+      # Mirrors rfd's <tt>impl Debug for FileHandle</tt>
+      # (<tt>src/file_handle/native.rs:173-177</tt>).
       #
       # === Example
       #
-      #   Ferro::Rfd::FileHandle.new("/tmp/x").inspect # => "\"/tmp/x\""
-      def inspect
+      #   Ferro::Rfd::FileHandle.new("/tmp/x").debug # => "\"/tmp/x\""
+      def debug
         Native.file_handle_debug(@path)
       end
 

@@ -26,6 +26,15 @@ module RfdSuite
     skip "#{platform} only; this extension was built for #{PLATFORM}" unless PLATFORM == platform
   end
 
+  # Runs the block where a terminal method the gem failed to refuse still
+  # opens no dialog: on macOS on a Ruby thread with no running app, where
+  # rfd's own refusal fires first; elsewhere here, for async terminal
+  # methods only, which start nothing until their Future is polled.
+  # Returns the block's value; a failed assertion inside fails the test.
+  private def where_no_dialog_opens(&block)
+    (PLATFORM == :macos) ? Thread.new(&block).value : block.call
+  end
+
   # A parent window for set_parent: anything that answers window_handle
   # and display_handle.
   Parent = Data.define(:window_handle, :display_handle)

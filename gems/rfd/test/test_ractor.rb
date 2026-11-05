@@ -33,7 +33,7 @@ class TestRactor < Minitest::Test
   def test_another_ractor_replays_a_shared_builder_through_rfd
     debug = run_script(<<~RUBY)
       dialog = Ractor.make_shareable(Ferro::Rfd::FileDialog.new.add_filter("text", ["txt"]).set_title("shared"))
-      Ractor.new(dialog) { |shared| shared.inspect }.value
+      Ractor.new(dialog) { |shared| shared.debug }.value
     RUBY
 
     assert_includes debug, 'title: Some("shared")'
@@ -43,7 +43,7 @@ class TestRactor < Minitest::Test
   def test_another_ractor_builds_its_own_dialogs_and_handles
     names = run_script(<<~RUBY)
       Ractor.new do
-        [Ferro::Rfd::MessageDialog.new.set_level(Ferro::Rfd::MessageLevel::Warning).inspect,
+        [Ferro::Rfd::MessageDialog.new.set_level(Ferro::Rfd::MessageLevel::Warning).debug,
           Ferro::Rfd::FileHandle.new("/tmp/report.csv").file_name]
       end.value
     RUBY

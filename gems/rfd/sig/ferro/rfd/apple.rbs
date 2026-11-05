@@ -12,5 +12,9 @@ module Ferro
       def pick_file_or_folder: () -> Future
       def pick_files_or_folders: () -> Future
     end
+
+    class AppKitWindowHandle < Data
+      def debug: () -> String
+    end
   end
 end

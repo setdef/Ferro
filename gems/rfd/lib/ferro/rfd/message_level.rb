@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: MIT
 #++
 
+require_relative "ferro_rfd"
+
 module Ferro
   module Rfd
     #--
@@ -48,13 +50,16 @@ module Ferro
         freeze
       end
 
-      # The constant that holds this level.
+      # rfd's derived +Debug+ text for this level, formatted by Rust: the
+      # variant's name. +inspect+ stays Ruby's.
+      #
+      # Mirrors rfd's derived +Debug+ (<tt>src/message_dialog.rs:153</tt>).
       #
       # === Example
       #
-      #   Ferro::Rfd::MessageLevel::Error.inspect # => "Ferro::Rfd::MessageLevel::Error"
-      def inspect
-        "#{self.class}::#{@name}"
+      #   Ferro::Rfd::MessageLevel::Error.debug # => "Error"
+      def debug
+        Native.message_level_debug(@name)
       end
 
       # Information: the default.

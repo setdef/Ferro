@@ -59,7 +59,13 @@ module Ferro
       def self.async_message_dialog_debug: (native_message_settings settings) -> String
       def self.message_dialog: (native_message_settings settings) -> native_result
       def self.async_message_dialog: (native_message_settings settings) -> Native::Future
+      def self.message_level_debug: (Symbol name) -> String
+      def self.message_buttons_debug: (Array[Symbol | String] buttons) -> String
+      def self.message_dialog_result_debug: (native_result result) -> String
+      def self.check_filter: (String name, Array[String] extensions) -> nil
       def self.check_parent: (native_parent pair) -> nil
+      def self.window_handle_debug: (native_window handle) -> String
+      def self.display_handle_debug: (native_display handle) -> String
       def self.file_name: (String path) -> String
       def self.file_handle_debug: (String path) -> String
       def self.read: (String path) -> Native::Future

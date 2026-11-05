@@ -6,6 +6,7 @@
 #++
 
 require_relative "ferro_rfd"
+require_relative "builder"
 require_relative "message_dialog"
 require_relative "future"
 
@@ -34,6 +35,9 @@ module Ferro
     #
     # Use it to ask a question without stalling the thread that asked.
     #
+    # Like MessageDialog, a dialog works once: #show uses it up, and any
+    # later call on it raises +IOError+, as rfd's +show+ takes the builder.
+    #
     # Mirrors rfd's +AsyncMessageDialog+ (<tt>src/message_dialog.rs:87-151</tt>),
     # which wraps a +MessageDialog+ as this one does.
     #
@@ -47,6 +51,8 @@ module Ferro
     #     .value
     #   puts "res: #{result}"
     class AsyncMessageDialog
+      include Builder
+
       # Creates a dialog with rfd's defaults, as MessageDialog.new does.
       #
       # Mirrors rfd's <tt>AsyncMessageDialog::new</tt>
@@ -56,6 +62,7 @@ module Ferro
       #
       #   dialog = Ferro::Rfd::AsyncMessageDialog.new
       def initialize
+        @consumed_by = nil
         @message_dialog = MessageDialog.new
       end
 
@@ -82,6 +89,7 @@ module Ferro
       #
       #   Ferro::Rfd::AsyncMessageDialog.new.set_level(Ferro::Rfd::MessageLevel::Error)
       def set_level(level)
+        live!
         @message_dialog = @message_dialog.dup.set_level(level)
         self
       end
@@ -95,6 +103,7 @@ module Ferro
       #
       #   Ferro::Rfd::AsyncMessageDialog.new.set_title("Update ready")
       def set_title(text)
+        live!
         @message_dialog = @message_dialog.dup.set_title(text)
         self
       end
@@ -108,6 +117,7 @@ module Ferro
       #
       #   Ferro::Rfd::AsyncMessageDialog.new.set_description("Restart now?")
       def set_description(text)
+        live!
         @message_dialog = @message_dialog.dup.set_description(text)
         self
       end
@@ -122,6 +132,7 @@ module Ferro
       #
       #   Ferro::Rfd::AsyncMessageDialog.new.set_buttons(Ferro::Rfd::MessageButtons::YesNo)
       def set_buttons(btn)
+        live!
         @message_dialog = @message_dialog.dup.set_buttons(btn)
         self
       end
@@ -136,6 +147,7 @@ module Ferro
       #
       #   Ferro::Rfd::AsyncMessageDialog.new.set_parent(window)
       def set_parent(parent)
+        live!
         @message_dialog = @message_dialog.dup.set_parent(parent)
         self
       end
@@ -151,19 +163,23 @@ module Ferro
       #   future = Ferro::Rfd::AsyncMessageDialog.new.set_description("Hi").show
       #   future.value # => Ferro::Rfd::MessageDialogResult::Ok
       def show
+        consume("AsyncMessageDialog#show")
         Future.__send__(:new, Native.async_message_dialog(@message_dialog.__send__(:settings)))
       end
 
-      # rfd's +Debug+ text for this dialog. On macOS, with an
-      # AppKitWindowHandle parent, it looks the window up as the dialog
-      # would, and from another thread waits for the main thread's run
-      # loop, uninterruptibly (FileDialog#set_parent).
+      # rfd's +Debug+ text for this dialog, formatted by Rust. +inspect+
+      # stays Ruby's. On macOS, with an AppKitWindowHandle parent, it looks
+      # the window up as the dialog would, and from another thread waits
+      # for the main thread's run loop, uninterruptibly (FileDialog#debug).
+      #
+      # Mirrors rfd's derived +Debug+ (<tt>src/message_dialog.rs:92</tt>).
       #
       # === Example
       #
-      #   Ferro::Rfd::AsyncMessageDialog.new.inspect
+      #   Ferro::Rfd::AsyncMessageDialog.new.debug
       #   # => "AsyncMessageDialog(MessageDialog { title: \"\", ... })"
-      def inspect
+      def debug
+        live!
         Native.async_message_dialog_debug(@message_dialog.__send__(:settings))
       end
     end

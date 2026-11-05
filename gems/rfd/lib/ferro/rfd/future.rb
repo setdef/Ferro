@@ -30,13 +30,18 @@ module Ferro
     #
     # === Behavior
     #
-    # Like <tt>Thread#value</tt>, #value returns the same value, or raises
-    # the same exception, every time, and one thread waits at a time.
+    # <tt>.await</tt> takes the future, so a Future works once: the #value
+    # that returns its answer, or raises the exception it finished with,
+    # uses it up, and any later #value raises +IOError+, as a closed IO
+    # does. One thread waits at a time; another that was waiting on the
+    # same Future gets that +IOError+ once the first has its answer.
     # Waiting releases Ruby's global VM lock, and an interrupt (Ctrl-C,
     # <tt>Thread#raise</tt>, <tt>Thread#kill</tt>, +Timeout+) ends the
     # wait without closing the dialog; call #value again to keep waiting.
     # An interrupt that arrives just as the answer does still raises, but
-    # the answer is kept: the next #value returns it without waiting.
+    # the answer is kept: the next #value returns it without waiting. One
+    # that lands after the answer is recorded but before #value returns
+    # loses it, as Rust's cancellation of a dropped future would.
     #
     # Nothing waits for a Future you drop. On Windows and Linux its dialog
     # never opens unless #value runs; on macOS a sheet already open stays
@@ -61,9 +66,17 @@ module Ferro
       def initialize(native)
         @native = native
         @lock = Thread::Mutex.new
+        @consumed = false
         @done = false
         @value = nil
         @error = nil
+      end
+
+      # Raises +TypeError+: a Rust future is not +Clone+, so a copy that
+      # shared the native future would answer a second time. Ruby words it
+      # as it does for +Thread+, which has no allocator either.
+      def initialize_copy(_original)
+        raise TypeError, "allocator undefined for #{self.class}"
       end
 
       # Waits for the future and returns what it finished with: a
@@ -78,11 +91,21 @@ module Ferro
       # once, since the sheet finishes on that thread's event loop, and
       # the thread would be waiting on itself.
       #
+      # The answer, or the exception the work finished with, uses the
+      # Future up, as <tt>.await</tt> takes a Rust future: a later call
+      # raises +IOError+. An interrupt that ends the wait does not, and a
+      # later call waits on.
+      #
       # === Example
       #
       #   result = Ferro::Rfd::AsyncMessageDialog.new.set_title("Hi").show.value
       def value
-        @lock.synchronize { settle unless @done }
+        @lock.synchronize do
+          raise IOError, "#{self.class} consumed by Future#value" if @consumed
+
+          settle unless @done
+          @consumed = true
+        end
         error = @error
         raise error if error
 

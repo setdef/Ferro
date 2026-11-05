@@ -38,9 +38,13 @@ class TestFileHandle < Minitest::Test
     assert_equal path, Ferro::Rfd::FileHandle.new(Pathname.new(path)).path
   end
 
-  # rfd's Debug is the path's (src/file_handle/native.rs:173-177).
-  def test_inspect_is_rfds_debug
-    assert_equal "\"/tmp/report.csv\"", Ferro::Rfd::FileHandle.new("/tmp/report.csv").inspect
+  # rfd's Debug is the path's (src/file_handle/native.rs:173-177);
+  # inspect stays Ruby's.
+  def test_debug_is_rfds_debug
+    handle = Ferro::Rfd::FileHandle.new("/tmp/report.csv")
+
+    assert_equal "\"/tmp/report.csv\"", handle.debug
+    assert_match(%r{\A#<Ferro::Rfd::FileHandle:0x\h+ @path="/tmp/report.csv">\z}, handle.inspect)
   end
 
   # rfd's file_name is empty without a final component or for a name that
@@ -57,6 +61,8 @@ class TestFileHandle < Minitest::Test
     assert_equal "hello", File.read(Ferro::Rfd::FileHandle.new(path))
   end
 
+  # rfd's read and write borrow the handle (src/file_handle/native.rs:145,
+  # :154), so one handle serves both, and again.
   def test_write_then_read_round_trips_bytes
     handle = Ferro::Rfd::FileHandle.new(path)
     bytes = [0, 255, 10, 13].pack("C*")
@@ -66,17 +72,18 @@ class TestFileHandle < Minitest::Test
 
     assert_equal bytes, read
     assert_equal Encoding::BINARY, read.encoding
+    assert_equal bytes, handle.read.value
   end
 
   # rfd unwraps the read (src/file_handle/native.rs:51), so a missing file
-  # panics inside rfd; the panic arrives as Ferro::Rfd::Error, the same one
-  # each time.
+  # panics inside rfd; the panic arrives as Ferro::Rfd::Error, and uses
+  # the Future up, as a panic ends an .await.
   def test_reading_a_missing_file_raises_rfds_panic
     future = Ferro::Rfd::FileHandle.new(path("missing")).read
 
     error = assert_raises(Ferro::Rfd::Error) { future.value }
     assert_match(/\Arfd panicked: called `Result::unwrap\(\)` on an `Err` value: /, error.message)
-    assert_same error, assert_raises(Ferro::Rfd::Error) { future.value }
+    assert_raises(IOError) { future.value }
   end
 
   def test_a_failed_write_raises_rubys_error_for_it

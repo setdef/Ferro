@@ -139,13 +139,61 @@ class TestFuture < Minitest::Test
     assert_equal "kept", future.value
   end
 
-  def test_value_keeps_what_the_future_finished_with
+  # .await takes the future, so the answer comes once; a later value
+  # raises IOError, as a closed IO does (ADR 001, 2026-11-05).
+  def test_value_uses_the_future_up
     future = Ferro::Rfd::FileHandle.new(@fifo).read
     writer = Thread.new { File.write(@fifo, "once") }
-    first = future.value
-    writer.join
 
-    assert_same first, future.value
+    assert_equal "once", future.value
+    writer.join
+    error = assert_raises(IOError) { future.value }
+    assert_equal "Ferro::Rfd::Future consumed by Future#value", error.message
+  end
+
+  # A second thread waiting on the same Future gets the IOError once the
+  # first has the answer.
+  def test_a_second_waiter_finds_the_future_used_up
+    future = Ferro::Rfd::FileHandle.new(@fifo).read
+    first = Thread.new { future.value }
+    Thread.pass until first.status == "sleep"
+    second = Thread.new { future.value }
+    second.report_on_exception = false
+    Thread.pass until second.status == "sleep"
+    File.write(@fifo, "first")
+
+    assert_equal "first", first.value
+    assert_raises(IOError) { second.join }
+  end
+
+  # The native wait holds its lock with the GVL released; a second native
+  # wait could only block holding the GVL, which the first needs back, so
+  # the wait could never finish: ThreadError (ADR 001's error rule). Only
+  # a __send__ past the Future's own lock reaches it.
+  def test_a_second_native_wait_raises_thread_error
+    future = Ferro::Rfd::FileHandle.new(@fifo).read
+    first = Thread.new { future.value }
+    Thread.pass until first.status == "sleep"
+
+    error = assert_raises(ThreadError) { future.instance_variable_get(:@native).__send__(:native_value) }
+    assert_equal "another thread is waiting on this future", error.message
+    File.write(@fifo, "done")
+    assert_equal "done", first.value
+  end
+
+  # A Rust future is not Clone: a copy sharing the native future would
+  # answer again after the original had.
+  def test_a_future_cannot_be_copied
+    future = Ferro::Rfd::FileHandle.new(@fifo).read
+
+    %i[dup clone].each do |copy|
+      error = assert_raises(TypeError, copy.to_s) { future.public_send(copy) }
+      assert_equal "allocator undefined for Ferro::Rfd::Future", error.message
+    end
+    writer = Thread.new { File.write(@fifo, "done") }
+
+    assert_equal "done", future.value
+    writer.join
   end
 
   def test_a_future_is_made_only_by_rfds_methods

@@ -53,6 +53,11 @@ module Ferro
   # its Windows <tt>common-controls-v6</tt> feature are not built; the
   # README says why.
   #
+  # Each type rfd or raw-window-handle gives +Debug+ answers +debug+ with
+  # that text, formatted by Rust; +inspect+ stays Ruby's. rfd's terminal
+  # methods take their builder, so a dialog works once, and a used one
+  # raises +IOError+, as a closed IO does.
+  #
   # === Examples
   #
   #   require "ferro/rfd"
@@ -95,17 +100,17 @@ module Ferro
 
     # A filter as the native layer takes it: its name and extensions, as
     # frozen Strings. Each extension becomes a String with +to_s+, as
-    # Rust's +ToString+ formats any value. A NUL byte raises
-    # +ArgumentError+ in Ruby's words, since rfd's portal backend panics
-    # on one (rfd <tt>src/backend/xdg_desktop_portal.rs:47-65</tt>).
+    # Rust's +ToString+ formats any value. On Linux a NUL byte raises
+    # +ArgumentError+ with the text rfd's portal backend panics with
+    # (rfd <tt>src/backend/xdg_desktop_portal.rs:47-65</tt>), which the
+    # native layer gives; elsewhere rfd takes it.
     def self.filter(name, extensions) # :nodoc:
       list = Array.try_convert(extensions)
       raise TypeError, "no implicit conversion of #{extensions.class} into Array" unless list
 
       name = string(name)
       extensions = list.map { |extension| -extension.to_s }.freeze
-      raise ArgumentError, "string contains null byte" if [name, *extensions].any? { |text| text.include?("\0") }
-
+      Native.check_filter(name, extensions)
       [name, extensions]
     end
     private_class_method :filter

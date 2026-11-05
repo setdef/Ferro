@@ -12,7 +12,6 @@ module Ferro
         private def self.new: (Symbol name) -> instance
 
         def initialize: (Symbol name) -> void
-        def inspect: () -> String
         def to_s: () -> String
         def ==: (Object other) -> bool
         def eql?: (Object other) -> bool
@@ -25,8 +24,11 @@ module Ferro
       Cancel: MessageDialogResult
 
       private def self.from_native: (native_result tuple) -> MessageDialogResult
+      private def self.to_native: (MessageDialogResult result) -> native_result
 
       def self.default: () -> MessageDialogResult
+
+      def debug: () -> String
 
       class Custom < Data
         include MessageDialogResult

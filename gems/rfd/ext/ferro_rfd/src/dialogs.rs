@@ -9,6 +9,7 @@
 //! `[level, title, description, buttons, parent]`, each `nil` where the
 //! Ruby builder's setter never ran, so rfd's default stays.
 
+use std::ffi::CString;
 use std::path::PathBuf;
 
 use magnus::{prelude::*, Error, RArray, Ruby, Symbol, Value};
@@ -19,7 +20,7 @@ use rfd::{
 
 use crate::future::{Future, Output};
 use crate::handles::{self, Parent, ParentSpec};
-use crate::{gvl, path_from_ruby, path_to_ruby, platform, rfd_error, settle, Panic};
+use crate::{gvl, panic_text, path_from_ruby, path_to_ruby, platform, rfd_error, settle, Panic};
 
 type ParentPair = (Option<RArray>, Option<RArray>);
 
@@ -42,11 +43,6 @@ type MessageArgs = (
     Option<ParentPair>,
 );
 
-/// What Ruby raises for a NUL byte in a string a C API would get: its own
-/// `ArgumentError` text (`rb_string_value_cstr`, `string.c:2930-2941` at
-/// Ruby v4.0.9).
-const NUL_BYTE: &str = "string contains null byte";
-
 /// A file dialog's settings, converted to Rust values.
 struct FileSettings {
     filters: Vec<(String, Vec<String>)>,
@@ -57,18 +53,56 @@ struct FileSettings {
     can_create_directories: Option<bool>,
 }
 
-/// Whether a filter has a NUL byte, which rfd's portal backend unwraps
-/// into a panic (rfd `src/backend/xdg_desktop_portal.rs:47-65`). It is
-/// refused on every platform, so code tested elsewhere does not crash on
-/// Linux (plan 002, decision 9).
-fn has_nul(filter: &(String, Vec<String>)) -> bool {
-    filter.0.contains('\0') || filter.1.iter().any(|extension| extension.contains('\0'))
+// SPDX-SnippetBegin
+// SPDX-SnippetCopyrightText: 2022 Bartłomiej Maryńczak
+// SPDX-License-Identifier: MIT
+// SPDX-SnippetComment: the CString conversions of rfd 0.17.2's
+//   From<&Filter> for portal::FileFilter (src/backend/xdg_desktop_portal.rs:47-65)
+
+/// The text rfd's portal backend panics with for a filter named `name`
+/// with `extensions`, if it panics: it unwraps `CString::new` on the name,
+/// then on `*.{extension}` for each extension but `*` and the empty one
+/// (rfd `src/backend/xdg_desktop_portal.rs:47-65`), and `Result::unwrap`
+/// panics with its own words and the `NulError`'s `Debug`.
+fn filter_panic(name: &str, extensions: &[String]) -> Option<String> {
+    let unwrap = |text: Vec<u8>| {
+        CString::new(text)
+            .err()
+            .map(|error| format!("called `Result::unwrap()` on an `Err` value: {error:?}"))
+    };
+    unwrap(name.as_bytes().to_vec()).or_else(|| {
+        extensions
+            .iter()
+            .filter(|extension| *extension != "*" && !extension.is_empty())
+            .find_map(|extension| unwrap(format!("*.{extension}").into_bytes()))
+    })
+}
+
+// SPDX-SnippetEnd
+
+/// The `ArgumentError` for a filter rfd would panic on here, if any. Only
+/// the portal backend panics; elsewhere rfd passes the NUL byte on, and so
+/// does the gem (ADR 001's error rule refuses only what the crate panics
+/// on).
+fn refuse_filter(ruby: &Ruby, filter: &(String, Vec<String>)) -> Result<(), Error> {
+    if !platform::PORTAL {
+        return Ok(());
+    }
+    filter_panic(&filter.0, &filter.1).map_or(Ok(()), |message| {
+        Err(Error::new(ruby.exception_arg_error(), message))
+    })
+}
+
+/// `Native.check_filter`: refuses a filter rfd would panic on, when
+/// `add_filter` is called rather than when the dialog runs.
+pub fn check_filter(ruby: &Ruby, name: String, extensions: Vec<String>) -> Result<(), Error> {
+    refuse_filter(ruby, &(name, extensions))
 }
 
 fn file_settings(ruby: &Ruby, args: FileArgs) -> Result<FileSettings, Error> {
     let (filters, directory, file_name, title, parent, can_create_directories) = args;
-    if filters.iter().any(has_nul) {
-        return Err(Error::new(ruby.exception_arg_error(), NUL_BYTE));
+    for filter in &filters {
+        refuse_filter(ruby, filter)?;
     }
     Ok(FileSettings {
         filters,
@@ -140,14 +174,14 @@ fn finish<T>(
     settle(ruby, outcome)?.map_err(|refusal| platform::refusal_error(ruby, refusal))
 }
 
-/// Runs `job` with `parent`, for `inspect`: with the GVL released only
-/// when the parent looks a window up, which may wait for the main thread
-/// (plan 008, decision 5).
-fn describe(
+/// Runs `job` with `parent`, for a `debug` text: with the GVL released
+/// only when the parent looks a window up, which may wait for the main
+/// thread (plan 008, decision 5).
+pub fn describe<T: Send>(
     ruby: &Ruby,
     parent: Option<ParentSpec>,
-    job: impl FnOnce(Option<&Parent>) -> String + Send,
-) -> Result<String, Error> {
+    job: impl FnOnce(Option<&Parent>) -> T + Send,
+) -> Result<T, Error> {
     let outcome = if parent.is_some_and(|parent| parent.needs_main_thread()) {
         gvl::without_gvl(ruby, || handles::with_parent(parent, job))?
             .unwrap_or_else(|payload| Err(crate::panic_of(&payload)))
@@ -258,9 +292,14 @@ impl Picked {
     }
 }
 
-/// The `Ferro::Rfd::Error` for a call rfd would panic on here, if any.
+/// The `Ferro::Rfd::Error` for a call rfd would panic on here, if any:
+/// the error a caught panic of rfd's raises, `rfd panicked: ...` with
+/// rfd's message, raised before rfd's side effects (plan 002, decision 5;
+/// ADR 001's error rule).
 fn refuse(ruby: &Ruby, refusal: Option<&'static str>) -> Result<(), Error> {
-    refusal.map_or(Ok(()), |message| Err(rfd_error(ruby, message)))
+    refusal.map_or(Ok(()), |message| {
+        Err(rfd_error(ruby, panic_text(&Panic(message.to_owned()))))
+    })
 }
 
 /// Runs a sync dialog with `parent`, with the GVL released (plan 002,
@@ -450,6 +489,41 @@ pub fn async_message_dialog_debug(ruby: &Ruby, args: MessageArgs) -> Result<Stri
     })
 }
 
+/// `Native.message_level_debug`: rfd's derived `Debug` of the level
+/// `name` names (rfd `src/message_dialog.rs:153`).
+pub fn message_level_debug(ruby: &Ruby, name: Symbol) -> Result<String, Error> {
+    level(ruby, name).map(|level| format!("{level:?}"))
+}
+
+/// `Native.message_buttons_debug`: rfd's derived `Debug` of the buttons a
+/// tagged Array names (rfd `src/message_dialog.rs:161`).
+pub fn message_buttons_debug(ruby: &Ruby, tuple: RArray) -> Result<String, Error> {
+    buttons(ruby, tuple).map(|buttons| format!("{buttons:?}"))
+}
+
+/// The result a tagged Array names: `[:Yes]`, or `[:Custom, text]`
+/// (rfd `src/message_dialog.rs:179-187`).
+fn result_from_ruby(ruby: &Ruby, tuple: RArray) -> Result<MessageDialogResult, Error> {
+    let tag: Symbol = tuple.entry(0)?;
+    match tag.name()?.as_ref() {
+        "Yes" => Ok(MessageDialogResult::Yes),
+        "No" => Ok(MessageDialogResult::No),
+        "Ok" => Ok(MessageDialogResult::Ok),
+        "Cancel" => Ok(MessageDialogResult::Cancel),
+        "Custom" => Ok(MessageDialogResult::Custom(tuple.entry(1)?)),
+        other => Err(Error::new(
+            ruby.exception_arg_error(),
+            format!("unknown MessageDialogResult {other}"),
+        )),
+    }
+}
+
+/// `Native.message_dialog_result_debug`: rfd's derived `Debug` of the
+/// result a tagged Array names (rfd `src/message_dialog.rs:179`).
+pub fn message_dialog_result_debug(ruby: &Ruby, tuple: RArray) -> Result<String, Error> {
+    result_from_ruby(ruby, tuple).map(|result| format!("{result:?}"))
+}
+
 /// A result as Ruby rebuilds it: `[:Yes]`, or `[:Custom, text]` (rfd
 /// `src/message_dialog.rs:179-187`).
 pub fn result_to_ruby(ruby: &Ruby, result: MessageDialogResult) -> RArray {
@@ -513,8 +587,9 @@ pub fn async_message_dialog(ruby: &Ruby, args: MessageArgs) -> Result<Future, Er
 
 #[cfg(test)]
 mod tests {
-    use super::{async_message_launch, attaches, has_nul};
+    use super::{async_message_launch, attaches, filter_panic};
     use crate::handles::{ParentSpec, WindowSpec};
+    use std::ffi::CString;
 
     /// rfd's macOS backend shows a message as a sheet only when its parent
     /// has a window (`src/backend/macos/message_dialog.rs:172-183`); a
@@ -546,23 +621,71 @@ mod tests {
         assert!(!async_message_launch(None).1);
     }
 
+    /// What `filter_panic` predicts is what `Result::unwrap` panics with
+    /// for the same conversions, on every platform.
     #[test]
-    fn a_nul_byte_in_a_filter_name_or_extension_is_found() {
-        let filter = |name: &str, extensions: &[&str]| {
-            (
-                name.to_owned(),
-                extensions.iter().map(|&e| e.to_owned()).collect::<Vec<_>>(),
-            )
+    fn a_filter_panic_is_unwraps_own_text() {
+        let unwrapped = |text: &str| {
+            let text = text.to_owned();
+            crate::capture(move || CString::new(text).unwrap()).err()
         };
-        assert!(!has_nul(&filter("Text", &["txt", "md"])));
-        assert!(has_nul(&filter("Te\0xt", &["txt"])));
-        assert!(has_nul(&filter("Text", &["txt", "m\0d"])));
+        let strings = |list: &[&str]| list.iter().map(|&e| e.to_owned()).collect::<Vec<_>>();
+
+        assert_eq!(filter_panic("Text", &strings(&["txt", "md"])), None);
+        assert_eq!(
+            filter_panic("Te\0xt", &strings(&["txt"])),
+            unwrapped("Te\0xt").map(|panic| panic.0)
+        );
+        assert_eq!(
+            filter_panic("Text", &strings(&["txt", "m\0d"])),
+            unwrapped("*.m\0d").map(|panic| panic.0)
+        );
+        assert_eq!(
+            filter_panic("Te\0xt", &[]),
+            Some(
+                "called `Result::unwrap()` on an `Err` value: NulError(2, [84, 101, 0, 120, 116])"
+                    .to_owned()
+            )
+        );
+        assert_eq!(filter_panic("Text", &strings(&["*", ""])), None);
     }
 
-    /// The portal backend panics on what `has_nul` finds, which is why it
-    /// is refused (rfd `src/backend/xdg_desktop_portal.rs:49`).
+    /// rfd's portal backend panics with exactly the predicted text, before
+    /// it asks the portal for anything (rfd
+    /// `src/backend/xdg_desktop_portal.rs:47-65`, `:80-92`).
+    #[cfg(not(any(target_os = "macos", windows)))]
     #[test]
-    fn a_nul_byte_is_what_cstring_refuses() {
-        assert!(std::ffi::CString::new("Te\0xt").is_err());
+    fn rfds_portal_backend_panics_on_a_nul_byte_as_predicted() {
+        for (name, extension) in [("Te\0xt", "txt"), ("Text", "m\0d")] {
+            let panicked = crate::capture(move || {
+                rfd::FileDialog::new()
+                    .add_filter(name, &[extension])
+                    .pick_file()
+            });
+            assert_eq!(
+                panicked.err().map(|panic| panic.0),
+                filter_panic(name, &[extension.to_owned()])
+            );
+        }
+    }
+
+    /// The `Debug` texts rfd derives for its enums.
+    #[test]
+    fn the_enums_debug_as_rfd_derives() {
+        use rfd::{MessageButtons, MessageDialogResult, MessageLevel};
+        assert_eq!(format!("{:?}", MessageLevel::Warning), "Warning");
+        assert_eq!(format!("{:?}", MessageButtons::YesNo), "YesNo");
+        assert_eq!(
+            format!(
+                "{:?}",
+                MessageButtons::OkCancelCustom("a\"b".into(), "c".into())
+            ),
+            r#"OkCancelCustom("a\"b", "c")"#
+        );
+        assert_eq!(format!("{:?}", MessageDialogResult::Cancel), "Cancel");
+        assert_eq!(
+            format!("{:?}", MessageDialogResult::Custom("Save".into())),
+            r#"Custom("Save")"#
+        );
     }
 }

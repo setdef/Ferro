@@ -6,6 +6,7 @@
 #++
 
 require_relative "ferro_rfd"
+require_relative "builder"
 require_relative "file_dialog"
 require_relative "future"
 
@@ -45,13 +46,16 @@ module Ferro
     # prints a note to standard error and shows an ordinary modal dialog
     # instead, there and then: the terminal method waits for the user (with
     # Ruby's global VM lock released) and returns a Future that is already
-    # finished. Off the main thread that is impossible, and the terminal
-    # method raises Error, with rfd's message, instead of letting rfd
-    # panic. Future#value on the main thread refuses to wait for a sheet,
+    # finished. Off the main thread that is impossible, and rfd would
+    # panic: the terminal method raises the Error a caught panic raises,
+    # <tt>rfd panicked: ...</tt> with rfd's message, before rfd creates the
+    # application on the wrong thread. Future#value on the main thread refuses to wait for a sheet,
     # which would never finish.
     #
     # Results are FileHandle objects rather than path Strings. The options
-    # behave as FileDialog's do; see each method there.
+    # behave as FileDialog's do; see each method there. Like FileDialog, a
+    # dialog works once: a terminal method uses it up, and any later call
+    # on it raises +IOError+, as rfd's terminal methods take the builder.
     #
     # Mirrors rfd's +AsyncFileDialog+ (<tt>src/file_dialog.rs:177-331</tt>),
     # which wraps a +FileDialog+ as this one does.
@@ -71,6 +75,8 @@ module Ferro
     #   # main thread):
     #   handle = Ferro::Rfd::AsyncFileDialog.new.pick_folder.value
     class AsyncFileDialog
+      include Builder
+
       # Creates a dialog with rfd's defaults, as FileDialog.new does.
       #
       # Mirrors rfd's <tt>AsyncFileDialog::new</tt>
@@ -80,6 +86,7 @@ module Ferro
       #
       #   dialog = Ferro::Rfd::AsyncFileDialog.new
       def initialize
+        @consumed_by = nil
         @file_dialog = FileDialog.new
       end
 
@@ -97,7 +104,12 @@ module Ferro
       end
 
       # Adds a file type filter. Returns the dialog. See
-      # FileDialog#add_filter.
+      # FileDialog#add_filter. On Linux a NUL byte in the name or an
+      # extension raises +ArgumentError+ here, although rfd's async portal
+      # dialog would panic on a thread of its own and resolve to +nil+
+      # (<tt>src/backend/xdg_desktop_portal.rs:28-32</tt>): no Ruby input
+      # may panic the crate, even on rfd's thread, which also prints to
+      # standard error.
       #
       # Mirrors rfd's <tt>AsyncFileDialog::add_filter</tt>
       # (<tt>src/file_dialog.rs:193-205</tt>).
@@ -106,6 +118,7 @@ module Ferro
       #
       #   Ferro::Rfd::AsyncFileDialog.new.add_filter("Images", ["png", "jpg"])
       def add_filter(name, extensions)
+        live!
         @file_dialog = @file_dialog.dup.add_filter(name, extensions)
         self
       end
@@ -120,6 +133,7 @@ module Ferro
       #
       #   Ferro::Rfd::AsyncFileDialog.new.set_directory(Dir.home)
       def set_directory(path)
+        live!
         @file_dialog = @file_dialog.dup.set_directory(path)
         self
       end
@@ -134,6 +148,7 @@ module Ferro
       #
       #   Ferro::Rfd::AsyncFileDialog.new.set_file_name("notes.txt")
       def set_file_name(file_name)
+        live!
         @file_dialog = @file_dialog.dup.set_file_name(file_name)
         self
       end
@@ -148,6 +163,7 @@ module Ferro
       #
       #   Ferro::Rfd::AsyncFileDialog.new.set_title("Open a log")
       def set_title(title)
+        live!
         @file_dialog = @file_dialog.dup.set_title(title)
         self
       end
@@ -163,6 +179,7 @@ module Ferro
       #
       #   Ferro::Rfd::AsyncFileDialog.new.set_parent(window)
       def set_parent(parent)
+        live!
         @file_dialog = @file_dialog.dup.set_parent(parent)
         self
       end
@@ -177,6 +194,7 @@ module Ferro
       #
       #   Ferro::Rfd::AsyncFileDialog.new.set_can_create_directories(true)
       def set_can_create_directories(can)
+        live!
         @file_dialog = @file_dialog.dup.set_can_create_directories(can)
         self
       end
@@ -248,21 +266,25 @@ module Ferro
         start(:save_file)
       end
 
-      # rfd's +Debug+ text for this dialog. On macOS, with an
-      # AppKitWindowHandle parent, it looks the window up as the dialog
-      # would, and from another thread waits for the main thread's run
-      # loop, uninterruptibly (FileDialog#set_parent).
+      # rfd's +Debug+ text for this dialog, formatted by Rust. +inspect+
+      # stays Ruby's. On macOS, with an AppKitWindowHandle parent, it looks
+      # the window up as the dialog would, and from another thread waits
+      # for the main thread's run loop, uninterruptibly (FileDialog#debug).
+      #
+      # Mirrors rfd's derived +Debug+ (<tt>src/file_dialog.rs:182</tt>).
       #
       # === Example
       #
-      #   Ferro::Rfd::AsyncFileDialog.new.inspect
+      #   Ferro::Rfd::AsyncFileDialog.new.debug
       #   # => "AsyncFileDialog { file_dialog: FileDialog { filters: [], ... } }"
-      def inspect
+      def debug
+        live!
         Native.async_file_dialog_debug(@file_dialog.__send__(:settings))
       end
 
-      # Starts rfd's +call+ and wraps its future.
+      # Uses the dialog up, then starts rfd's +call+ and wraps its future.
       private def start(call)
+        consume("AsyncFileDialog##{call}")
         Future.__send__(:new, Native.async_file_dialog(call, @file_dialog.__send__(:settings)))
       end
     end

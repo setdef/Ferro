@@ -4,6 +4,9 @@
 module Ferro
   module Rfd
     class MessageDialog
+      include Builder
+
+      @consumed_by: String?
       @level: MessageLevel
       @title: String?
       @description: String?
@@ -19,7 +22,7 @@ module Ferro
       def set_buttons: (MessageButtons btn) -> self
       def set_parent: (_Parent parent) -> self
       def show: () -> MessageDialogResult
-      def inspect: () -> String
+      def debug: () -> String
 
       private
 
