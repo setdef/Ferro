@@ -120,13 +120,15 @@ module Ferro
           Ferro::Time::Unit.__send__(:compare, [false, @place], other)
         end
 
-        # The constant that holds this unit.
+        # time-core's derived +Debug+ text for this unit, formatted by
+        # Rust: the struct's name. +inspect+ stays Ruby's (ADR 001, 2026-11-05). Mirrors
+        # time-core's derived +Debug+ (<tt>time-core-0.1.9/src/unit.rs:21-28</tt>).
         #
         # === Example
         #
-        #   Ferro::Time::Unit::Second.inspect # => "Ferro::Time::Unit::Second"
-        def inspect
-          "Ferro::Time::Unit::#{@name}"
+        #   Ferro::Time::Unit::Second.debug # => "Second"
+        def debug
+          Native.unit_debug(@name, false)
         end
 
         # The unit's name, which +per+ hands the native layer.
@@ -211,13 +213,15 @@ module Ferro
           Ferro::Time::Unit.__send__(:compare, [true, @place], other)
         end
 
-        # The constant that holds this variant.
+        # time-core's derived +Debug+ text for this variant, formatted by
+        # Rust. +inspect+ stays Ruby's (ADR 001, 2026-11-05). Mirrors time-core's derived +Debug+
+        # for +Unit+ (<tt>time-core-0.1.9/src/unit.rs:289-309</tt>).
         #
         # === Example
         #
-        #   Ferro::Time::Unit::Unit::Hour.inspect # => "Ferro::Time::Unit::Unit::Hour"
-        def inspect
-          "Ferro::Time::Unit::Unit::#{@name}"
+        #   Ferro::Time::Unit::Unit::Hour.debug # => "Hour"
+        def debug
+          Native.unit_debug(@name, true)
         end
 
         # Where the variant sits from Nanosecond (0) to Week (7).

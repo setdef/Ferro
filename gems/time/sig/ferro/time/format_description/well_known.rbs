@@ -7,10 +7,12 @@ module Ferro
       module WellKnown
         class Rfc2822
           private def self.new: () -> instance
+          def self.debug: () -> String
         end
 
         class Rfc3339
           private def self.new: () -> instance
+          def self.debug: () -> String
         end
       end
     end

@@ -37,6 +37,24 @@ class TestPortParsing < Minitest::Test
     nil
   end
 
+  # The ComponentRange a parse error holds, as Rust's pattern
+  # <tt>Err(Parse::TryFromParsed(TryFromParsed::ComponentRange(range)))</tt>
+  # reads it.
+  private def held_range(error)
+    case error
+    in T::Error::Parse::TryFromParsed[T::Error::TryFromParsed::ComponentRange[range]] then range
+    end
+  end
+
+  # The component name a parse error holds, as Rust's pattern
+  # <tt>Err(Parse::ParseFromDescription(ParseFromDescription::InvalidComponent(name)))</tt>
+  # reads it.
+  private def held_component(error)
+    case error
+    in T::Error::Parse::ParseFromDescription[T::Error::ParseFromDescription::InvalidComponent[name]] then name
+    end
+  end
+
   # Names a deprecated method quietly, since the tests run under -w.
   private def quietly
     deprecated = Warning[:deprecated]
@@ -143,7 +161,7 @@ class TestPortParsing < Minitest::Test
       ["Mon, 02 Jan 2021 03:04:05 -060", "offset minute"],
     ].each do |input, name|
       error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) { T::OffsetDateTime.parse(input, WellKnown::Rfc2822) }
-      assert_equal name, error.name
+      assert_equal name, held_component(error)
     end
   end
 
@@ -172,7 +190,7 @@ class TestPortParsing < Minitest::Test
       ["Fri, 30 Dec 2021 23:59:60 Z", true],
     ].each do |input, conditional|
       error = assert_raises(T::Error::Parse::TryFromParsed::ComponentRange) { T::OffsetDateTime.parse(input, WellKnown::Rfc2822) }
-      assert_equal ["second", conditional], [error.name, error.is_conditional]
+      assert_equal ["second", conditional], [held_range(error).name, held_range(error).is_conditional]
     end
   end
 
@@ -242,7 +260,7 @@ class TestPortParsing < Minitest::Test
       ["2021-01-01T00:00:00+24:00", "offset hour"],
     ].each do |input, name|
       error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) { T::OffsetDateTime.parse(input, WellKnown::Rfc3339) }
-      assert_equal name, error.name
+      assert_equal name, held_component(error)
     end
   end
 
@@ -270,7 +288,7 @@ class TestPortParsing < Minitest::Test
       ["2021-01-01T00:00:00+00:60", "offset minute", false],
     ].each do |input, name, conditional|
       error = assert_raises(T::Error::Parse::TryFromParsed::ComponentRange) { T::OffsetDateTime.parse(input, WellKnown::Rfc3339) }
-      assert_equal [name, conditional], [error.name, error.is_conditional]
+      assert_equal [name, conditional], [held_range(error).name, held_range(error).is_conditional]
     end
   end
 
@@ -289,7 +307,7 @@ class TestPortParsing < Minitest::Test
       ["2021-01-02T03:04:60Z", "second", false],
     ].each do |input, name, conditional|
       error = assert_raises(T::Error::Parse::TryFromParsed::ComponentRange) { T::PlainDateTime.parse(input, WellKnown::Rfc3339) }
-      assert_equal [name, conditional], [error.name, error.is_conditional]
+      assert_equal [name, conditional], [held_range(error).name, held_range(error).is_conditional]
     end
   end
 
@@ -325,7 +343,7 @@ class TestPortParsing < Minitest::Test
       ["2021-01-01T00:00:00+24:00", "offset hour"],
     ].each do |input, name|
       error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) { T::PlainDateTime.parse(input, WellKnown::Rfc3339) }
-      assert_equal name, error.name
+      assert_equal name, held_component(error)
     end
   end
 
@@ -336,7 +354,7 @@ class TestPortParsing < Minitest::Test
       ["2021-12-31T23:04:60Z", false],
     ].each do |input, conditional|
       error = assert_raises(T::Error::Parse::TryFromParsed::ComponentRange) { T::Time.parse(input, WellKnown::Rfc3339) }
-      assert_equal ["second", conditional], [error.name, error.is_conditional]
+      assert_equal ["second", conditional], [held_range(error).name, held_range(error).is_conditional]
     end
   end
 
@@ -497,7 +515,7 @@ class TestPortParsing < Minitest::Test
       ["12345678a", fd("[subsecond digits:9]"), "subsecond"],
     ].each do |input, description, name|
       error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) { T::Time.parse(input, description) }
-      assert_equal name, error.name
+      assert_equal name, held_component(error)
     end
   end
 
@@ -545,7 +563,7 @@ class TestPortParsing < Minitest::Test
       ["  2a21", fd("[year padding:space]"), "year"],
     ].each do |input, description, name|
       error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) { T::Date.parse(input, description) }
-      assert_equal name, error.name
+      assert_equal name, held_component(error)
     end
   end
 
@@ -559,7 +577,7 @@ class TestPortParsing < Minitest::Test
       ["2019-W53-1", fd("[year]-W[week_number repr:monday]-[weekday repr:monday]"), "ordinal"],
     ].each do |input, description, name|
       error = assert_raises(T::Error::Parse::TryFromParsed::ComponentRange) { T::Date.parse(input, description) }
-      assert_equal name, error.name
+      assert_equal name, held_range(error).name
     end
   end
 
@@ -582,7 +600,7 @@ class TestPortParsing < Minitest::Test
       ["00:00:60", fd("[offset_hour]:[offset_minute]:[offset_second]"), "offset second"],
     ].each do |input, description, name|
       error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) { T::UtcOffset.parse(input, description) }
-      assert_equal name, error.name
+      assert_equal name, held_component(error)
     end
   end
 
@@ -601,7 +619,7 @@ class TestPortParsing < Minitest::Test
       ["2021-001 13 PM", fd("[year]-[ordinal] [hour repr:12] [period]"), "hour"],
     ].each do |input, description, name|
       error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) { T::PlainDateTime.parse(input, description) }
-      assert_equal name, error.name
+      assert_equal name, held_component(error)
     end
   end
 
@@ -630,7 +648,7 @@ class TestPortParsing < Minitest::Test
       ["2021-001 12 PM +26", fd("[year]-[ordinal] [hour repr:12] [period] [offset_hour sign:mandatory]"), "offset hour"],
     ].each do |input, description, name|
       error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) { T::OffsetDateTime.parse(input, description) }
-      assert_equal name, error.name
+      assert_equal name, held_component(error)
     end
   end
 
@@ -660,7 +678,7 @@ class TestPortParsing < Minitest::Test
       ["2021-001 12 PM +26", fd("[year]-[ordinal] [hour repr:12] [period] [offset_hour sign:mandatory]"), "offset hour"],
     ].each do |input, description, name|
       error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) { T::UtcDateTime.parse(input, description) }
-      assert_equal name, error.name
+      assert_equal name, held_component(error)
     end
   end
 
@@ -683,7 +701,7 @@ class TestPortParsing < Minitest::Test
       ["🦀", fd("[ignore count:3]")],
     ].each do |input, description|
       error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) { T::Date.parse(input, description) }
-      assert_equal "ignore", error.name
+      assert_equal "ignore", held_component(error)
     end
   end
 
@@ -721,7 +739,7 @@ class TestPortParsing < Minitest::Test
       ["a", fd("[unix_timestamp precision:nanosecond]")],
     ].each do |input, description|
       error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) { T::OffsetDateTime.parse(input, description) }
-      assert_equal "unix_timestamp", error.name
+      assert_equal "unix_timestamp", held_component(error)
     end
   end
 
@@ -859,7 +877,7 @@ class TestPortParsing < Minitest::Test
   # <tt>parsing.rs:1216</tt>, +parse_ignore_component_too_short+.
   def test_parse_ignore_component_too_short
     error = assert_raises(T::Error::ParseFromDescription::InvalidComponent) { T::Parsing::Parsed.new.parse_component("abcdef", ignore(7)) }
-    assert_equal "ignore", error.name
+    assert_equal "ignore", error.to_a.first
   end
 
   # <tt>parsing.rs:1255</tt>, +parse_ignore_component_v2_not_utf8_boundary+:
@@ -906,7 +924,7 @@ class TestPortParsing < Minitest::Test
   def test_parse_first_item_err
     parsed = T::Parsing::Parsed.new
     error = assert_raises(T::Error::ParseFromDescription::InvalidComponent) { parsed.parse_items("2021-01-02", [fd2("[first [[period]][x]]")]) }
-    assert_equal "period", error.name
+    assert_equal "period", error.to_a.first
   end
 
   # <tt>parsing.rs:1508</tt>, +parse_with_defaults_date_success+.
@@ -931,7 +949,7 @@ class TestPortParsing < Minitest::Test
     error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) do
       T::Date.parse_with_defaults("Ja-15", fd1("[month]-[day]"), defaults(year: 2020))
     end
-    assert_equal "month", error.name
+    assert_equal "month", held_component(error)
   end
 
   # <tt>parsing.rs:1563</tt>, +parse_with_defaults_date_component_range+.
@@ -939,7 +957,7 @@ class TestPortParsing < Minitest::Test
     error = assert_raises(T::Error::Parse::TryFromParsed::ComponentRange) do
       T::Date.parse_with_defaults("02-30", fd1("[month]-[day]"), defaults(year: 2020))
     end
-    assert_equal "day", error.name
+    assert_equal "day", held_range(error).name
   end
 
   # <tt>parsing.rs:1590</tt>, +parse_with_defaults_time_success+.
@@ -964,7 +982,7 @@ class TestPortParsing < Minitest::Test
     error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) do
       T::Time.parse_with_defaults("a", fd1("[hour]"), defaults(minute: 30))
     end
-    assert_equal "hour", error.name
+    assert_equal "hour", held_component(error)
   end
 
   # <tt>parsing.rs:1646</tt>, +parse_with_defaults_utc_offset_success+.
@@ -989,7 +1007,7 @@ class TestPortParsing < Minitest::Test
     error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) do
       T::UtcOffset.parse_with_defaults("*05", fd1("[offset_hour sign:mandatory]"), defaults(offset_minute_signed: 30))
     end
-    assert_equal "offset hour", error.name
+    assert_equal "offset hour", held_component(error)
   end
 
   # <tt>parsing.rs:1707</tt>, <tt>:1768</tt>, +parse_with_defaults_plain_date_time_success+
@@ -1021,7 +1039,7 @@ class TestPortParsing < Minitest::Test
       error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) do
         type.parse_with_defaults("2020-01-02 Ja", fd1("[year]-[month]-[day] [hour]"), defaults(hour_24: 12))
       end
-      assert_equal "hour", error.name
+      assert_equal "hour", held_component(error)
     end
   end
 
@@ -1054,7 +1072,7 @@ class TestPortParsing < Minitest::Test
       T::OffsetDateTime.parse_with_defaults("2020-01-a 03:04", fd1("[year]-[month]-[day] [hour]:[minute]"),
         defaults(offset_hour: 0, offset_minute_signed: 0))
     end
-    assert_equal "day", error.name
+    assert_equal "day", held_component(error)
   end
 
   # <tt>parsing.rs:1899</tt>, +parse_with_defaults_timestamp_success+.

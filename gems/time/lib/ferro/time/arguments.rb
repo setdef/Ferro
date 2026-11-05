@@ -10,6 +10,12 @@ module Ferro
     # Converts the gem's Ruby values to what the native layer takes, and
     # back. Private to the gem.
     module Arguments # :nodoc:
+      # Nanoseconds in a second.
+      NANOSECONDS = 1_000_000_000
+
+      # The most whole seconds a std +Duration+ holds, +u64+'s maximum.
+      U64_MAX = (2 ** 64) - 1
+
       class << self
         # The number of +month+, refusing anything but a Month as Rust's
         # type checker would.
@@ -45,6 +51,42 @@ module Ferro
           end
 
           duration
+        end
+
+        # The whole seconds and nanoseconds of the std +Duration+ that
+        # +seconds+ names, the pair the native layer reads as a
+        # <tt>std::time::Duration</tt> (ADR 001, 2026-11-05). A Float goes
+        # through core's <tt>Duration::try_from_secs_f64</tt>, which rounds to
+        # the nearest nanosecond, ties to even, and refuses a negative, NaN,
+        # infinite, or too large count with +ArgumentError+ and core's text.
+        # Any other Numeric is exact: its Rational value, rounded the same
+        # way. Its seconds then cross as a +u64+, so magnus refuses with
+        # +RangeError+ a count that is negative after that rounding, or too
+        # large; a negative count that rounds to zero nanoseconds is zero.
+        def std_duration(seconds)
+          case seconds
+          when Float then Native.std_from_secs_f64(seconds)
+          when Numeric then (Rational(_ = seconds) * NANOSECONDS).round(half: :even).divmod(NANOSECONDS)
+          else raise TypeError, "no implicit conversion of #{seconds.class} into Numeric"
+          end
+        end
+
+        # The pair #std_duration gives, or +nil+ where +seconds+ is not a
+        # number of seconds a std +Duration+ can hold, for the comparisons,
+        # which answer rather than raise.
+        def std_duration_or_nil(seconds)
+          return unless seconds.is_a?(Numeric)
+
+          whole, nanoseconds = std_duration(seconds)
+          [whole, nanoseconds] if whole.between?(0, U64_MAX)
+        rescue ArgumentError, RangeError
+          nil
+        end
+
+        # A Rational number of seconds from a std +Duration+'s whole
+        # +nanoseconds+, exact to the nanosecond (ADR 001, 2026-11-05).
+        def seconds(nanoseconds)
+          Rational(nanoseconds, NANOSECONDS)
         end
 
         # A year, month number, and day, with the month as a Month.

@@ -678,9 +678,14 @@ module Ferro
       # +RangeError+ with time's message, "resulting value is out of range".
       # Ruby's <tt>+=</tt> works through it. Mirrors time's
       # <tt>Add<SignedDuration> for OffsetDateTime</tt>
-      # (<tt>src/offset_date_time.rs:1672-1684</tt>).
+      # (<tt>src/offset_date_time.rs:1672-1684</tt>). Given Numeric seconds,
+      # it adds a std +Duration+ to the local date and time and keeps the
+      # offset, as <tt>Add<std::time::Duration></tt> does
+      # (<tt>:1686-1706</tt>), raising +RangeError+ with "overflow adding
+      # duration to date" or "resulting value is out of range" where it
+      # panics. SignedDuration says how a number is read.
       #
-      # [duration] SignedDuration.
+      # [duration] SignedDuration, or Numeric seconds.
       #
       # === Example
       #
@@ -689,6 +694,8 @@ module Ferro
       #   (datetime + Ferro::Time::Duration::DAY).to_s # => "2019-01-02 12:30:45.123456789 -05:00:00"
       #   Ferro::Time::PlainDateTime::MAX.assume_utc + Ferro::Time::Duration::DAY # raises RangeError
       def +(duration)
+        return Native.offset_date_time_std(self, :+, Arguments.std_duration(duration)) if duration.is_a?(Numeric)
+
         Native.offset_date_time_arith(self, :+, Arguments.duration(duration))
       end
 
@@ -1006,11 +1013,14 @@ module Ferro
       # span from +other+ to this instant, given a OffsetDateTime, a
       # UtcDateTime, or Ruby's ::Time, as time's <tt>Sub</tt> impls do. Ruby's
       # own <tt>::Time#-</tt> is unchanged, so <tt>time - datetime</tt> stays
-      # Ruby's. Mirrors time's <tt>Sub for OffsetDateTime</tt>
-      # (<tt>src/interop/offsetdatetime_utcdatetime.rs,
+      # Ruby's. Given Numeric seconds, it subtracts a std +Duration+, as
+      # <tt>Sub<std::time::Duration></tt> does (<tt>src/offset_date_time.rs:1747-1767</tt>),
+      # with "overflow subtracting duration from date" or "resulting value
+      # is out of range" where it panics. Mirrors time's <tt>Sub for
+      # OffsetDateTime</tt> (<tt>src/interop/offsetdatetime_utcdatetime.rs,
       # src/interop/offsetdatetime_systemtime.rs</tt>).
       #
-      # [other] SignedDuration, OffsetDateTime, UtcDateTime, Timestamp, or ::Time.
+      # [other] SignedDuration, OffsetDateTime, UtcDateTime, Timestamp, ::Time, or Numeric seconds.
       #
       # === Example
       #
@@ -1021,6 +1031,7 @@ module Ferro
       def -(other)
         case other
         when SignedDuration then Native.offset_date_time_arith(self, :-, other)
+        when Numeric then Native.offset_date_time_std(self, :-, Arguments.std_duration(other))
         when OffsetDateTime then Native.offset_date_time_difference(self, other)
         when UtcDateTime then Native.offset_date_time_difference_utc(self, other)
         when Timestamp then Native.offset_date_time_difference_timestamp(self, other)
@@ -1198,8 +1209,8 @@ module Ferro
       #
       #   datetime = Ferro::Time::Date.from_calendar_date(2019, Ferro::Time::Month::January, 1).with_hms_nano(12, 30, 45, 123_456_789)
       #     .assume_offset(Ferro::Time::UtcOffset.from_hms(-5, 0, 0))
-      #   datetime.inspect # => "2019-01-01 12:30:45.123456789 -05:00:00"
-      def inspect
+      #   datetime.debug # => "2019-01-01 12:30:45.123456789 -05:00:00"
+      def debug
         Native.offset_date_time_debug(self)
       end
 

@@ -32,7 +32,7 @@ module Ferro
 
         # time's +Debug+ for the item: a literal as is, a component as its
         # variant, a compound as a list.
-        def inspect
+        def debug
           Native.format_item_debug(0, Arguments.encode_item(_ = self))
         end
       end

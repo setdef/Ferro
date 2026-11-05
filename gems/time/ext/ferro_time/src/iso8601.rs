@@ -90,7 +90,7 @@ impl Parts {
     }
 }
 
-const fn components(index: u8) -> FormattedComponents {
+pub const fn components(index: u8) -> FormattedComponents {
     match index {
         0 => FormattedComponents::None,
         1 => FormattedComponents::Date,
@@ -102,7 +102,7 @@ const fn components(index: u8) -> FormattedComponents {
     }
 }
 
-const fn date_kind(index: u8) -> DateKind {
+pub const fn date_kind(index: u8) -> DateKind {
     match index {
         0 => DateKind::Calendar,
         1 => DateKind::Week,
@@ -110,7 +110,7 @@ const fn date_kind(index: u8) -> DateKind {
     }
 }
 
-const fn time_precision(index: u8, digits: u8) -> TimePrecision {
+pub const fn time_precision(index: u8, digits: u8) -> TimePrecision {
     let decimal_digits = NonZero::new(digits);
     match index {
         0 => TimePrecision::Hour { decimal_digits },
@@ -119,7 +119,7 @@ const fn time_precision(index: u8, digits: u8) -> TimePrecision {
     }
 }
 
-const fn offset_precision(index: u8) -> OffsetPrecision {
+pub const fn offset_precision(index: u8) -> OffsetPrecision {
     match index {
         0 => OffsetPrecision::Hour,
         _ => OffsetPrecision::Minute,

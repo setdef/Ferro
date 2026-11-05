@@ -169,12 +169,13 @@ class TestIter < Minitest::Test
     refute_equal Month.iter_from(Month::May), Month.iter_from(Month::May).rev
   end
 
-  def test_inspect_is_times_debug
+  def test_debug_is_times_debug
     iter = five_days
     assert_equal january(5), iter.nth(4)
     # time leaves the front where it was when nth takes the last date.
-    assert_equal "DateIter { front: 2019-01-01, back: None }", iter.inspect
-    assert_equal "Rev { iter: WeekdayIter { current: Sunday } }", Weekday.iter_from(Weekday::Sunday).rev.inspect
+    assert_equal "DateIter { front: 2019-01-01, back: None }", iter.debug
+    assert_equal "Rev { iter: WeekdayIter { current: Sunday } }", Weekday.iter_from(Weekday::Sunday).rev.debug
+    assert_match(/\A#<Ferro::Time::Iter::DateIter:0x\h+>\z/, iter.inspect)
   end
 
   def test_all_and_any_test_each_item_once_from_the_first_and_leave_the_iterator_alone

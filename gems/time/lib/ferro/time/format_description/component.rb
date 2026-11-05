@@ -42,7 +42,7 @@ module Ferro
       #
       #   modifier = Ferro::Time::FormatDescription::Modifier
       #   component = Ferro::Time::FormatDescription::Component::Hour24.new(modifier::Hour24.default)
-      #   component.inspect # => "Hour24(Hour24 { padding: Zero })"
+      #   component.debug # => "Hour24(Hour24 { padding: Zero })"
       #   Ferro::Time::Time.from_hms(7, 0, 0).format(Ferro::Time::FormatDescription::BorrowedFormatItem.from(component)) # => "07"
       module Component
         # The component +item+ holds, raising Error::DifferentVariant
@@ -92,7 +92,7 @@ module Ferro
         end
 
         # time's +Debug+ for the component: the variant and its modifier.
-        def inspect
+        def debug
           Native.format_item_debug(1, __send__(:encode))
         end
 

@@ -126,11 +126,16 @@ pub fn mul_int(value: SignedDuration, scalar: i128) -> Result<SignedDuration, Fa
     nanoseconds_i128(product)
 }
 
-/// `Div<i32>` (`:1681-1694`): Rust's own division panics on zero, which
-/// Ruby words as `ZeroDivisionError`.
+/// The panic of Rust's own integer division by zero, which `Div<i32>`
+/// reaches (`:1681-1694`); ADR 001's error rule refuses it with
+/// `RangeError` and this text.
+pub const DIVIDE_BY_ZERO: &str = "attempt to divide by zero";
+
+/// `Div<i32>` (`:1681-1694`), refusing a zero divisor with Rust's panic
+/// text.
 pub fn div_int(value: SignedDuration, scalar: i128) -> Result<SignedDuration, Failure> {
     if scalar == 0 {
-        return Err(Failure::ZeroDivision);
+        return Err(Failure::Range(DIVIDE_BY_ZERO.to_owned()));
     }
     nanoseconds_i128(value.whole_nanoseconds() / scalar)
 }
@@ -460,7 +465,7 @@ pub fn define(native: RModule) -> Result<(), Error> {
 mod tests {
     use super::{
         add, display_precision, div_float, div_int, mul_float, mul_int, nanoseconds_i128, neg, new,
-        seconds_f32, seconds_f64, sub, unit, PRECISION_OUT_OF_RANGE,
+        seconds_f32, seconds_f64, sub, unit, DIVIDE_BY_ZERO, PRECISION_OUT_OF_RANGE,
     };
     use crate::{capture, Failure, Panic};
     use time::SignedDuration;
@@ -576,11 +581,11 @@ mod tests {
             mul_float(SignedDuration::SECOND, 1.5).unwrap(),
             SignedDuration::SECOND * 1.5_f64
         );
-        assert!(matches!(
-            div_int(SignedDuration::SECOND, 0),
-            Err(Failure::ZeroDivision)
-        ));
-        assert!(capture(|| SignedDuration::SECOND / std::hint::black_box(0_i32)).is_err());
+        assert_eq!(
+            refusal(div_int(SignedDuration::SECOND, 0)),
+            panic_of(|| SignedDuration::SECOND / std::hint::black_box(0_i32))
+        );
+        assert_eq!(refusal(div_int(SignedDuration::SECOND, 0)), DIVIDE_BY_ZERO);
     }
 
     #[test]

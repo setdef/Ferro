@@ -38,7 +38,7 @@ module Ferro
       def to_i: () -> Integer
       def <=>: (Month other) -> Integer | (Object other) -> Integer?
       def to_s: () -> String
-      def inspect: () -> String
+      def debug: () -> String
     end
   end
 end

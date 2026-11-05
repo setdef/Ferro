@@ -56,7 +56,7 @@ module Ferro
           end
 
           # time's +Debug+ for this modifier.
-          def inspect
+          def debug
             Native.format_item_debug(2, __send__(:encode))
           end
 
@@ -81,9 +81,10 @@ module Ferro
             freeze
           end
 
-          # The constant that holds this variant.
-          def inspect
-            "#{self.class.name}::#{@name}"
+          # time's derived +Debug+ text for this variant, formatted by
+          # Rust: its name. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
+          def debug
+            Native.modifier_enum_debug(self.class.name.to_s.split("::").last.to_s.to_sym, @index)
           end
 
           # The variant's place in time's enum, for the native layer.
@@ -393,6 +394,18 @@ module Ferro
           # Trailing input is permitted but discarded.
           Discard = new(1, :Discard)
 
+          # The variant's integer value, which Rust's <tt>as u8</tt> computes:
+          # 0 for +Prohibit+, 1 for +Discard+. Only this modifier enum has
+          # one, as the others are <tt>#[non_exhaustive]</tt> and Rust
+          # forbids casting them outside the crate (ADR 001, 2026-11-05).
+          #
+          # === Example
+          #
+          #   Ferro::Time::FormatDescription::Modifier::TrailingInput::Discard.to_i # => 1
+          def to_i
+            Native.trailing_input_to_i(index)
+          end
+
           ALL = [Prohibit, Discard].freeze
           private_constant :ALL
         end
@@ -404,7 +417,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::Day.default.inspect # => "Day { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::Day.default.debug # => "Day { padding: Zero }"
         class Day < Data.define(:padding)
           include Value
 
@@ -435,7 +448,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::Day.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::Day.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "Day { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -454,7 +467,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::MonthShort.default.inspect # => "MonthShort { case_sensitive: true }"
+        #   Ferro::Time::FormatDescription::Modifier::MonthShort.default.debug # => "MonthShort { case_sensitive: true }"
         class MonthShort < Data.define(:case_sensitive)
           include Value
 
@@ -481,7 +494,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::MonthShort.default.with_case_sensitive(false).inspect
+          #   Ferro::Time::FormatDescription::Modifier::MonthShort.default.with_case_sensitive(false).debug
           #   # => "MonthShort { case_sensitive: false }"
           def with_case_sensitive(case_sensitive)
             with(case_sensitive:)
@@ -502,7 +515,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::MonthLong.default.inspect # => "MonthLong { case_sensitive: true }"
+        #   Ferro::Time::FormatDescription::Modifier::MonthLong.default.debug # => "MonthLong { case_sensitive: true }"
         class MonthLong < Data.define(:case_sensitive)
           include Value
 
@@ -529,7 +542,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::MonthLong.default.with_case_sensitive(false).inspect
+          #   Ferro::Time::FormatDescription::Modifier::MonthLong.default.with_case_sensitive(false).debug
           #   # => "MonthLong { case_sensitive: false }"
           def with_case_sensitive(case_sensitive)
             with(case_sensitive:)
@@ -550,7 +563,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::MonthNumerical.default.inspect # => "MonthNumerical { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::MonthNumerical.default.debug # => "MonthNumerical { padding: Zero }"
         class MonthNumerical < Data.define(:padding)
           include Value
 
@@ -578,7 +591,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::MonthNumerical.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::MonthNumerical.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "MonthNumerical { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -662,7 +675,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::Ordinal.default.inspect # => "Ordinal { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::Ordinal.default.debug # => "Ordinal { padding: Zero }"
         class Ordinal < Data.define(:padding)
           include Value
 
@@ -693,7 +706,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::Ordinal.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::Ordinal.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "Ordinal { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -711,7 +724,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::WeekdayShort.default.inspect # => "WeekdayShort { case_sensitive: true }"
+        #   Ferro::Time::FormatDescription::Modifier::WeekdayShort.default.debug # => "WeekdayShort { case_sensitive: true }"
         class WeekdayShort < Data.define(:case_sensitive)
           include Value
 
@@ -739,7 +752,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::WeekdayShort.default.with_case_sensitive(false).inspect
+          #   Ferro::Time::FormatDescription::Modifier::WeekdayShort.default.with_case_sensitive(false).debug
           #   # => "WeekdayShort { case_sensitive: false }"
           def with_case_sensitive(case_sensitive)
             with(case_sensitive:)
@@ -759,7 +772,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::WeekdayLong.default.inspect # => "WeekdayLong { case_sensitive: true }"
+        #   Ferro::Time::FormatDescription::Modifier::WeekdayLong.default.debug # => "WeekdayLong { case_sensitive: true }"
         class WeekdayLong < Data.define(:case_sensitive)
           include Value
 
@@ -787,7 +800,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::WeekdayLong.default.with_case_sensitive(false).inspect
+          #   Ferro::Time::FormatDescription::Modifier::WeekdayLong.default.with_case_sensitive(false).debug
           #   # => "WeekdayLong { case_sensitive: false }"
           def with_case_sensitive(case_sensitive)
             with(case_sensitive:)
@@ -808,7 +821,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::WeekdaySunday.default.inspect # => "WeekdaySunday { one_indexed: true }"
+        #   Ferro::Time::FormatDescription::Modifier::WeekdaySunday.default.debug # => "WeekdaySunday { one_indexed: true }"
         class WeekdaySunday < Data.define(:one_indexed)
           include Value
 
@@ -836,7 +849,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::WeekdaySunday.default.with_one_indexed(false).inspect
+          #   Ferro::Time::FormatDescription::Modifier::WeekdaySunday.default.with_one_indexed(false).debug
           #   # => "WeekdaySunday { one_indexed: false }"
           def with_one_indexed(one_indexed)
             with(one_indexed:)
@@ -857,7 +870,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::WeekdayMonday.default.inspect # => "WeekdayMonday { one_indexed: true }"
+        #   Ferro::Time::FormatDescription::Modifier::WeekdayMonday.default.debug # => "WeekdayMonday { one_indexed: true }"
         class WeekdayMonday < Data.define(:one_indexed)
           include Value
 
@@ -885,7 +898,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::WeekdayMonday.default.with_one_indexed(false).inspect
+          #   Ferro::Time::FormatDescription::Modifier::WeekdayMonday.default.with_one_indexed(false).debug
           #   # => "WeekdayMonday { one_indexed: false }"
           def with_one_indexed(one_indexed)
             with(one_indexed:)
@@ -975,7 +988,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::WeekNumberIso.default.inspect # => "WeekNumberIso { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::WeekNumberIso.default.debug # => "WeekNumberIso { padding: Zero }"
         class WeekNumberIso < Data.define(:padding)
           include Value
 
@@ -1006,7 +1019,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::WeekNumberIso.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::WeekNumberIso.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "WeekNumberIso { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -1022,7 +1035,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::WeekNumberSunday.default.inspect # => "WeekNumberSunday { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::WeekNumberSunday.default.debug # => "WeekNumberSunday { padding: Zero }"
         class WeekNumberSunday < Data.define(:padding)
           include Value
 
@@ -1054,7 +1067,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::WeekNumberSunday.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::WeekNumberSunday.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "WeekNumberSunday { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -1070,7 +1083,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::WeekNumberMonday.default.inspect # => "WeekNumberMonday { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::WeekNumberMonday.default.debug # => "WeekNumberMonday { padding: Zero }"
         class WeekNumberMonday < Data.define(:padding)
           include Value
 
@@ -1102,7 +1115,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::WeekNumberMonday.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::WeekNumberMonday.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "WeekNumberMonday { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -1178,7 +1191,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::CalendarYearFullExtendedRange.default.inspect # => "CalendarYearFullExtendedRange { padding: Zero, sign_is_mandatory: false }"
+        #   Ferro::Time::FormatDescription::Modifier::CalendarYearFullExtendedRange.default.debug # => "CalendarYearFullExtendedRange { padding: Zero, sign_is_mandatory: false }"
         class CalendarYearFullExtendedRange < Data.define(:padding, :sign_is_mandatory)
           include Value
 
@@ -1206,7 +1219,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::CalendarYearFullExtendedRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::CalendarYearFullExtendedRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "CalendarYearFullExtendedRange { padding: Space, sign_is_mandatory: false }"
           def with_padding(padding)
             with(padding:)
@@ -1222,7 +1235,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::CalendarYearFullExtendedRange.default.with_sign_is_mandatory(true).inspect
+          #   Ferro::Time::FormatDescription::Modifier::CalendarYearFullExtendedRange.default.with_sign_is_mandatory(true).debug
           #   # => "CalendarYearFullExtendedRange { padding: Zero, sign_is_mandatory: true }"
           def with_sign_is_mandatory(sign_is_mandatory)
             with(sign_is_mandatory:)
@@ -1245,7 +1258,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::CalendarYearFullStandardRange.default.inspect # => "CalendarYearFullStandardRange { padding: Zero, sign_is_mandatory: false }"
+        #   Ferro::Time::FormatDescription::Modifier::CalendarYearFullStandardRange.default.debug # => "CalendarYearFullStandardRange { padding: Zero, sign_is_mandatory: false }"
         class CalendarYearFullStandardRange < Data.define(:padding, :sign_is_mandatory)
           include Value
 
@@ -1273,7 +1286,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::CalendarYearFullStandardRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::CalendarYearFullStandardRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "CalendarYearFullStandardRange { padding: Space, sign_is_mandatory: false }"
           def with_padding(padding)
             with(padding:)
@@ -1288,7 +1301,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::CalendarYearFullStandardRange.default.with_sign_is_mandatory(true).inspect
+          #   Ferro::Time::FormatDescription::Modifier::CalendarYearFullStandardRange.default.with_sign_is_mandatory(true).debug
           #   # => "CalendarYearFullStandardRange { padding: Zero, sign_is_mandatory: true }"
           def with_sign_is_mandatory(sign_is_mandatory)
             with(sign_is_mandatory:)
@@ -1311,7 +1324,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::IsoYearFullExtendedRange.default.inspect # => "IsoYearFullExtendedRange { padding: Zero, sign_is_mandatory: false }"
+        #   Ferro::Time::FormatDescription::Modifier::IsoYearFullExtendedRange.default.debug # => "IsoYearFullExtendedRange { padding: Zero, sign_is_mandatory: false }"
         class IsoYearFullExtendedRange < Data.define(:padding, :sign_is_mandatory)
           include Value
 
@@ -1339,7 +1352,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::IsoYearFullExtendedRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::IsoYearFullExtendedRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "IsoYearFullExtendedRange { padding: Space, sign_is_mandatory: false }"
           def with_padding(padding)
             with(padding:)
@@ -1354,7 +1367,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::IsoYearFullExtendedRange.default.with_sign_is_mandatory(true).inspect
+          #   Ferro::Time::FormatDescription::Modifier::IsoYearFullExtendedRange.default.with_sign_is_mandatory(true).debug
           #   # => "IsoYearFullExtendedRange { padding: Zero, sign_is_mandatory: true }"
           def with_sign_is_mandatory(sign_is_mandatory)
             with(sign_is_mandatory:)
@@ -1377,7 +1390,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::IsoYearFullStandardRange.default.inspect # => "IsoYearFullStandardRange { padding: Zero, sign_is_mandatory: false }"
+        #   Ferro::Time::FormatDescription::Modifier::IsoYearFullStandardRange.default.debug # => "IsoYearFullStandardRange { padding: Zero, sign_is_mandatory: false }"
         class IsoYearFullStandardRange < Data.define(:padding, :sign_is_mandatory)
           include Value
 
@@ -1405,7 +1418,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::IsoYearFullStandardRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::IsoYearFullStandardRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "IsoYearFullStandardRange { padding: Space, sign_is_mandatory: false }"
           def with_padding(padding)
             with(padding:)
@@ -1420,7 +1433,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::IsoYearFullStandardRange.default.with_sign_is_mandatory(true).inspect
+          #   Ferro::Time::FormatDescription::Modifier::IsoYearFullStandardRange.default.with_sign_is_mandatory(true).debug
           #   # => "IsoYearFullStandardRange { padding: Zero, sign_is_mandatory: true }"
           def with_sign_is_mandatory(sign_is_mandatory)
             with(sign_is_mandatory:)
@@ -1444,7 +1457,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::CalendarYearCenturyExtendedRange.default.inspect # => "CalendarYearCenturyExtendedRange { padding: Zero, sign_is_mandatory: false }"
+        #   Ferro::Time::FormatDescription::Modifier::CalendarYearCenturyExtendedRange.default.debug # => "CalendarYearCenturyExtendedRange { padding: Zero, sign_is_mandatory: false }"
         class CalendarYearCenturyExtendedRange < Data.define(:padding, :sign_is_mandatory)
           include Value
 
@@ -1473,7 +1486,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::CalendarYearCenturyExtendedRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::CalendarYearCenturyExtendedRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "CalendarYearCenturyExtendedRange { padding: Space, sign_is_mandatory: false }"
           def with_padding(padding)
             with(padding:)
@@ -1489,7 +1502,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::CalendarYearCenturyExtendedRange.default.with_sign_is_mandatory(true).inspect
+          #   Ferro::Time::FormatDescription::Modifier::CalendarYearCenturyExtendedRange.default.with_sign_is_mandatory(true).debug
           #   # => "CalendarYearCenturyExtendedRange { padding: Zero, sign_is_mandatory: true }"
           def with_sign_is_mandatory(sign_is_mandatory)
             with(sign_is_mandatory:)
@@ -1513,7 +1526,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::CalendarYearCenturyStandardRange.default.inspect # => "CalendarYearCenturyStandardRange { padding: Zero, sign_is_mandatory: false }"
+        #   Ferro::Time::FormatDescription::Modifier::CalendarYearCenturyStandardRange.default.debug # => "CalendarYearCenturyStandardRange { padding: Zero, sign_is_mandatory: false }"
         class CalendarYearCenturyStandardRange < Data.define(:padding, :sign_is_mandatory)
           include Value
 
@@ -1542,7 +1555,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::CalendarYearCenturyStandardRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::CalendarYearCenturyStandardRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "CalendarYearCenturyStandardRange { padding: Space, sign_is_mandatory: false }"
           def with_padding(padding)
             with(padding:)
@@ -1557,7 +1570,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::CalendarYearCenturyStandardRange.default.with_sign_is_mandatory(true).inspect
+          #   Ferro::Time::FormatDescription::Modifier::CalendarYearCenturyStandardRange.default.with_sign_is_mandatory(true).debug
           #   # => "CalendarYearCenturyStandardRange { padding: Zero, sign_is_mandatory: true }"
           def with_sign_is_mandatory(sign_is_mandatory)
             with(sign_is_mandatory:)
@@ -1581,7 +1594,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::IsoYearCenturyExtendedRange.default.inspect # => "IsoYearCenturyExtendedRange { padding: Zero, sign_is_mandatory: false }"
+        #   Ferro::Time::FormatDescription::Modifier::IsoYearCenturyExtendedRange.default.debug # => "IsoYearCenturyExtendedRange { padding: Zero, sign_is_mandatory: false }"
         class IsoYearCenturyExtendedRange < Data.define(:padding, :sign_is_mandatory)
           include Value
 
@@ -1609,7 +1622,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::IsoYearCenturyExtendedRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::IsoYearCenturyExtendedRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "IsoYearCenturyExtendedRange { padding: Space, sign_is_mandatory: false }"
           def with_padding(padding)
             with(padding:)
@@ -1625,7 +1638,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::IsoYearCenturyExtendedRange.default.with_sign_is_mandatory(true).inspect
+          #   Ferro::Time::FormatDescription::Modifier::IsoYearCenturyExtendedRange.default.with_sign_is_mandatory(true).debug
           #   # => "IsoYearCenturyExtendedRange { padding: Zero, sign_is_mandatory: true }"
           def with_sign_is_mandatory(sign_is_mandatory)
             with(sign_is_mandatory:)
@@ -1649,7 +1662,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::IsoYearCenturyStandardRange.default.inspect # => "IsoYearCenturyStandardRange { padding: Zero, sign_is_mandatory: false }"
+        #   Ferro::Time::FormatDescription::Modifier::IsoYearCenturyStandardRange.default.debug # => "IsoYearCenturyStandardRange { padding: Zero, sign_is_mandatory: false }"
         class IsoYearCenturyStandardRange < Data.define(:padding, :sign_is_mandatory)
           include Value
 
@@ -1677,7 +1690,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::IsoYearCenturyStandardRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::IsoYearCenturyStandardRange.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "IsoYearCenturyStandardRange { padding: Space, sign_is_mandatory: false }"
           def with_padding(padding)
             with(padding:)
@@ -1692,7 +1705,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::IsoYearCenturyStandardRange.default.with_sign_is_mandatory(true).inspect
+          #   Ferro::Time::FormatDescription::Modifier::IsoYearCenturyStandardRange.default.with_sign_is_mandatory(true).debug
           #   # => "IsoYearCenturyStandardRange { padding: Zero, sign_is_mandatory: true }"
           def with_sign_is_mandatory(sign_is_mandatory)
             with(sign_is_mandatory:)
@@ -1713,7 +1726,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::CalendarYearLastTwo.default.inspect # => "CalendarYearLastTwo { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::CalendarYearLastTwo.default.debug # => "CalendarYearLastTwo { padding: Zero }"
         class CalendarYearLastTwo < Data.define(:padding)
           include Value
 
@@ -1741,7 +1754,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::CalendarYearLastTwo.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::CalendarYearLastTwo.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "CalendarYearLastTwo { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -1762,7 +1775,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::IsoYearLastTwo.default.inspect # => "IsoYearLastTwo { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::IsoYearLastTwo.default.debug # => "IsoYearLastTwo { padding: Zero }"
         class IsoYearLastTwo < Data.define(:padding)
           include Value
 
@@ -1790,7 +1803,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::IsoYearLastTwo.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::IsoYearLastTwo.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "IsoYearLastTwo { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -1906,7 +1919,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::Hour12.default.inspect # => "Hour12 { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::Hour12.default.debug # => "Hour12 { padding: Zero }"
         class Hour12 < Data.define(:padding)
           include Value
 
@@ -1932,7 +1945,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::Hour12.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::Hour12.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "Hour12 { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -1952,7 +1965,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::Hour24.default.inspect # => "Hour24 { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::Hour24.default.debug # => "Hour24 { padding: Zero }"
         class Hour24 < Data.define(:padding)
           include Value
 
@@ -1978,7 +1991,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::Hour24.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::Hour24.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "Hour24 { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -2048,7 +2061,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::Minute.default.inspect # => "Minute { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::Minute.default.debug # => "Minute { padding: Zero }"
         class Minute < Data.define(:padding)
           include Value
 
@@ -2079,7 +2092,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::Minute.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::Minute.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "Minute { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -2093,7 +2106,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::Period.default.inspect # => "Period { is_uppercase: true, case_sensitive: true }"
+        #   Ferro::Time::FormatDescription::Modifier::Period.default.debug # => "Period { is_uppercase: true, case_sensitive: true }"
         class Period < Data.define(:is_uppercase, :case_sensitive)
           include Value
 
@@ -2132,7 +2145,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::Period.default.with_is_uppercase(false).inspect
+          #   Ferro::Time::FormatDescription::Modifier::Period.default.with_is_uppercase(false).debug
           #   # => "Period { is_uppercase: false, case_sensitive: true }"
           def with_is_uppercase(is_uppercase)
             with(is_uppercase:)
@@ -2146,7 +2159,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::Period.default.with_case_sensitive(false).inspect
+          #   Ferro::Time::FormatDescription::Modifier::Period.default.with_case_sensitive(false).debug
           #   # => "Period { is_uppercase: true, case_sensitive: false }"
           def with_case_sensitive(case_sensitive)
             with(case_sensitive:)
@@ -2160,7 +2173,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::Second.default.inspect # => "Second { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::Second.default.debug # => "Second { padding: Zero }"
         class Second < Data.define(:padding)
           include Value
 
@@ -2191,7 +2204,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::Second.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::Second.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "Second { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -2205,7 +2218,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::Subsecond.default.inspect # => "Subsecond { digits: OneOrMore }"
+        #   Ferro::Time::FormatDescription::Modifier::Subsecond.default.debug # => "Subsecond { digits: OneOrMore }"
         class Subsecond < Data.define(:digits)
           include Value
 
@@ -2237,7 +2250,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::Subsecond.default.with_digits(Ferro::Time::FormatDescription::Modifier::SubsecondDigits::One).inspect
+          #   Ferro::Time::FormatDescription::Modifier::Subsecond.default.with_digits(Ferro::Time::FormatDescription::Modifier::SubsecondDigits::One).debug
           #   # => "Subsecond { digits: One }"
           def with_digits(digits)
             with(digits:)
@@ -2251,7 +2264,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::OffsetHour.default.inspect # => "OffsetHour { sign_is_mandatory: false, padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::OffsetHour.default.debug # => "OffsetHour { sign_is_mandatory: false, padding: Zero }"
         class OffsetHour < Data.define(:sign_is_mandatory, :padding)
           include Value
 
@@ -2289,7 +2302,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::OffsetHour.default.with_sign_is_mandatory(true).inspect
+          #   Ferro::Time::FormatDescription::Modifier::OffsetHour.default.with_sign_is_mandatory(true).debug
           #   # => "OffsetHour { sign_is_mandatory: true, padding: Zero }"
           def with_sign_is_mandatory(sign_is_mandatory)
             with(sign_is_mandatory:)
@@ -2302,7 +2315,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::OffsetHour.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::OffsetHour.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "OffsetHour { sign_is_mandatory: false, padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -2316,7 +2329,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::OffsetMinute.default.inspect # => "OffsetMinute { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::OffsetMinute.default.debug # => "OffsetMinute { padding: Zero }"
         class OffsetMinute < Data.define(:padding)
           include Value
 
@@ -2347,7 +2360,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::OffsetMinute.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::OffsetMinute.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "OffsetMinute { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -2361,7 +2374,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::OffsetSecond.default.inspect # => "OffsetSecond { padding: Zero }"
+        #   Ferro::Time::FormatDescription::Modifier::OffsetSecond.default.debug # => "OffsetSecond { padding: Zero }"
         class OffsetSecond < Data.define(:padding)
           include Value
 
@@ -2392,7 +2405,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::OffsetSecond.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).inspect
+          #   Ferro::Time::FormatDescription::Modifier::OffsetSecond.default.with_padding(Ferro::Time::FormatDescription::Modifier::Padding::Space).debug
           #   # => "OffsetSecond { padding: Space }"
           def with_padding(padding)
             with(padding:)
@@ -2408,7 +2421,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::Ignore.count(1).inspect # => "Ignore { count: 1 }"
+        #   Ferro::Time::FormatDescription::Modifier::Ignore.count(1).debug # => "Ignore { count: 1 }"
         class Ignore < Data.define(:count)
           include Value
 
@@ -2442,7 +2455,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::Ignore.count(1).with_count(2).inspect
+          #   Ferro::Time::FormatDescription::Modifier::Ignore.count(1).with_count(2).debug
           #   # => "Ignore { count: 2 }"
           def with_count(count)
             with(count:)
@@ -2460,7 +2473,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::UnixTimestampSecond.default.inspect # => "UnixTimestampSecond { sign_is_mandatory: false }"
+        #   Ferro::Time::FormatDescription::Modifier::UnixTimestampSecond.default.debug # => "UnixTimestampSecond { sign_is_mandatory: false }"
         class UnixTimestampSecond < Data.define(:sign_is_mandatory)
           include Value
 
@@ -2489,7 +2502,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::UnixTimestampSecond.default.with_sign_is_mandatory(true).inspect
+          #   Ferro::Time::FormatDescription::Modifier::UnixTimestampSecond.default.with_sign_is_mandatory(true).debug
           #   # => "UnixTimestampSecond { sign_is_mandatory: true }"
           def with_sign_is_mandatory(sign_is_mandatory)
             with(sign_is_mandatory:)
@@ -2509,7 +2522,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::UnixTimestampMillisecond.default.inspect # => "UnixTimestampMillisecond { sign_is_mandatory: false }"
+        #   Ferro::Time::FormatDescription::Modifier::UnixTimestampMillisecond.default.debug # => "UnixTimestampMillisecond { sign_is_mandatory: false }"
         class UnixTimestampMillisecond < Data.define(:sign_is_mandatory)
           include Value
 
@@ -2538,7 +2551,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::UnixTimestampMillisecond.default.with_sign_is_mandatory(true).inspect
+          #   Ferro::Time::FormatDescription::Modifier::UnixTimestampMillisecond.default.with_sign_is_mandatory(true).debug
           #   # => "UnixTimestampMillisecond { sign_is_mandatory: true }"
           def with_sign_is_mandatory(sign_is_mandatory)
             with(sign_is_mandatory:)
@@ -2558,7 +2571,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::UnixTimestampMicrosecond.default.inspect # => "UnixTimestampMicrosecond { sign_is_mandatory: false }"
+        #   Ferro::Time::FormatDescription::Modifier::UnixTimestampMicrosecond.default.debug # => "UnixTimestampMicrosecond { sign_is_mandatory: false }"
         class UnixTimestampMicrosecond < Data.define(:sign_is_mandatory)
           include Value
 
@@ -2587,7 +2600,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::UnixTimestampMicrosecond.default.with_sign_is_mandatory(true).inspect
+          #   Ferro::Time::FormatDescription::Modifier::UnixTimestampMicrosecond.default.with_sign_is_mandatory(true).debug
           #   # => "UnixTimestampMicrosecond { sign_is_mandatory: true }"
           def with_sign_is_mandatory(sign_is_mandatory)
             with(sign_is_mandatory:)
@@ -2607,7 +2620,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::UnixTimestampNanosecond.default.inspect # => "UnixTimestampNanosecond { sign_is_mandatory: false }"
+        #   Ferro::Time::FormatDescription::Modifier::UnixTimestampNanosecond.default.debug # => "UnixTimestampNanosecond { sign_is_mandatory: false }"
         class UnixTimestampNanosecond < Data.define(:sign_is_mandatory)
           include Value
 
@@ -2636,7 +2649,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::UnixTimestampNanosecond.default.with_sign_is_mandatory(true).inspect
+          #   Ferro::Time::FormatDescription::Modifier::UnixTimestampNanosecond.default.with_sign_is_mandatory(true).debug
           #   # => "UnixTimestampNanosecond { sign_is_mandatory: true }"
           def with_sign_is_mandatory(sign_is_mandatory)
             with(sign_is_mandatory:)
@@ -2713,7 +2726,7 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription::Modifier::End.default.inspect # => "End { trailing_input: Prohibit }"
+        #   Ferro::Time::FormatDescription::Modifier::End.default.debug # => "End { trailing_input: Prohibit }"
         class End < Data.define(:trailing_input)
           include Value
 
@@ -2742,7 +2755,7 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::Modifier::End.default.with_trailing_input(Ferro::Time::FormatDescription::Modifier::TrailingInput::Discard).inspect
+          #   Ferro::Time::FormatDescription::Modifier::End.default.with_trailing_input(Ferro::Time::FormatDescription::Modifier::TrailingInput::Discard).debug
           #   # => "End { trailing_input: Discard }"
           def with_trailing_input(trailing_input)
             with(trailing_input:)

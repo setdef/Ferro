@@ -58,7 +58,7 @@ class TestTimestamp < Minitest::Test
     assert_raises(T::Error::ComponentRange) { ts(0, 1_000_000_000) }
     assert_raises(TypeError) { T::Timestamp.from(1) }
     assert_raises(TypeError) { T::Timestamp.from(nil) }
-    assert_raises(TypeError) { ts(0) + 1 }
+    assert_raises(TypeError) { ts(0) + :one }
     assert_raises(TypeError) { ts(0) - "1" }
     assert_raises(TypeError) { ts(0).checked_add(1) }
     assert_raises(TypeError) { ts(0).replace_month(1) }

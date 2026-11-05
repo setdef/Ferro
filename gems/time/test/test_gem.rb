@@ -22,15 +22,15 @@ class TestGem < Minitest::Test
     assert_equal locked("time"), SPEC.metadata.fetch("time_version")
   end
 
-  # Every feature with a Ruby meaning is on, and large-dates is off
-  # (plan 007, decision 2).
+  # The features ADR 002 builds in are on, the ones it drops (serde, rand,
+  # quickcheck) are off, and large-dates is off (plan 007, decision 2).
   def test_the_manifest_pins_that_time_without_large_dates
     manifest = File.read(File.join(ROOT, "ext/ferro_time/Cargo.toml"))
     time = manifest[/^time = .*$/]
 
     assert_includes time, %(version = "=#{locked('time')}")
     assert_includes time,
-      %(features = ["std", "formatting", "parsing", "local-offset", "macros", "serde-human-readable", "serde-well-known"])
+      %(features = ["std", "formatting", "parsing", "local-offset", "macros"])
     refute_includes time, "large-dates"
     refute_includes File.read(File.join(ROOT, "Cargo.lock")), %(name = "rand")
   end

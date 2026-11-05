@@ -148,6 +148,19 @@ module Ferro
         Native.weekday_number(@days_from_monday, :number_from_sunday)
       end
 
+      # The weekday's integer value, Rust's <tt>weekday as u8</tt>: Weekday is
+      # <tt>#[repr(u8)]</tt> and fieldless, so Monday is 0 and Sunday 6, and
+      # Ruby's own conversion to an Integer stands in for Rust's +as+, which
+      # has no name to keep (ADR 001, 2026-11-05). Mirrors time's
+      # <tt>Weekday</tt> (<tt>src/weekday.rs:16-33</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Time::Weekday::Sunday.to_i # => 6
+      def to_i
+        Native.weekday_to_i(@days_from_monday)
+      end
+
       # The zero-indexed number of days from Monday: Monday is 0. Mirrors
       # time's <tt>Weekday::number_days_from_monday</tt>
       # (<tt>src/weekday.rs:143-152</tt>).
@@ -180,13 +193,15 @@ module Ferro
         Native.weekday_display(@days_from_monday)
       end
 
-      # The constant that holds this weekday.
+      # time's derived +Debug+ text for this weekday, formatted by Rust:
+      # the variant's name. +inspect+ stays Ruby's (ADR 001, 2026-11-05). Mirrors time's derived +Debug+
+      # for +Weekday+ (<tt>src/weekday.rs:12</tt>).
       #
       # === Example
       #
-      #   Ferro::Time::Weekday::Friday.inspect # => "Ferro::Time::Weekday::Friday"
-      def inspect
-        "Ferro::Time::Weekday::#{@name}"
+      #   Ferro::Time::Weekday::Friday.debug # => "Friday"
+      def debug
+        Native.weekday_debug(@days_from_monday)
       end
 
       # The days from Monday, for the native layer.

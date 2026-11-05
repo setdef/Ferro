@@ -52,7 +52,18 @@ class TestFormatItems < Minitest::Test
     assert_same M::Padding::Zero, M::Padding.default
     assert_same M::SubsecondDigits::OneOrMore, M::SubsecondDigits.default
     assert_same M::TrailingInput::Prohibit, M::TrailingInput.default
-    assert_equal "Ferro::Time::FormatDescription::Modifier::Padding::None", M::Padding::None.inspect
+    assert_equal "None", M::Padding::None.debug
+    assert_equal "OneOrMore", M::SubsecondDigits::OneOrMore.debug
+    assert_equal "Extended", quietly { M::YearRange::Extended.debug }
+  end
+
+  # TrailingInput alone of the modifier enums is exhaustive, so Rust may
+  # cast it (modifier.rs:1145-1152); to_i answers that cast (ADR 001,
+  # 2026-11-05). The non_exhaustive ones have none.
+  def test_trailing_input_answers_rusts_cast_and_the_others_none
+    assert_equal [0, 1], [M::TrailingInput::Prohibit, M::TrailingInput::Discard].map(&:to_i)
+    refute_respond_to M::Padding::Zero, :to_i
+    refute_respond_to M::SubsecondDigits::One, :to_i
   end
 
   def test_fields_time_keeps_to_itself_have_private_readers
@@ -61,7 +72,7 @@ class TestFormatItems < Minitest::Test
     refute_respond_to M::MonthShort.default, :case_sensitive
     refute_respond_to M::CalendarYearFullStandardRange.default, :padding
     refute_respond_to M::End.default, :trailing_input
-    assert_equal "MonthShort { case_sensitive: false }", M::MonthShort.default.with_case_sensitive(false).inspect
+    assert_equal "MonthShort { case_sensitive: false }", M::MonthShort.default.with_case_sensitive(false).debug
   end
 
   def test_builders_check_their_arguments_types
@@ -120,7 +131,7 @@ class TestFormatItems < Minitest::Test
     assert_match(/FormatDescription::FormatItem is deprecated/, deprecation_warnings { FD::FormatItem })
     assert_match(/FormatDescription.parse is deprecated since time 0.3.48/, deprecation_warnings { FD.parse("[day]") })
     assert_empty deprecation_warnings { M::Day.default.with_padding(M::Padding::Space) }
-    assert_empty deprecation_warnings { FD.parse_owned(1, "[year] [month repr:short]").inspect }
+    assert_empty deprecation_warnings { FD.parse_owned(1, "[year] [month repr:short]").debug }
   end
 
   def test_the_deprecated_parse_is_version_1
@@ -143,7 +154,7 @@ class TestFormatItems < Minitest::Test
       week = C::WeekNumber.new(M::WeekNumber.default.with_repr(M::WeekNumberRepr::Sunday))
       assert_equal "05", date.format(B::Component.new(week))
       assert_equal "Year(Year { padding: Zero, repr: LastTwo, range: Extended, iso_week_based: true, sign_is_mandatory: false })",
-        year.inspect
+        year.debug
     end
   end
 
@@ -162,7 +173,7 @@ class TestFormatItems < Minitest::Test
     quietly do
       literal = O::Literal.new("a\xFFb".b)
       assert_equal "a\u{FFFD}b", T::Date::MIN.format(literal)
-      assert_equal "a\u{FFFD}b", literal.inspect
+      assert_equal "a\u{FFFD}b", literal.debug
       out = +""
       T::Date::MIN.format_into(out, literal)
       assert_equal "a\xFFb".b, out.b
@@ -207,7 +218,7 @@ class TestFormatItems < Minitest::Test
   def test_parse_errors_with_items_are_times
     fd = FD.parse_borrowed(2, "[year]-[month]")
     error = assert_raises(T::Error::Parse::ParseFromDescription::InvalidComponent) { T::Date.parse("2026-13", fd) }
-    assert_equal "month", error.name
+    assert_equal "month", error.to_a.first.to_a.first
     assert_raises(T::Error::Parse::TryFromParsed::InsufficientInformation) { T::Date.parse("2026-10", fd) }
   end
 
@@ -218,11 +229,11 @@ class TestFormatItems < Minitest::Test
     item = B::Optional.new(item)
     error = assert_raises(ArgumentError) { T::Date::MIN.format(item) }
     assert_equal "format items nested more than 255 levels deep", error.message
-    assert_raises(ArgumentError) { item.inspect }
+    assert_raises(ArgumentError) { item.debug }
   end
 
-  def test_component_inspect_is_times_debug
-    assert_equal "Ignore(Ignore { count: 3 })", C::Ignore.new(M::Ignore.count(3)).inspect
+  def test_component_debug_is_times_debug
+    assert_equal "Ignore(Ignore { count: 3 })", C::Ignore.new(M::Ignore.count(3)).debug
     assert_equal "[Day(Day { padding: Zero }), -, Optional(First([a, [b, c]]))]",
       O.from(
         [
@@ -230,6 +241,6 @@ class TestFormatItems < Minitest::Test
           B::StringLiteral.new("-"),
           B::Optional.new(B::First.new([B::StringLiteral.new("a"), B::Compound.new([B::StringLiteral.new("b"), B::StringLiteral.new("c")])])),
         ]
-      ).inspect
+      ).debug
   end
 end

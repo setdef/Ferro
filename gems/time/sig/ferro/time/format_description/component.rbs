@@ -9,7 +9,7 @@ module Ferro
 
         def initialize: (modifier: Data) -> void
         def ==: (Object other) -> bool
-        def inspect: () -> String
+        def debug: () -> String
 
         private
 

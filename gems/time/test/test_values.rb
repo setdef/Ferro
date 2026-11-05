@@ -112,14 +112,19 @@ class TestValues < Minitest::Test
     assert_raises(NoMethodError) { Month.new(1, :January) }
     assert_raises(NoMethodError) { Weekday.new(0, :Monday) }
     refute_respond_to Weekday::Monday, :<
-    assert_equal "Ferro::Time::Month::May", Month::May.inspect
+    assert_equal "May", Month::May.debug
+    assert_equal "Friday", Weekday::Friday.debug
   end
 
-  def test_inspect_is_time_s_debug_and_to_s_its_display
-    assert_equal "2019-01-01", date(2019, 1, 1).inspect
+  def test_debug_is_time_s_debug_and_to_s_its_display
+    assert_equal "2019-01-01", date(2019, 1, 1).debug
+    assert_equal "0:00:00.0", T::Time::MIDNIGHT.debug
+    assert_equal "+00:00:00", T::UtcOffset::UTC.debug
+    assert_match(/\A#<Ferro::Time::Date:0x\h+>\z/, date(2019, 1, 1).inspect)
     assert_equal "0:00:00.0", T::Time::MIDNIGHT.to_s
     assert_equal "+00:00:00", T::UtcOffset::UTC.to_s
-    assert_equal "SignedDuration { seconds: 93784, nanoseconds: 5 }", Duration.new(93_784, 5).inspect
+    assert_equal "SignedDuration { seconds: 93784, nanoseconds: 5 }", Duration.new(93_784, 5).debug
+    assert_match(/\A#<Ferro::Time::SignedDuration:0x\h+>\z/, Duration.new(93_784, 5).inspect)
     assert_equal "1d2h3m4s5ns", Duration.new(93_784, 5).to_s
     assert_equal "0s", Duration::ZERO.to_s
   end
@@ -138,7 +143,7 @@ class TestValues < Minitest::Test
 
   def test_a_wrong_argument_type_raises_type_error
     assert_raises(TypeError) { T::Date.from_calendar_date(2019, 1, 1) }
-    assert_raises(TypeError) { date(2019, 1, 1) + 1 }
+    assert_raises(TypeError) { date(2019, 1, 1) + :one }
     assert_raises(TypeError) { date(2019, 1, 1) - "x" }
     assert_raises(TypeError) { date(2019, 1, 1).with_time(1) }
     assert_raises(TypeError) { date(2019, 1, 1).format("[year]") }
@@ -148,30 +153,44 @@ class TestValues < Minitest::Test
     assert_raises(RangeError) { clock(256, 0) }
   end
 
-  # A number on the left reaches time's reflexive Mul<SignedDuration> for
-  # i32 and f64 through coerce, and only that: Rust has no other operator
-  # with a number on the left, and Ruby's words for that stay as they were.
-  def test_a_number_on_the_left_only_multiplies
+  # A number on the left reaches, through coerce, time's impls with a
+  # number on the left: the reflexive Mul<SignedDuration> for i32 and f64,
+  # and std Duration's Add, Sub, Div, and PartialOrd with a SignedDuration
+  # (ADR 001, 2026-11-05). Every other operator keeps Ruby's own words.
+  def test_a_number_on_the_left_reaches_only_times_impls
     second = Duration::SECOND
     assert_equal Duration.seconds(3), 3 * second
     assert_equal Duration.milliseconds(1_500), 1.5 * second
     assert_raises(RangeError) { (2 ** 40) * second }
     assert_raises(RangeError) { 2 * Duration::MAX }
-    %i[+ - / % ** div divmod fdiv modulo remainder pow].each do |operator|
+    assert_equal Duration.seconds(3), 2 + second
+    assert_equal Duration.seconds(1), 2 - second
+    assert_equal Duration.milliseconds(-500), Rational(1, 2) - second
+    assert_in_delta 2.5, 2.5 / second
+    %i[% ** div divmod fdiv modulo remainder pow].each do |operator|
       error = assert_raises(TypeError, operator.to_s) { 2.public_send(operator, second) }
       assert_equal "Ferro::Time::SignedDuration can't be coerced into Integer", error.message
     end
-    error = assert_raises(TypeError) { 2.5 + second }
-    assert_equal "Ferro::Time::SignedDuration can't be coerced into Float", error.message
-    error = assert_raises(ArgumentError) { 2 < second }
+    error = assert_raises(TypeError) { Rational(1, 2) * second }
+    assert_equal "Ferro::Time::SignedDuration can't be coerced into Rational", error.message
+    assert_operator 0.5, :<, second
+    assert_operator 1, :<=, second
+    assert_operator 2, :>, second
+    assert_equal(-1, 0 <=> second)
+    assert_equal 0, 1 <=> second
+    assert_equal 1, 1.5 <=> second
+    error = assert_raises(ArgumentError) { -1 < second }
     assert_equal "comparison of Integer with Ferro::Time::SignedDuration failed", error.message
-    assert_nil 2 <=> second
+    assert_nil(-1 <=> second)
+    assert_equal 1, second
     refute_equal 2, second
-    assert_raises(TypeError) { Rational(1, 2) * second }
   end
 
   def test_month_and_weekday_numbers
     assert_equal (1..12).to_a, (1..12).map { |n| Month.try_from(n).to_i }
+    # Weekday is #[repr(u8)], so Rust's `as u8` reads 0 for Monday to 6
+    # for Sunday, which to_i answers (ADR 001, 2026-11-05).
+    assert_equal (0..6).to_a, %i[Monday Tuesday Wednesday Thursday Friday Saturday Sunday].map { |day| Weekday.const_get(day).to_i }
     assert_equal [1, 2, 0, 1], [
       Weekday::Monday.number_from_monday,
       Weekday::Monday.number_from_sunday,

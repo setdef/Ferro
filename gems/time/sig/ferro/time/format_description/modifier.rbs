@@ -10,7 +10,7 @@ module Ferro
 
         module Value : Data
           def initialize: (**field fields) -> void
-          def inspect: () -> String
+          def debug: () -> String
 
           private
 
@@ -24,7 +24,7 @@ module Ferro
           private def self.new: (Integer index, Symbol name) -> instance
 
           def initialize: (Integer index, Symbol name) -> void
-          def inspect: () -> String
+          def debug: () -> String
 
           private
 
@@ -127,6 +127,8 @@ module Ferro
           ALL: Array[TrailingInput]
 
           def self.default: () -> TrailingInput
+
+          def to_i: () -> Integer
         end
 
         class Day < Data

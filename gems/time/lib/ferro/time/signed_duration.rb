@@ -30,10 +30,27 @@ module Ferro
     # with time's message where Rust panics, and the +checked_+ and
     # +saturating_+ methods answer without raising.
     #
-    # A SignedDuration is frozen and shareable between Ractors. std's
-    # unsigned +Duration+ is not bound: which Ruby value stands for it is a
-    # choice for all of Ferro's gems at once (plan 010, decision 16), and
-    # every operation with it has a SignedDuration twin here.
+    # A SignedDuration is frozen and shareable between Ractors.
+    #
+    # Where time takes Rust's unsigned <tt>std::time::Duration</tt>, this
+    # takes any Numeric number of seconds, and where time returns one, this
+    # returns a Rational number of seconds, exact to the nanosecond, as
+    # Ruby's own <tt>Time#subsec</tt> is (ADR 001, 2026-11-05). So
+    # <tt>duration + 1.5</tt> adds a second and a half, as time's
+    # <tt>Add<std::time::Duration></tt> does, while <tt>duration * 2</tt>
+    # still multiplies by a count, as <tt>Mul<i32></tt> does: Rust picks
+    # the impl by type, and here the operator picks it: <tt>*</tt> and
+    # <tt>/</tt> take counts, and <tt>+</tt>, <tt>-</tt>, and the
+    # comparisons take spans. A Float
+    # crosses as core's <tt>Duration::try_from_secs_f64</tt> reads it,
+    # rounding to the nearest nanosecond, and raises +ArgumentError+ with
+    # core's words for a negative, NaN, or infinite one; any other Numeric
+    # is exact, rounded to the nearest nanosecond, and raises +RangeError+
+    # where that rounding leaves it negative or past 2**64 seconds, so
+    # <tt>Rational(-1, 10**10)</tt>, a tenth of a nanosecond below zero,
+    # is zero. <tt>Div<std::time::Duration></tt>
+    # has no operator here, since <tt>/</tt> by a number divides by a
+    # count; its answer is <tt>duration / SignedDuration.try_from(seconds)</tt>.
     #
     # Mirrors time's +SignedDuration+ (<tt>src/signed_duration.rs</tt>).
     #
@@ -293,6 +310,24 @@ module Ferro
         def checked_seconds_f32(seconds)
           Native.duration_checked_float32(seconds)
         end
+
+        # Converts a std +Duration+, given as a Numeric number of seconds,
+        # raising Error::ConversionRange when its whole seconds do not fit
+        # a 64-bit signed integer. Mirrors time's
+        # <tt>TryFrom<std::time::Duration> for SignedDuration</tt>
+        # (<tt>src/signed_duration.rs:1423-1436</tt>).
+        #
+        # [seconds] Numeric, as the class RDoc says a std +Duration+ is
+        #           read.
+        #
+        # === Example
+        #
+        #   Ferro::Time::Duration.try_from(1.5) == Ferro::Time::Duration.milliseconds(1_500) # => true
+        #   Ferro::Time::Duration.try_from(2**63)
+        #   # raises Ferro::Time::Error::ConversionRange: Source value is out of range for the target type
+        def try_from(seconds)
+          Native.duration_try_from_std(Arguments.std_duration(seconds))
+        end
       end
 
       # Equivalent to <tt>SignedDuration.seconds(0)</tt>. Mirrors time's
@@ -393,6 +428,46 @@ module Ferro
       #   Ferro::Time::Duration.seconds(-1).abs == Ferro::Time::Duration::SECOND # => true
       def abs
         Native.duration_abs(self)
+      end
+
+      # The absolute value as a std +Duration+, a Rational number of
+      # seconds. Unlike #abs it never saturates, since a std +Duration+
+      # holds the absolute value of MIN. Mirrors time's
+      # <tt>SignedDuration::unsigned_abs</tt>
+      # (<tt>src/signed_duration.rs:375-391</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Time::Duration.seconds(-1).unsigned_abs # => 1r
+      #   Ferro::Time::Duration.seconds(-(2**63)).unsigned_abs # => 9_223_372_036_854_775_808r
+      def unsigned_abs
+        Arguments.seconds(Native.duration_unsigned_abs(self))
+      end
+
+      # This duration as a std +Duration+, a Rational number of seconds,
+      # exact to the nanosecond. A std +Duration+ is unsigned, so a
+      # negative duration raises Error::ConversionRange, the error time's
+      # +TryFrom+ returns. Ruby's core calls +to_r+ on any object it is
+      # handed as a number before checking that the object is one
+      # (<tt>num_exact_check</tt>, <tt>time.c:561</tt>), so a negative
+      # duration given to core raises this gem's class:
+      # <tt>::Time.at(0) + -Duration::MINUTE</tt> raises
+      # Error::ConversionRange, where <tt>::Time.at(0) + Duration::MINUTE</tt>
+      # raises core's +TypeError+. Rust names this
+      # conversion after its target, <tt>std::time::Duration::try_from</tt>;
+      # in Ruby the target is a Rational, and +to_r+ is Ruby's conversion to
+      # one, as OffsetDateTime#to_time is time's <tt>From</tt> into a
+      # +SystemTime+. Mirrors time's
+      # <tt>TryFrom<SignedDuration> for std::time::Duration</tt>
+      # (<tt>src/signed_duration.rs:1438-1455</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Time::Duration.milliseconds(1_500).to_r # => 3/2r
+      #   (-Ferro::Time::Duration::SECOND).to_r
+      #   # raises Ferro::Time::Error::ConversionRange: Source value is out of range for the target type
+      def to_r
+        Arguments.seconds(Native.duration_to_std(self))
       end
 
       # The whole weeks. Mirrors time's <tt>SignedDuration::whole_weeks</tt>
@@ -648,31 +723,44 @@ module Ferro
         Native.duration_checked_neg(self)
       end
 
-      # Adds two durations, as time's +Add+ does, raising +RangeError+ with
-      # time's message, "overflow when adding durations", where Rust panics.
-      # Mirrors time's <tt>Add for SignedDuration</tt>
-      # (<tt>src/signed_duration.rs:1457-1469</tt>).
+      # Adds a duration, as time's +Add+ does, or a std +Duration+ given as
+      # Numeric seconds, as <tt>Add<std::time::Duration></tt> does. Where
+      # Rust panics this raises +RangeError+ with time's message: "overflow
+      # when adding durations", or, for a std +Duration+ past 64-bit signed
+      # seconds, "overflow converting <tt>std::time::Duration</tt> to
+      # <tt>time::SignedDuration</tt>: ConversionRange". Mirrors time's
+      # <tt>Add for SignedDuration</tt> and <tt>Add<std::time::Duration></tt>
+      # (<tt>src/signed_duration.rs:1457-1483</tt>).
       #
-      # [rhs] SignedDuration.
+      # [rhs] SignedDuration, or Numeric seconds.
       #
       # === Example
       #
       #   (Ferro::Time::Duration::HOUR + Ferro::Time::Duration::MINUTE).to_s # => "1h1m"
+      #   (Ferro::Time::Duration::HOUR + 1.5).to_s # => "1h1s500ms"
       def +(rhs)
+        return Native.duration_std(self, :+, Arguments.std_duration(rhs)) if rhs.is_a?(Numeric)
+
         Native.duration_op(self, :+, Arguments.duration(rhs))
       end
 
-      # Subtracts a duration, as time's +Sub+ does, raising +RangeError+ with
-      # time's message, "overflow when subtracting durations", where Rust
-      # panics. Mirrors time's <tt>Sub for SignedDuration</tt>
-      # (<tt>src/signed_duration.rs:1547-1559</tt>).
+      # Subtracts a duration, as time's +Sub+ does, or a std +Duration+
+      # given as Numeric seconds, as <tt>Sub<std::time::Duration></tt>
+      # does, raising +RangeError+ with time's message, "overflow when
+      # subtracting durations" or the conversion's message #+ gives, where
+      # Rust panics. Mirrors time's <tt>Sub for SignedDuration</tt> and
+      # <tt>Sub<std::time::Duration></tt>
+      # (<tt>src/signed_duration.rs:1547-1573</tt>).
       #
-      # [rhs] SignedDuration.
+      # [rhs] SignedDuration, or Numeric seconds.
       #
       # === Example
       #
       #   (Ferro::Time::Duration::HOUR - Ferro::Time::Duration::MINUTE).to_s # => "59m"
+      #   (Ferro::Time::Duration::HOUR - 60).to_s # => "59m"
       def -(rhs)
+        return Native.duration_std(self, :-, Arguments.std_duration(rhs)) if rhs.is_a?(Numeric)
+
         Native.duration_op(self, :-, Arguments.duration(rhs))
       end
 
@@ -713,36 +801,52 @@ module Ferro
         end
       end
 
-      # Lets an Integer or a Float on the left multiply a SignedDuration, as
-      # time's reflexive <tt>Mul<SignedDuration> for i32</tt> and
-      # <tt>for f64</tt> do, which compute <tt>rhs * self</tt>. Ruby's
-      # <tt>Integer#*</tt> and <tt>Float#*</tt> ask the right-hand value to
-      # coerce the left (<tt>numeric.c</tt>, +rb_num_coerce_bin+, at Ruby
-      # v4.0.9), so neither changes. The pair returned holds +number+ in a
-      # private wrapper that answers only <tt>*</tt>: Rust has no other
-      # operator with a number on the left, so <tt>2 + duration</tt> raises
-      # +TypeError+ and <tt>2 < duration</tt> +ArgumentError+, in Ruby's own
-      # words. Mirrors time's <tt>Mul<SignedDuration> for i32</tt>
-      # (<tt>src/signed_duration.rs:1657-1668, 1757-1768</tt>).
+      # Lets a number on the left of a SignedDuration reach time's impls
+      # with a number on the left. Ruby's numeric operators ask the
+      # right-hand value to coerce the left (<tt>numeric.c</tt>,
+      # +rb_num_coerce_bin+ and +rb_num_coerce_relop+, at Ruby v4.0.9), so
+      # none of them changes. The pair returned holds +number+ in a private
+      # wrapper that answers as Rust does:
       #
-      # [number] Integer or Float.
+      # - <tt>2 * duration</tt>, by an Integer or a Float, is time's
+      #   reflexive <tt>Mul<SignedDuration> for i32</tt> or <tt>for f64</tt>,
+      #   <tt>duration * 2</tt>
+      #   (<tt>src/signed_duration.rs:1657-1668, 1757-1768</tt>).
+      # - <tt>2 + duration</tt> and <tt>2 - duration</tt> take the number as
+      #   a std +Duration+ in seconds, as <tt>Add<SignedDuration></tt> and
+      #   <tt>Sub<SignedDuration> for std::time::Duration</tt> do, returning
+      #   a SignedDuration (<tt>:1485-1497</tt>, <tt>:1575-1589</tt>).
+      # - <tt>2 / duration</tt> is <tt>Div<SignedDuration> for
+      #   std::time::Duration</tt>, a Float (<tt>:1866-1877</tt>).
+      # - <tt>2 < duration</tt> and <tt>2 <=> duration</tt> compare as
+      #   <tt>PartialOrd<SignedDuration> for std::time::Duration</tt> does
+      #   (<tt>:1912-1917</tt>); a number no std +Duration+ holds, such as a
+      #   negative one, compares as +nil+, so <tt><</tt> raises Ruby's own
+      #   +ArgumentError+.
+      #
+      # Any other operator raises Ruby's own +TypeError+.
+      #
+      # [number] Numeric.
       #
       # === Example
       #
       #   (2 * Ferro::Time::Duration::SECOND).to_s # => "2s"
       #   (1.5 * Ferro::Time::Duration::SECOND).to_s # => "1s500ms"
+      #   (2 + Ferro::Time::Duration::SECOND).to_s # => "3s"
+      #   1 < Ferro::Time::Duration::MINUTE # => true
       def coerce(number)
-        raise TypeError, "#{number.class} can't be coerced into Ferro::Time::SignedDuration" unless number.is_a?(Integer) || number.is_a?(Float)
+        raise TypeError, "#{number.class} can't be coerced into Ferro::Time::SignedDuration" unless number.is_a?(Numeric)
 
         [Scalar.new(number), self]
       end
 
-      # Divides by an Integer, as time's <tt>Div<i32></tt> does, raising
-      # +ZeroDivisionError+ for zero, Ruby's words for Rust's panic; by a
-      # Float, as <tt>Div<f64></tt> does, raising +RangeError+ with time's
-      # message where Rust panics; or by another SignedDuration, returning
-      # their ratio as a Float, as <tt>Div for SignedDuration</tt> does.
-      # Mirrors time's <tt>Div for SignedDuration</tt>
+      # Divides by an Integer, as time's <tt>Div<i32></tt> does; by a
+      # Float, as <tt>Div<f64></tt> does; or by another SignedDuration,
+      # returning their ratio as a Float, as <tt>Div for SignedDuration</tt>
+      # does. Where Rust panics this raises +RangeError+ with the panic's
+      # text: time's message for an overflowing or NaN quotient, and Rust's
+      # "attempt to divide by zero" for an Integer zero. Mirrors time's
+      # <tt>Div for SignedDuration</tt>
       # (<tt>src/signed_duration.rs:1681-1851</tt>).
       #
       # [rhs] Integer, Float, or SignedDuration.
@@ -751,7 +855,7 @@ module Ferro
       #
       #   (Ferro::Time::Duration::MINUTE / 4).to_s # => "15s"
       #   Ferro::Time::Duration::HOUR / Ferro::Time::Duration::MINUTE # => 60.0
-      #   Ferro::Time::Duration::SECOND / 0 # raises ZeroDivisionError
+      #   Ferro::Time::Duration::SECOND / 0 # raises RangeError: attempt to divide by zero
       def /(rhs)
         case rhs
         when Integer then Native.duration_scale_int(self, :/, rhs)
@@ -761,16 +865,30 @@ module Ferro
         end
       end
 
-      # Whether +other+ is the same SignedDuration, by time's +PartialEq+.
-      # +false+ for anything else.
+      # Whether +other+ is the same SignedDuration, by time's +PartialEq+,
+      # or the same span as a std +Duration+ given as Numeric seconds, by
+      # <tt>PartialEq<std::time::Duration></tt>
+      # (<tt>src/signed_duration.rs:1879-1891</tt>), so a negative duration
+      # equals no number. +false+ for anything else, and for a number no
+      # std +Duration+ holds. Ruby's own <tt>Integer#==</tt> asks this
+      # method when it is handed a SignedDuration, so <tt>60 ==
+      # Duration::MINUTE</tt> answers the same, as Rust's impl the other
+      # way round does.
       #
       # === Example
       #
       #   duration = Ferro::Time::Duration.new(93_784, 5)
       #   duration == Ferro::Time::Duration::MAX # => false
       #   duration == duration # => true
+      #   Ferro::Time::Duration::MINUTE == 60 # => true
       def ==(other)
-        other.is_a?(SignedDuration) && Native.duration_eq(self, other)
+        case other
+        when SignedDuration then Native.duration_eq(self, other)
+        when Numeric
+          std = Arguments.std_duration_or_nil(other)
+          !std.nil? && Native.duration_std_eq(self, std)
+        else false
+        end
       end
 
       # Whether +other+ is an equal SignedDuration, as time's +Eq+ says, so
@@ -795,15 +913,25 @@ module Ferro
         Native.duration_hash(self)
       end
 
-      # Compares with another SignedDuration by time's +Ord+, so the
-      # Comparable operators answer as Rust's do; +nil+ for anything else.
+      # Compares with another SignedDuration by time's +Ord+, or with a std
+      # +Duration+ given as Numeric seconds by
+      # <tt>PartialOrd<std::time::Duration></tt>
+      # (<tt>src/signed_duration.rs:1893-1910</tt>), so the Comparable
+      # operators answer as Rust's do; +nil+ for anything else, and for a
+      # number no std +Duration+ holds.
       #
       # === Example
       #
       #   duration = Ferro::Time::Duration.new(93_784, 5)
       #   duration <=> Ferro::Time::Duration::MAX # => -1
+      #   Ferro::Time::Duration::MINUTE < 61 # => true
       def <=>(other)
-        Native.duration_cmp(self, other) if other.is_a?(SignedDuration)
+        case other
+        when SignedDuration then Native.duration_cmp(self, other)
+        when Numeric
+          std = Arguments.std_duration_or_nil(other)
+          Native.duration_std_cmp(self, std) unless std.nil?
+        end
       end
 
       # The value as time's +Display+ writes it. Without a +precision+ it
@@ -844,13 +972,14 @@ module Ferro
         Native.duration_display_precision(self, precision)
       end
 
-      # The value as time's +Debug+ writes it.
+      # The value as time's +Debug+ writes it, formatted by Rust.
+      # +inspect+ stays Ruby's (ADR 001, 2026-11-05).
       #
       # === Example
       #
       #   duration = Ferro::Time::Duration.new(93_784, 5)
-      #   duration.inspect # => "SignedDuration { seconds: 93784, nanoseconds: 5 }"
-      def inspect
+      #   duration.debug # => "SignedDuration { seconds: 93784, nanoseconds: 5 }"
+      def debug
         Native.duration_debug(self)
       end
 
@@ -883,45 +1012,80 @@ module Ferro
       end
 
       # A number on the left of a SignedDuration, as #coerce hands it to
-      # Ruby's numeric operators. It multiplies, as time's reflexive +Mul+
-      # does, and refuses every other operator with Ruby's own error.
+      # Ruby's numeric operators. It answers each operator time has with a
+      # number on the left, and refuses every other with Ruby's own error.
       class Scalar
-        # Holds +number+, the Integer or Float on the left.
+        # Holds +number+, the Numeric on the left.
         def initialize(number)
           @number = number
           freeze
         end
 
         # +duration+ times the number, as time's <tt>Mul<SignedDuration> for
-        # i32</tt> computes <tt>rhs * self</tt>.
+        # i32</tt> and <tt>for f64</tt> compute <tt>rhs * self</tt>. Rust has
+        # no such impl for a std +Duration+, so any other Numeric raises
+        # Ruby's own +TypeError+.
         def *(other)
-          other * @number
+          case (number = @number)
+          when Integer, Float then other * number
+          else method_missing(:*, other)
+          end
         end
 
-        # Ruby's comparisons of a number with a value they cannot compare
-        # answer +nil+, so Ruby raises its own +ArgumentError+.
-        def <(_other)
-          nil
+        # The number as a std +Duration+ plus +duration+, as time's
+        # <tt>Add<SignedDuration> for std::time::Duration</tt> computes
+        # <tt>rhs + self</tt>.
+        def +(other)
+          other + @number
+        end
+
+        # The number as a std +Duration+ minus +duration+, as time's
+        # <tt>Sub<SignedDuration> for std::time::Duration</tt> does.
+        def -(other)
+          Native.duration_std(other, :rsub, Arguments.std_duration(@number))
+        end
+
+        # The number as a std +Duration+ divided by +duration+, a Float, as
+        # time's <tt>Div<SignedDuration> for std::time::Duration</tt> does.
+        def /(other)
+          Native.std_duration_ratio(Arguments.std_duration(@number), other)
+        end
+
+        # The number as a std +Duration+ compared with +duration+, as time's
+        # <tt>PartialOrd<SignedDuration> for std::time::Duration</tt>
+        # compares; +nil+ for a number no std +Duration+ holds.
+        def <=>(other)
+          std = Arguments.std_duration_or_nil(@number)
+          Native.std_duration_cmp(std, other) unless std.nil?
+        end
+
+        # Whether the number is less than +duration+, by #<=>; +nil+, so
+        # that Ruby raises its own +ArgumentError+, where they do not
+        # compare.
+        def <(other)
+          (self <=> other)&.negative?
         end
 
         # See #<.
-        def <=(_other)
-          nil
+        def <=(other)
+          order = self <=> other
+          order <= 0 unless order.nil?
         end
 
         # See #<.
-        def >(_other)
-          nil
+        def >(other)
+          (self <=> other)&.positive?
         end
 
         # See #<.
-        def >=(_other)
-          nil
+        def >=(other)
+          order = self <=> other
+          order >= 0 unless order.nil?
         end
 
         # Raises the +TypeError+ Ruby raises for an operand that does not
         # coerce, since Rust has no other operator with a number on the left.
-        def method_missing(_name, *)
+        def method_missing(_name, *_args)
           raise TypeError, "Ferro::Time::SignedDuration can't be coerced into #{@number.class}"
         end
 

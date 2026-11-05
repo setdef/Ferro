@@ -19,7 +19,7 @@ module Ferro
 
           def initialize: (Config config) -> void
           def ==: (Object other) -> bool
-          def inspect: () -> String
+          def debug: () -> String
 
           attr_reader config: Config
         end

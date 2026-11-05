@@ -809,15 +809,21 @@ module Ferro
       # "resulting value is out of range", where Rust panics. Mirrors time's
       # <tt>Add<SignedDuration> for Timestamp</tt>
       # (<tt>src/timestamp.rs:1450-1462</tt>); the <tt>AddAssign</tt> impls
-      # are Ruby's <tt>+=</tt>, and std's +Duration+ waits with the rest of
-      # its operations (plan 010, decision 16).
+      # are Ruby's <tt>+=</tt>. Given Numeric seconds, it adds a std
+      # +Duration+, as <tt>Add<std::time::Duration></tt> does
+      # (<tt>:1464-1475</tt>), raising +RangeError+ with that impl's
+      # message, "resulting value is out of range: Positive", where it
+      # panics. SignedDuration says how a number is read (ADR 001,
+      # 2026-11-05).
       #
-      # [duration] SignedDuration.
+      # [duration] SignedDuration, or Numeric seconds.
       #
       # === Example
       #
       #   (Ferro::Time::Timestamp::UNIX_EPOCH + Ferro::Time::Duration::DAY).as_seconds # => 86_400
       def +(duration)
+        return Native.timestamp_std(self, :+, Arguments.std_duration(duration)) if duration.is_a?(Numeric)
+
         Native.timestamp_arith(self, :+, Arguments.duration(duration))
       end
 
@@ -834,7 +840,12 @@ module Ferro
       # src/interop/offsetdatetime_timestamp.rs:9-19,
       # src/interop/systemdatetime_timestamp.rs:12-23</tt>).
       #
-      # [other] SignedDuration, Timestamp, UtcDateTime, OffsetDateTime, or ::Time.
+      # Given Numeric seconds, it subtracts a std +Duration+, as
+      # <tt>Sub<std::time::Duration></tt> does (<tt>src/timestamp.rs:1513-1524</tt>),
+      # raising +RangeError+ with "resulting value is out of range:
+      # Negative" where it panics.
+      #
+      # [other] SignedDuration, Timestamp, UtcDateTime, OffsetDateTime, ::Time, or Numeric seconds.
       #
       # === Example
       #
@@ -844,6 +855,7 @@ module Ferro
       def -(other)
         case other
         when SignedDuration then Native.timestamp_arith(self, :-, other)
+        when Numeric then Native.timestamp_std(self, :-, Arguments.std_duration(other))
         when Timestamp then Native.timestamp_difference(self, other)
         when UtcDateTime then Native.timestamp_with_utc(self, :-, other)
         when OffsetDateTime then Native.timestamp_with_offset_date_time(self, :-, other)
@@ -1005,8 +1017,8 @@ module Ferro
       #
       # === Example
       #
-      #   Ferro::Time::Timestamp.new(1_546_398_245, 0).inspect # => "1546398245"
-      def inspect
+      #   Ferro::Time::Timestamp.new(1_546_398_245, 0).debug # => "1546398245"
+      def debug
         Native.timestamp_debug(self)
       end
 

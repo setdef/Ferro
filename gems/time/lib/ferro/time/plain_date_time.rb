@@ -459,9 +459,15 @@ module Ferro
       # +RangeError+ with time's message, "resulting value is out of range".
       # Ruby's <tt>+=</tt> works through it. Mirrors time's
       # <tt>Add<SignedDuration> for PlainDateTime</tt>
-      # (<tt>src/plain_date_time.rs:1187-1199</tt>).
+      # (<tt>src/plain_date_time.rs:1187-1199</tt>). Given Numeric seconds,
+      # it adds a std +Duration+, as <tt>Add<std::time::Duration></tt> does
+      # (<tt>:1201-1220</tt>), raising +RangeError+ with time's message where
+      # it panics: "overflow adding duration to date" when the whole days
+      # leave the range, "resulting value is out of range" when the clock
+      # then wraps past the last day. SignedDuration says how a number is
+      # read (ADR 001, 2026-11-05).
       #
-      # [duration] SignedDuration.
+      # [duration] SignedDuration, or Numeric seconds.
       #
       # === Example
       #
@@ -469,6 +475,8 @@ module Ferro
       #   (datetime + Ferro::Time::Duration::DAY).to_s # => "2019-01-02 12:30:45.123456789"
       #   Ferro::Time::PlainDateTime::MAX + Ferro::Time::Duration::DAY # raises RangeError
       def +(duration)
+        return Native.plain_std(self, :+, Arguments.std_duration(duration)) if duration.is_a?(Numeric)
+
         Native.plain_arith(self, :+, Arguments.duration(duration))
       end
 
@@ -515,10 +523,13 @@ module Ferro
       # does, raising +RangeError+ with time's message, "resulting value is
       # out of range", where Rust panics; or, given another PlainDateTime,
       # returns the span between them, as <tt>Sub for PlainDateTime</tt> does.
-      # Mirrors time's <tt>Sub for PlainDateTime</tt>
-      # (<tt>src/plain_date_time.rs:1247-1314</tt>).
+      # Given Numeric seconds, it subtracts a std +Duration+, as
+      # <tt>Sub<std::time::Duration></tt> does, raising +RangeError+ with
+      # "overflow subtracting duration from date" or "resulting value is out
+      # of range" where Rust panics. Mirrors time's <tt>Sub for
+      # PlainDateTime</tt> (<tt>src/plain_date_time.rs:1247-1314</tt>).
       #
-      # [other] SignedDuration or PlainDateTime.
+      # [other] SignedDuration, PlainDateTime, or Numeric seconds.
       #
       # === Example
       #
@@ -529,6 +540,7 @@ module Ferro
         case other
         when SignedDuration then Native.plain_arith(self, :-, other)
         when PlainDateTime then Native.plain_difference(self, other)
+        when Numeric then Native.plain_std(self, :-, Arguments.std_duration(other))
         else raise TypeError, "no implicit conversion of #{other.class} into Ferro::Time::SignedDuration"
         end
       end
@@ -900,8 +912,8 @@ module Ferro
       # === Example
       #
       #   datetime = Ferro::Time::Date.from_calendar_date(2019, Ferro::Time::Month::January, 1).with_hms_nano(12, 30, 45, 123_456_789)
-      #   datetime.inspect # => "2019-01-01 12:30:45.123456789"
-      def inspect
+      #   datetime.debug # => "2019-01-01 12:30:45.123456789"
+      def debug
         Native.plain_debug(self)
       end
 

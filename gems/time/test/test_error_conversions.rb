@@ -36,7 +36,7 @@ class TestErrorConversions < Minitest::Test
   def test_a_parse_error_reaches_its_component_range
     parsed = E::TryFromParsed.try_from(parse_error)
     assert_instance_of E::TryFromParsed::ComponentRange, parsed
-    assert_equal ["day", true], [parsed.name, parsed.is_conditional]
+    assert_equal ["day", true], [parsed.source.name, parsed.source.is_conditional]
 
     range = E::ComponentRange.try_from(parsed)
     assert_instance_of E::ComponentRange, range
@@ -100,7 +100,7 @@ class TestErrorConversions < Minitest::Test
     end
     converted = E::ParseFromDescription.try_from(invalid)
     assert_instance_of E::ParseFromDescription::InvalidComponent, converted
-    assert_equal ["year", "the 'year' component could not be parsed"], [converted.name, converted.message]
+    assert_equal ["year", "the 'year' component could not be parsed"], [converted.to_a.first, converted.message]
 
     literal = E::ParseFromDescription.try_from(E::Parse::ParseFromDescription::InvalidLiteral.new)
     assert_instance_of E::ParseFromDescription::InvalidLiteral, literal
@@ -119,12 +119,12 @@ class TestErrorConversions < Minitest::Test
   def test_parse_from
     range = E::Parse.from(E::TryFromParsed::ComponentRange.new("day", true))
     assert_instance_of E::Parse::TryFromParsed::ComponentRange, range
-    assert_equal ["day", true, "day was not in range"], [range.name, range.is_conditional, range.message]
+    assert_equal ["day", true, "day was not in range"], [range.source.source.name, range.source.source.is_conditional, range.message]
     assert_instance_of E::Parse::TryFromParsed::InsufficientInformation,
       E::Parse.from(E::TryFromParsed::InsufficientInformation.new)
     component = E::Parse.from(E::ParseFromDescription::InvalidComponent.new("hour"))
     assert_instance_of E::Parse::ParseFromDescription::InvalidComponent, component
-    assert_equal "hour", component.name
+    assert_equal "hour", component.to_a.first.to_a.first
     assert_instance_of E::Parse::ParseFromDescription::InvalidLiteral,
       E::Parse.from(E::ParseFromDescription::InvalidLiteral.new)
     assert_instance_of E::Parse::ParseFromDescription::UnexpectedTrailingCharacters,
@@ -141,10 +141,10 @@ class TestErrorConversions < Minitest::Test
     direct = E::ComponentRange.new("hour", false)
     format = E::Format.from(direct)
     assert_instance_of E::Format::ComponentRange, format
-    assert_equal ["hour", false, "hour was not in range"], [format.name, format.is_conditional, format.message]
+    assert_equal ["hour", false, "hour was not in range"], [format.source.name, format.source.is_conditional, format.message]
     parsed = E::TryFromParsed.from(direct)
     assert_instance_of E::TryFromParsed::ComponentRange, parsed
-    assert_equal ["hour", false], [parsed.name, parsed.is_conditional]
+    assert_equal ["hour", false], [parsed.source.name, parsed.source.is_conditional]
 
     assert_raises(TypeError) { E::Format.from(E::TryFromParsed::ComponentRange.new("hour", false)) }
     assert_raises(TypeError) { E::TryFromParsed.from(E::Format::ComponentRange.new("hour", false)) }
@@ -155,7 +155,7 @@ class TestErrorConversions < Minitest::Test
   def test_source
     source = parse_error.source
     assert_instance_of E::TryFromParsed::ComponentRange, source
-    assert_equal ["day", true], [source.name, source.is_conditional]
+    assert_equal ["day", true], [source.source.name, source.source.is_conditional]
     assert_instance_of E::ComponentRange, source.source
     assert_nil source.source.source
 
@@ -165,7 +165,7 @@ class TestErrorConversions < Minitest::Test
 
     component = E::Parse::ParseFromDescription::InvalidComponent.new("year").source
     assert_instance_of E::ParseFromDescription::InvalidComponent, component
-    assert_equal "year", component.name
+    assert_equal "year", component.to_a.first
     assert_nil component.source
     assert_instance_of E::ParseFromDescription::InvalidLiteral,
       E::Parse::ParseFromDescription::InvalidLiteral.new.source

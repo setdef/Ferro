@@ -455,8 +455,49 @@ impl Items {
     }
 }
 
+/// The derived `Debug` text of the variant at `index` of `F`, one of the
+/// modifier enums.
+fn variant_debug<F: Field + std::fmt::Debug>(index: u64) -> Result<String, Failure> {
+    F::decode(Encoded::Int(index))
+        .map(|value| format!("{value:?}"))
+        .ok_or_else(|| unknown("modifier variant"))
+}
+
+/// time's derived `Debug` for the variant at `index` of the modifier enum
+/// named `name` (`src/format_description/modifier.rs`), so a variant's
+/// `debug` is Rust's text (ADR 001, 2026-11-05).
+fn modifier_enum_debug(ruby: &Ruby, name: Symbol, index: u64) -> Result<String, Error> {
+    let name = name.name()?;
+    guarded(ruby, || match name.as_ref() {
+        "Padding" => variant_debug::<Padding>(index),
+        "SubsecondDigits" => variant_debug::<SubsecondDigits>(index),
+        "TrailingInput" => variant_debug::<TrailingInput>(index),
+        "MonthRepr" => variant_debug::<MonthRepr>(index),
+        "WeekdayRepr" => variant_debug::<WeekdayRepr>(index),
+        "WeekNumberRepr" => variant_debug::<WeekNumberRepr>(index),
+        "YearRepr" => variant_debug::<YearRepr>(index),
+        "YearRange" => variant_debug::<YearRange>(index),
+        "UnixTimestampPrecision" => variant_debug::<UnixTimestampPrecision>(index),
+        _ => Err(unknown("modifier enum")),
+    })
+}
+
+/// `TrailingInput::X as u8` for the variant at `index`
+/// (`src/format_description/modifier.rs:1145-1152`): the one modifier enum
+/// that is exhaustive and fieldless, so Rust may cast it, and `to_i` binds
+/// the cast (ADR 001, 2026-11-05).
+fn trailing_input_to_i(ruby: &Ruby, index: u64) -> Result<u8, Error> {
+    guarded(ruby, || {
+        TrailingInput::decode(Encoded::Int(index))
+            .map(|value| value as u8)
+            .ok_or_else(|| unknown("modifier variant"))
+    })
+}
+
 /// Defines the functions on `Native`.
 pub fn define(native: RModule) -> Result<(), Error> {
+    native.define_singleton_method("modifier_enum_debug", function!(modifier_enum_debug, 2))?;
+    native.define_singleton_method("trailing_input_to_i", function!(trailing_input_to_i, 1))?;
     native.define_singleton_method(
         "format_description_items",
         function!(format_description_items, 2),

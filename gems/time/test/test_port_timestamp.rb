@@ -790,7 +790,7 @@ class TestPortTimestamp < Minitest::Test
   # <tt>timestamp.rs:805</tt>, +debug+.
   def test_debug
     [[stamp("0"), "0"], [stamp("1_546_398_245"), "1546398245"]].each do |ts, expected|
-      assert_equal expected, ts.inspect
+      assert_equal expected, ts.debug
     end
   end
 

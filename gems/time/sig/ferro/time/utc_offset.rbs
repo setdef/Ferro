@@ -33,7 +33,7 @@ module Ferro
       def hash: () -> Integer
       def <=>: (UtcOffset other) -> Integer | (Object other) -> Integer?
       def to_s: () -> String
-      def inspect: () -> String
+      def debug: () -> String
       def dup: () -> self
       def clone: (?freeze: bool?) -> self
     end

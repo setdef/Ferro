@@ -11,7 +11,7 @@ module Ferro
         def parse_item: (String input, FormatDescription::item item) -> String
         def parse_items: (String input, Array[FormatDescription::BorrowedFormatItem] | Array[FormatDescription::OwnedFormatItem] items) -> String
         def parse_component: (String input, FormatDescription::Component component) -> String
-        def inspect: () -> String
+        def debug: () -> String
         def year: () -> Integer?
         def year_last_two: () -> Integer?
         def iso_year: () -> Integer?

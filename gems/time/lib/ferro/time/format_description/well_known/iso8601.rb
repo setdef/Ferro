@@ -94,9 +94,9 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::FormatDescription::WellKnown::Iso8601::PARSING.inspect
+          #   Ferro::Time::FormatDescription::WellKnown::Iso8601::PARSING.debug
           #   # => "Iso8601 { config: Config { formatted_components: None, use_separators: false, year_is_six_digits: false, date_kind: Calendar, time_precision: Hour { decimal_digits: None }, offset_precision: Hour } }"
-          def inspect
+          def debug
             Native.iso8601_debug(@config.__send__(:settings))
           end
 

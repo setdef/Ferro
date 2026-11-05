@@ -12,11 +12,14 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-# Every feature with a Ruby meaning is on; large-dates, rand, quickcheck,
-# and wasm-bindgen are off (plan 007, decision 2). serde-well-known gates
-# no code of its own: it turns on serde, formatting, and parsing, which
-# serde-human-readable already does.
-time = { version = "=0.3.55", features = ["std", "formatting", "parsing", "local-offset", "macros", "serde-human-readable", "serde-well-known"] }
+# ADR 002 sorts time's features: std, formatting, parsing, and
+# local-offset are built in, and macros stays on as ADR 002's table leaves
+# it; serde, serde-human-readable, serde-well-known, rand, rand08, rand09,
+# rand010, quickcheck, and wasm-bindgen reach only Rust and are dropped;
+# large-dates is to be offered at install, and until the install-time
+# machinery ADR 002 describes exists it stays off, the crate's default
+# (plan 007, decision 2).
+time = { version = "=0.3.55", features = ["std", "formatting", "parsing", "local-offset", "macros"] }
 magnus = { version = "0.9.3", features = ["bytes"] }
 rb-sys = "0.9.130"
 

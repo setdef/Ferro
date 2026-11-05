@@ -31,7 +31,8 @@ module Ferro
       def number_days_from_monday: () -> Integer
       def number_days_from_sunday: () -> Integer
       def to_s: () -> String
-      def inspect: () -> String
+      def debug: () -> String
+      def to_i: () -> Integer
 
       private
 

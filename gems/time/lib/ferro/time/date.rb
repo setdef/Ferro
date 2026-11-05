@@ -446,6 +446,40 @@ module Ferro
         Native.date_arith(self, :checked_sub, Arguments.duration(duration))
       end
 
+      # Computes <tt>self + duration</tt> for a std +Duration+ given as
+      # Numeric seconds, returning +nil+ if an overflow occurred. Only its
+      # whole days count: a part day adds nothing. Mirrors time's
+      # <tt>Date::checked_add_std</tt> (<tt>src/date.rs:864-922</tt>).
+      #
+      # [duration] Numeric seconds, as SignedDuration says a std
+      #            +Duration+ is read.
+      #
+      # === Example
+      #
+      #   date = Ferro::Time::Date.from_calendar_date(2020, Ferro::Time::Month::December, 31)
+      #   date.checked_add_std(23 * 3_600) == date # => true
+      #   date.checked_add_std(47 * 3_600).to_s # => "2021-01-01"
+      #   Ferro::Time::Date::MAX.checked_add_std(86_400) # => nil
+      def checked_add_std(duration)
+        Native.date_std(self, :checked_add_std, Arguments.std_duration(duration))
+      end
+
+      # Computes <tt>self - duration</tt> for a std +Duration+ given as
+      # Numeric seconds, returning +nil+ if an overflow occurred. Only its
+      # whole days count. Mirrors time's <tt>Date::checked_sub_std</tt>
+      # (<tt>src/date.rs:986-1044</tt>).
+      #
+      # [duration] Numeric seconds.
+      #
+      # === Example
+      #
+      #   date = Ferro::Time::Date.from_calendar_date(2020, Ferro::Time::Month::December, 31)
+      #   date.checked_sub_std(47 * 3_600).to_s # => "2020-12-30"
+      #   Ferro::Time::Date::MIN.checked_sub_std(86_400) # => nil
+      def checked_sub_std(duration)
+        Native.date_std(self, :checked_sub_std, Arguments.std_duration(duration))
+      end
+
       # Computes <tt>self + duration</tt>, saturating at the earliest or
       # latest value on overflow. Mirrors time's <tt>Date::saturating_add</tt>
       # (<tt>src/date.rs:1110-1149</tt>).
@@ -479,14 +513,25 @@ module Ferro
       # <tt>Add<SignedDuration> for Date</tt>
       # (<tt>src/date.rs:1661-1672</tt>).
       #
-      # [duration] SignedDuration.
+      # Given Numeric seconds instead, it adds the whole days of a std
+      # +Duration+ of that many seconds, as time's
+      # <tt>Add<std::time::Duration> for Date</tt> does
+      # (<tt>src/date.rs:1675-1687</tt>), with the same message: so
+      # <tt>date + 86_400</tt> adds a day and <tt>date + 1</tt> adds none,
+      # where Ruby's own <tt>::Date + 1</tt> adds a day. SignedDuration
+      # says how a number is read (ADR 001, 2026-11-05).
+      #
+      # [duration] SignedDuration, or Numeric seconds.
       #
       # === Example
       #
       #   date = Ferro::Time::Date.from_calendar_date(2019, Ferro::Time::Month::January, 1)
       #   (date + Ferro::Time::Duration::DAY).to_s # => "2019-01-02"
+      #   (date + 172_799).to_s # => "2019-01-02"
       #   Ferro::Time::Date::MAX + Ferro::Time::Duration::DAY # raises RangeError
       def +(duration)
+        return Native.date_std(self, :+, Arguments.std_duration(duration)) if duration.is_a?(Numeric)
+
         Native.date_arith(self, :+, Arguments.duration(duration))
       end
 
@@ -494,10 +539,12 @@ module Ferro
       # does, raising +RangeError+ with time's message, "overflow subtracting
       # duration from date", where Rust panics; or, given another Date,
       # returns the whole days between them as a SignedDuration, as <tt>Sub
-      # for Date</tt> does. Mirrors time's <tt>Sub for Date</tt>
+      # for Date</tt> does. Given Numeric seconds, it subtracts the whole
+      # days of a std +Duration+, as <tt>Sub<std::time::Duration></tt>
+      # does, with the same message. Mirrors time's <tt>Sub for Date</tt>
       # (<tt>src/date.rs:1711-1768</tt>).
       #
-      # [other] SignedDuration or Date.
+      # [other] SignedDuration, Date, or Numeric seconds.
       #
       # === Example
       #
@@ -508,6 +555,7 @@ module Ferro
         case other
         when SignedDuration then Native.date_arith(self, :-, other)
         when Date then Native.date_difference(self, other)
+        when Numeric then Native.date_std(self, :-, Arguments.std_duration(other))
         else raise TypeError, "no implicit conversion of #{other.class} into Ferro::Time::SignedDuration"
         end
       end
@@ -774,8 +822,8 @@ module Ferro
       # === Example
       #
       #   date = Ferro::Time::Date.from_calendar_date(2019, Ferro::Time::Month::January, 1)
-      #   date.inspect # => "2019-01-01"
-      def inspect
+      #   date.debug # => "2019-01-01"
+      def debug
         Native.date_debug(self)
       end
 

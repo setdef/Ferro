@@ -189,7 +189,7 @@ class TestParsed < Minitest::Test
     assert_empty err
   end
 
-  def test_inspect_is_times_debug
-    assert_match(/\AParsed \{ year: /, Parsed.new.inspect)
+  def test_debug_is_times_debug
+    assert_match(/\AParsed \{ year: /, Parsed.new.debug)
   end
 end

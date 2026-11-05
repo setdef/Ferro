@@ -8,8 +8,8 @@
 require "test_helper"
 
 # Where time panics, the gem raises RangeError with time's own message,
-# checked before time runs, and ZeroDivisionError for an integer division
-# by zero (plan 007, decision 7). The Rust tests compare each message with
+# checked before time runs, and Rust's own words for an integer division
+# by zero (ADR 001, 2026-11-05). The Rust tests compare each message with
 # the panic time really raises; these check the Ruby side gets them.
 class TestPanics < Minitest::Test
   include TimeSuite
@@ -43,8 +43,7 @@ class TestPanics < Minitest::Test
     assert_refused(CONSTRUCTING) { Duration::MAX * 2.0 }
     assert_refused(CONSTRUCTING) { Duration::SECOND / 0.0 }
     assert_refused("passed NaN to `time::SignedDuration::seconds_f64`") { Duration::SECOND * Float::NAN }
-    error = assert_raises(ZeroDivisionError) { Duration::SECOND / 0 }
-    assert_equal "divided by 0", error.message
+    assert_refused("attempt to divide by zero") { Duration::SECOND / 0 }
   end
 
   # Rust picks Mul<i32> for an integer literal; an Integer outside it is

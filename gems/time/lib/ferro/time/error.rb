@@ -162,7 +162,7 @@ module Ferro
         def self.try_from(error)
           case error
           when ComponentRange then error
-          when Format::ComponentRange, TryFromParsed::ComponentRange then new(error.name, error.is_conditional)
+          when Format::ComponentRange, TryFromParsed::ComponentRange then error.source
           when Error then raise DifferentVariant
           else raise TypeError, "no implicit conversion of #{error.class} into Ferro::Time::Error"
           end
@@ -307,15 +307,24 @@ module Ferro
         #   Ferro::Time::Error::Format::InvalidComponent.new("year").message
         #   # => "The year component cannot be formatted into the requested format."
         class InvalidComponent < Format
-          # The name of the component.
-          attr_reader :component
-
           # Creates the error for +component+.
           #
-          # [component] String.
+          # [component] String, the name of the component.
           def initialize(component)
             @component = component
             super("The #{component} component cannot be formatted into the requested format.")
+          end
+
+          # The variant's one field, the component's name, positional as Rust leaves it
+          # (ADR 001, 2026-11-05), so <tt>in InvalidComponent[name]</tt> reads as
+          # Rust's pattern does.
+          def deconstruct
+            [@component]
+          end
+
+          # The variant's fields as an Array, as #deconstruct gives them.
+          def to_a
+            deconstruct
           end
         end
 
@@ -323,15 +332,8 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::Error::Format::ComponentRange.new("year", false).message # => "year was not in range"
+        #   Ferro::Time::Error::Format::ComponentRange.new("year", false).to_a.first.name # => "year"
         class ComponentRange < Format
-          # The name of the component whose value was out of range.
-          attr_reader :name
-
-          # Whether an input with this value could have succeeded if the
-          # values of other components were different.
-          attr_reader :is_conditional
-
           # Creates the error for the component +name+.
           #
           # [name] String.
@@ -350,7 +352,21 @@ module Ferro
           #   Ferro::Time::Error::Format::ComponentRange.new("year", false).source.class
           #   # => Ferro::Time::Error::ComponentRange
           def source
-            Error::ComponentRange.new(name, is_conditional)
+            Error::ComponentRange.new(@name, @is_conditional)
+          end
+
+          # The variant's one field, the Error::ComponentRange it holds, as
+          # #source answers it: positional as Rust leaves it (ADR 001,
+          # 2026-11-05), so <tt>in ComponentRange[range]</tt> reads as
+          # Rust's pattern does. time names no field of its own here; the
+          # name and conditionality are the held range's.
+          def deconstruct
+            [source]
+          end
+
+          # The variant's fields as an Array, as #deconstruct gives them.
+          def to_a
+            deconstruct
           end
         end
 
@@ -366,6 +382,22 @@ module Ferro
           # [message] String.
           def initialize(message = nil)
             super
+          end
+
+          # The variant's one field, positional as Rust leaves it (ADR 001,
+          # 2026-11-05): +nil+, as #source is, since a
+          # <tt>std::io::Error</tt> has no Ruby value here.
+          #
+          # === Example
+          #
+          #   Ferro::Time::Error::Format::StdIo.new("broken pipe").to_a # => [nil]
+          def deconstruct
+            [nil]
+          end
+
+          # The variant's fields as an Array, as #deconstruct gives them.
+          def to_a
+            deconstruct
           end
         end
       end
@@ -407,7 +439,7 @@ module Ferro
           case error
           when ParseFromDescription then error
           when Parse::ParseFromDescription::InvalidLiteral then InvalidLiteral.new
-          when Parse::ParseFromDescription::InvalidComponent then InvalidComponent.new(error.name)
+          when Parse::ParseFromDescription::InvalidComponent then error.source
           when Parse::ParseFromDescription::UnexpectedTrailingCharacters then UnexpectedTrailingCharacters.new
           when Parse::ParseFromDescription then ParseFromDescription.new(error.message)
           when Error then raise DifferentVariant
@@ -433,17 +465,26 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::Error::ParseFromDescription::InvalidComponent.new("year").name # => "year"
+        #   Ferro::Time::Error::ParseFromDescription::InvalidComponent.new("year").to_a # => ["year"]
         class InvalidComponent < ParseFromDescription
-          # The name of the component.
-          attr_reader :name
-
           # Creates the error for the component +name+.
           #
-          # [name] String.
+          # [name] String, the name of the component.
           def initialize(name)
             @name = name
             super("the '#{name}' component could not be parsed")
+          end
+
+          # The variant's one field, the component's name, positional as Rust leaves it
+          # (ADR 001, 2026-11-05), so <tt>in InvalidComponent[name]</tt> reads as
+          # Rust's pattern does.
+          def deconstruct
+            [@name]
+          end
+
+          # The variant's fields as an Array, as #deconstruct gives them.
+          def to_a
+            deconstruct
           end
         end
 
@@ -501,7 +542,7 @@ module Ferro
           case error
           when TryFromParsed then error
           when Parse::TryFromParsed::InsufficientInformation then InsufficientInformation.new
-          when Parse::TryFromParsed::ComponentRange then ComponentRange.new(error.name, error.is_conditional)
+          when Parse::TryFromParsed::ComponentRange then error.source
           when Parse::TryFromParsed then TryFromParsed.new(error.message)
           when Error then raise DifferentVariant
           else raise TypeError, "no implicit conversion of #{error.class} into Ferro::Time::Error"
@@ -550,15 +591,8 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::Error::TryFromParsed::ComponentRange.new("hour", false).name # => "hour"
+        #   Ferro::Time::Error::TryFromParsed::ComponentRange.new("hour", false).to_a.first.name # => "hour"
         class ComponentRange < TryFromParsed
-          # The name of the component whose value was out of range.
-          attr_reader :name
-
-          # Whether an input with this value could have succeeded if the
-          # values of other components were different.
-          attr_reader :is_conditional
-
           # Creates the error for the component +name+.
           #
           # [name] String.
@@ -578,7 +612,21 @@ module Ferro
           #   Ferro::Time::Error::TryFromParsed::ComponentRange.new("hour", false).source.class
           #   # => Ferro::Time::Error::ComponentRange
           def source
-            Error::ComponentRange.new(name, is_conditional)
+            Error::ComponentRange.new(@name, @is_conditional)
+          end
+
+          # The variant's one field, the Error::ComponentRange it holds, as
+          # #source answers it: positional as Rust leaves it (ADR 001,
+          # 2026-11-05), so <tt>in ComponentRange[range]</tt> reads as
+          # Rust's pattern does. time names no field of its own here; the
+          # name and conditionality are the held range's.
+          def deconstruct
+            [source]
+          end
+
+          # The variant's fields as an Array, as #deconstruct gives them.
+          def to_a
+            deconstruct
           end
         end
       end
@@ -627,10 +675,11 @@ module Ferro
           case error
           when Error::TryFromParsed::InsufficientInformation then TryFromParsed::InsufficientInformation.new
           when Error::TryFromParsed::ComponentRange
-            TryFromParsed::ComponentRange.new(error.name, error.is_conditional)
+            range = error.source
+            TryFromParsed::ComponentRange.new(range.name, range.is_conditional)
           when Error::TryFromParsed then TryFromParsed.new(error.message)
           when Error::ParseFromDescription::InvalidLiteral then ParseFromDescription::InvalidLiteral.new
-          when Error::ParseFromDescription::InvalidComponent then ParseFromDescription::InvalidComponent.new(error.name)
+          when Error::ParseFromDescription::InvalidComponent then ParseFromDescription::InvalidComponent.new(error.deconstruct.first)
           when Error::ParseFromDescription::UnexpectedTrailingCharacters
             ParseFromDescription::UnexpectedTrailingCharacters.new
           when Error::ParseFromDescription then ParseFromDescription.new(error.message)
@@ -658,6 +707,23 @@ module Ferro
             Error::TryFromParsed.try_from(self)
           end
 
+          # The variant's one field, the Error::TryFromParsed it holds, as #source
+          # answers it: positional as Rust leaves it (ADR 001, 2026-11-05), so
+          # <tt>in TryFromParsed[error]</tt> reads as Rust's pattern does.
+          #
+          # === Example
+          #
+          #   Ferro::Time::Error::Parse::TryFromParsed::InsufficientInformation.new.to_a.map(&:class)
+          #   # => [Ferro::Time::Error::TryFromParsed::InsufficientInformation]
+          def deconstruct
+            [source]
+          end
+
+          # The variant's fields as an Array, as #deconstruct gives them.
+          def to_a
+            deconstruct
+          end
+
           # The parsed input did not include enough information to
           # construct the type.
           #
@@ -681,13 +747,6 @@ module Ferro
           #   Ferro::Time::Date.parse("2019-02-30", Ferro::Time::FormatDescription::WellKnown::Iso8601::DATE)
           #   # raises Ferro::Time::Error::Parse::TryFromParsed::ComponentRange
           class ComponentRange < TryFromParsed
-            # The name of the component whose value was out of range.
-            attr_reader :name
-
-            # Whether an input with this value could have succeeded if the
-            # values of other components were different.
-            attr_reader :is_conditional
-
             # Creates the error for the component +name+.
             #
             # [name] String.
@@ -696,6 +755,17 @@ module Ferro
               @name = name
               @is_conditional = is_conditional
               super("#{name} was not in range")
+            end
+
+            # The Error::TryFromParsed::ComponentRange this holds, with the
+            # same name and conditionality.
+            #
+            # === Example
+            #
+            #   Ferro::Time::Error::Parse::TryFromParsed::ComponentRange.new("day", true).source.to_a.first.name
+            #   # => "day"
+            def source
+              Error::TryFromParsed::ComponentRange.new(@name, @is_conditional)
             end
           end
         end
@@ -713,9 +783,25 @@ module Ferro
           #
           # === Example
           #
-          #   Ferro::Time::Error::Parse::ParseFromDescription::InvalidComponent.new("year").source.name # => "year"
+          #   Ferro::Time::Error::Parse::ParseFromDescription::InvalidComponent.new("year").source.to_a # => ["year"]
           def source
             Error::ParseFromDescription.try_from(self)
+          end
+
+          # The variant's one field, the Error::ParseFromDescription it holds, as #source
+          # answers it: positional as Rust leaves it (ADR 001, 2026-11-05), so
+          # <tt>in ParseFromDescription[error]</tt> reads as Rust's pattern does.
+          #
+          # === Example
+          #
+          #   Ferro::Time::Error::Parse::ParseFromDescription::InvalidComponent.new("year").to_a.first.to_a # => ["year"]
+          def deconstruct
+            [source]
+          end
+
+          # The variant's fields as an Array, as #deconstruct gives them.
+          def to_a
+            deconstruct
           end
 
           # A string literal was not what was expected.
@@ -740,15 +826,22 @@ module Ferro
           #   Ferro::Time::Error::Parse::ParseFromDescription::InvalidComponent.new("year").message
           #   # => "the 'year' component could not be parsed"
           class InvalidComponent < ParseFromDescription
-            # The name of the component.
-            attr_reader :name
-
             # Creates the error for the component +name+.
             #
-            # [name] String.
+            # [name] String, the name of the component.
             def initialize(name)
               @name = name
               super("the '#{name}' component could not be parsed")
+            end
+
+            # The Error::ParseFromDescription::InvalidComponent this holds,
+            # naming the same component.
+            #
+            # === Example
+            #
+            #   Ferro::Time::Error::Parse::ParseFromDescription::InvalidComponent.new("year").source.to_a # => ["year"]
+            def source
+              Error::ParseFromDescription::InvalidComponent.new(@name)
             end
           end
 

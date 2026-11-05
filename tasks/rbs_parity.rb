@@ -26,6 +26,15 @@ require "rbs"
 # it, is reported whether or not a signature mentions it. Both rules exist
 # because, in Tokra, AppHandle#manage hid behind Manager#manage, a stub, and
 # Window and Webview inherited Manager's stubs the same way.
+#
+# RBS has no syntax for a refinement, so a module that holds refinements
+# (ferro-time's Ext traits) declares the methods it refines as its own
+# instance methods, the way Steep reads a +refine+ block. Refinement
+# modules are anonymous, so the lint reaches them through the module that
+# holds them: each public method of each refinement needs a signature on
+# that module. RBS cannot say which refinement a method belongs to, so a
+# declared method must be defined in every refinement the module holds,
+# with the declared visibility and arguments.
 class RbsParity
   # Ruby makes these private whatever the signature says.
   ALWAYS_PRIVATE = %i[initialize initialize_copy initialize_clone initialize_dup respond_to_missing?].freeze
@@ -104,6 +113,17 @@ class RbsParity
         next if kind == :singleton && generated_class_method?(mod, name)
 
         [key(mod.name, kind, name), "public in lib/ but has no signature"]
+      end + undeclared_refined(mod, signatures)
+    end
+  end
+
+  # The public methods of +mod+'s refinements that +signatures+ lacks.
+  private def undeclared_refined(mod, signatures)
+    mod.refinements.flat_map do |refinement|
+      refinement.public_instance_methods(false).filter_map do |name|
+        next if signatures.key?([:instance, name])
+
+        [key(mod.name, :instance, name), "public in #{refinement_label(refinement)} in lib/ but has no signature"]
       end
     end
   end
@@ -146,6 +166,8 @@ class RbsParity
     if kind == :instance && name == :initialize && target.is_a?(Class) && target < Data
       return [[label, "declared on a Data class; declare self.new instead (AGENTS.md)"]]
     end
+
+    return check_refined(target, label, name, declaration) if kind == :instance && refined?(target, name)
 
     actual = visibility_of(owner, name)
     return [[label, "declared in sig/ but not defined in lib/"]] unless actual
@@ -262,6 +284,42 @@ class RbsParity
 
   private def describe(method_owner)
     method_owner.name || method_owner.inspect
+  end
+
+  # Whether +name+ is one of the methods +target+'s refinements define,
+  # rather than one +target+ defines itself.
+  private def refined?(target, name)
+    return false if target.method_defined?(name) || target.private_method_defined?(name)
+
+    target.refinements.any? { |refinement| refined_visibility(refinement, name) }
+  end
+
+  # A method declared on a module of refinements must be defined in each
+  # one, since RBS cannot say which it belongs to.
+  private def check_refined(target, label, name, declaration)
+    target.refinements.flat_map do |refinement|
+      actual = refined_visibility(refinement, name)
+      next [[label, "declared in sig/ but not defined in #{refinement_label(refinement)} in lib/"]] unless actual
+
+      problems = []
+      matches = actual == declaration.visibility || (actual == :protected && declaration.visibility == :public)
+      unless matches
+        problems << [label, "#{declaration.visibility} in sig/ but #{actual} in #{refinement_label(refinement)} in lib/"]
+      end
+      problems + arity_problems(label, Shape.from_parameters(refinement.instance_method(name).parameters), declaration)
+    end
+  end
+
+  # The visibility of +name+ in +refinement+ itself, or +nil+.
+  private def refined_visibility(refinement, name)
+    if refinement.public_instance_methods(false).include?(name) then :public
+    elsif refinement.protected_instance_methods(false).include?(name) then :protected
+    elsif refinement.private_instance_methods(false).include?(name) then :private
+    end
+  end
+
+  private def refinement_label(refinement)
+    "the refinement of #{describe(refinement.target)}"
   end
 
   private def visibility_of(owner, name)

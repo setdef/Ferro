@@ -115,12 +115,32 @@ The API is time's, translated where Rust has no Ruby meaning:
   are frozen constants.
 * Every value is frozen and immutable, as Rust's +Copy+ values are, and
   compares, orders, and hashes as time's +PartialEq+, +Ord+, and +Hash+ do.
+  +debug+ answers time's +Debug+ text, formatted by Rust; +inspect+ is
+  Ruby's own.
 * Rust's operators are Ruby's: <tt>date + duration</tt>,
   <tt>datetime - other</tt>, <tt>duration * 3</tt>, <tt>-offset</tt>.
   Multiplying uses time's <tt>i32</tt> impl, Rust's type for an integer
   literal, from either side: <tt>2 * duration</tt> reaches time's
-  reflexive impl through SignedDuration#coerce, and no other operator
-  takes a number on the left, as in Rust.
+  reflexive impl through SignedDuration#coerce.
+* Where time takes or returns Rust's unsigned <tt>std::time::Duration</tt>,
+  the gem takes any Numeric number of seconds and returns a Rational, exact
+  to the nanosecond: <tt>date + 86_400</tt>, <tt>duration + 1.5</tt>,
+  <tt>2 - duration</tt>, <tt>duration == 60</tt>,
+  <tt>SignedDuration.try_from(1.5)</tt>, <tt>duration.to_r</tt>,
+  <tt>duration.unsigned_abs</tt>. As in Rust, the operator picks the impl:
+  <tt>*</tt> and <tt>/</tt> by a number take a count, while <tt>+</tt>,
+  <tt>-</tt>, and the comparisons take seconds, so <tt>date + 1</tt> adds
+  the whole days of one second, none, where Ruby's ::Date adds a day.
+* time's extension traits are refinements, in effect only where you bring
+  them in, as Rust's are only where you +use+ them:
+
+    using Ferro::Time::Ext::NumericalDuration
+    5.seconds + 500.milliseconds # => a SignedDuration of 5.5 s
+
+  Ext::NumericalStdDuration answers Rationals (<tt>5.std_minutes</tt>),
+  and Ext::SystemTimeExt adds <tt>checked_add_signed</tt>,
+  <tt>checked_sub_signed</tt>, and <tt>signed_duration_since</tt> to
+  Ruby's ::Time.
 * A description is a FormatDescriptionV3, the classes Rfc2822 and
   Rfc3339, an Iso8601 with any Config, or format items: a
   BorrowedFormatItem, an OwnedFormatItem, or an Array of either, as
@@ -172,8 +192,8 @@ What differs from calling time from Rust:
 
 * time panics on arithmetic that leaves its range, on a NaN or
   overflowing float, and on integer division by zero. The gem checks the
-  same conditions first and raises +RangeError+ with time's message, or
-  +ZeroDivisionError+, instead. Any other panic raises Ferro::Time::Error
+  same conditions first and raises +RangeError+ with the panic's message
+  instead. Any other panic raises Ferro::Time::Error
   with <tt>time panicked: ...</tt> rather than ending your Ruby process.
 * Formatting a type with a well-known format that needs more than the type
   holds, such as RFC 3339 for a Date, is a compile-time error in Rust. The
@@ -188,13 +208,14 @@ What differs from calling time from Rust:
   with time's formatters and joining them as time does; a test checks the
   result against time's own formatter.
 
-Not bound yet: every impl with std's unsigned +Duration+ (Timestamp's
-included), whose Ruby value is a choice for all of Ferro's gems at once.
-Most operations that take std's +Duration+ have a SignedDuration twin
-that is bound; the conversions, the comparisons, and +unsigned_abs+ do
-not. ferro-time's plan 010 says why. SignedDuration#to_s takes Rust's
-precision, <tt>duration.to_s(3)</tt> for <tt>{:.3}</tt>, but not its width
-or fill. time's +serde+ and +macros+ features are built and add no Ruby API.
+Not bound: <tt>Div<std::time::Duration> for SignedDuration</tt>, since
+<tt>/</tt> by a number is a count (its value is
+<tt>duration / SignedDuration.try_from(seconds)</tt>); +InstantExt+, since
+no Ruby class stands for std's +Instant+; and time's hidden items.
+SignedDuration#to_s takes Rust's precision, <tt>duration.to_s(3)</tt> for
+<tt>{:.3}</tt>, but not its width or fill. time's +macros+ feature is built
+and adds no Ruby API; its +serde+ features are not built, as they serve
+only Rust.
 
 time's +large-dates+ feature is off, as Tauri and its plugins build time,
 so years run from -9999 to 9999. The +rand+, +quickcheck+, and

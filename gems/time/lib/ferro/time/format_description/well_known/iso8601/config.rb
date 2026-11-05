@@ -44,14 +44,26 @@ module Ferro
               freeze
             end
 
-            # The constant that holds this variant.
+            # time's derived +Debug+ text for this variant, formatted by
+            # Rust: its name. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
             #
             # === Example
             #
-            #   Ferro::Time::FormatDescription::WellKnown::Iso8601::FormattedComponents::Date.inspect
-            #   # => "Ferro::Time::FormatDescription::WellKnown::Iso8601::FormattedComponents::Date"
-            def inspect
-              "Ferro::Time::FormatDescription::WellKnown::Iso8601::FormattedComponents::#{@name}"
+            #   Ferro::Time::FormatDescription::WellKnown::Iso8601::FormattedComponents::Date.debug # => "Date"
+            def debug
+              Native.iso8601_enum_debug(:FormattedComponents, @index, 0)
+            end
+
+            # The variant's integer value, Rust's <tt>variant as u8</tt>: the
+            # enum is fieldless and exhaustive, so +as+ reads its
+            # discriminant, for which Ruby's own conversion to an Integer
+            # stands in (ADR 001, 2026-11-05).
+            #
+            # === Example
+            #
+            #   Ferro::Time::FormatDescription::WellKnown::Iso8601::FormattedComponents::Date.to_i # => 1
+            def to_i
+              Native.iso8601_enum_to_i(:FormattedComponents, @index)
             end
 
             # The variant's place in time's enum, for the native layer.
@@ -100,14 +112,26 @@ module Ferro
               freeze
             end
 
-            # The constant that holds this variant.
+            # time's derived +Debug+ text for this variant, formatted by
+            # Rust: its name. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
             #
             # === Example
             #
-            #   Ferro::Time::FormatDescription::WellKnown::Iso8601::DateKind::Week.inspect
-            #   # => "Ferro::Time::FormatDescription::WellKnown::Iso8601::DateKind::Week"
-            def inspect
-              "Ferro::Time::FormatDescription::WellKnown::Iso8601::DateKind::#{@name}"
+            #   Ferro::Time::FormatDescription::WellKnown::Iso8601::DateKind::Week.debug # => "Week"
+            def debug
+              Native.iso8601_enum_debug(:DateKind, @index, 0)
+            end
+
+            # The variant's integer value, Rust's <tt>variant as u8</tt>: the
+            # enum is fieldless and exhaustive, so +as+ reads its
+            # discriminant, for which Ruby's own conversion to an Integer
+            # stands in (ADR 001, 2026-11-05).
+            #
+            # === Example
+            #
+            #   Ferro::Time::FormatDescription::WellKnown::Iso8601::DateKind::Week.to_i # => 1
+            def to_i
+              Native.iso8601_enum_to_i(:DateKind, @index)
             end
 
             # The variant's place in time's enum, for the native layer.
@@ -150,6 +174,17 @@ module Ferro
               # :attr_reader: decimal_digits
               # The number of decimal digits, from 1 to 255, or +nil+ for
               # none.
+
+              # time's derived +Debug+ text for this precision, formatted
+              # by Rust. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
+              #
+              # === Example
+              #
+              #   Ferro::Time::FormatDescription::WellKnown::Iso8601::TimePrecision::Hour.new(decimal_digits: 3).debug
+              #   # => "Hour { decimal_digits: Some(3) }"
+              def debug
+                Native.iso8601_enum_debug(:TimePrecision, 0, decimal_digits || 0)
+              end
             end
 
             # Format the hour and minute. Seconds and nanoseconds will be
@@ -164,6 +199,17 @@ module Ferro
               # :attr_reader: decimal_digits
               # The number of decimal digits, from 1 to 255, or +nil+ for
               # none.
+
+              # time's derived +Debug+ text for this precision, formatted
+              # by Rust. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
+              #
+              # === Example
+              #
+              #   Ferro::Time::FormatDescription::WellKnown::Iso8601::TimePrecision::Minute.new(decimal_digits: 3).debug
+              #   # => "Minute { decimal_digits: Some(3) }"
+              def debug
+                Native.iso8601_enum_debug(:TimePrecision, 1, decimal_digits || 0)
+              end
             end
 
             # Format the hour, minute, and second. Nanoseconds will be
@@ -178,6 +224,17 @@ module Ferro
               # :attr_reader: decimal_digits
               # The number of decimal digits, from 1 to 255, or +nil+ for
               # none.
+
+              # time's derived +Debug+ text for this precision, formatted
+              # by Rust. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
+              #
+              # === Example
+              #
+              #   Ferro::Time::FormatDescription::WellKnown::Iso8601::TimePrecision::Second.new(decimal_digits: 3).debug
+              #   # => "Second { decimal_digits: Some(3) }"
+              def debug
+                Native.iso8601_enum_debug(:TimePrecision, 2, decimal_digits || 0)
+              end
             end
           end
 
@@ -206,14 +263,26 @@ module Ferro
               freeze
             end
 
-            # The constant that holds this variant.
+            # time's derived +Debug+ text for this variant, formatted by
+            # Rust: its name. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
             #
             # === Example
             #
-            #   Ferro::Time::FormatDescription::WellKnown::Iso8601::OffsetPrecision::Hour.inspect
-            #   # => "Ferro::Time::FormatDescription::WellKnown::Iso8601::OffsetPrecision::Hour"
-            def inspect
-              "Ferro::Time::FormatDescription::WellKnown::Iso8601::OffsetPrecision::#{@name}"
+            #   Ferro::Time::FormatDescription::WellKnown::Iso8601::OffsetPrecision::Hour.debug # => "Hour"
+            def debug
+              Native.iso8601_enum_debug(:OffsetPrecision, @index, 0)
+            end
+
+            # The variant's integer value, Rust's <tt>variant as u8</tt>: the
+            # enum is fieldless and exhaustive, so +as+ reads its
+            # discriminant, for which Ruby's own conversion to an Integer
+            # stands in (ADR 001, 2026-11-05).
+            #
+            # === Example
+            #
+            #   Ferro::Time::FormatDescription::WellKnown::Iso8601::OffsetPrecision::Hour.to_i # => 0
+            def to_i
+              Native.iso8601_enum_to_i(:OffsetPrecision, @index)
             end
 
             # The variant's place in time's enum, for the native layer.
@@ -397,9 +466,9 @@ module Ferro
             #
             # === Example
             #
-            #   Ferro::Time::FormatDescription::WellKnown::Iso8601::Config::DEFAULT.inspect
+            #   Ferro::Time::FormatDescription::WellKnown::Iso8601::Config::DEFAULT.debug
             #   # => "Config { formatted_components: DateTimeOffset, use_separators: true, year_is_six_digits: false, date_kind: Calendar, time_precision: Second { decimal_digits: Some(9) }, offset_precision: Minute }"
-            def inspect
+            def debug
               Native.iso8601_config_debug(@settings)
             end
 

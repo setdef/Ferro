@@ -17,6 +17,23 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 - `SignedDuration#to_s(precision)`, time's concise `Display` with a precision (Rust's `{:.3}`); a precision from 65,536 up to `usize`'s maximum raises `RangeError` ("Formatting argument out of range"), as Rust's formatter panics, and one from `2**64` up raises Ruby's own `RangeError`.
 - The conversions between time's error types: `Error::ComponentRange.try_from`, `Error::TryFromParsed.try_from` and `.from`, `Error::ParseFromDescription.try_from`, `Error::Parse.from`, and `Error::Format.from`, raising `Error::DifferentVariant` for another variant.
 - `Error#source`, the error one holds, as time's `Error::source` answers it: a parse error's `Error::TryFromParsed` or `Error::ParseFromDescription` twin, and a nested `ComponentRange`'s `Error::ComponentRange`.
+- time's operations with std's `Duration`, which takes any Numeric number of seconds and answers a Rational: `SignedDuration.try_from(seconds)`, `#to_r`, `#unsigned_abs`, `+` and `-` with seconds on either side, `seconds / duration`, and `==` and `<=>` with seconds both ways; `Date#checked_add_std` and `#checked_sub_std`; and `+` and `-` with seconds on `Date`, `Time`, `PlainDateTime`, `UtcDateTime`, `OffsetDateTime`, and `Timestamp`, raising `RangeError` with time's message where Rust panics.
+- `Ferro::Time::Ext::NumericalDuration`, `NumericalStdDuration`, and `SystemTimeExt`, time's extension traits as refinements brought in with `using`: `5.seconds`, `1.5.std_minutes`, and `::Time#signed_duration_since`.
+- `debug` on every value, iterator, `Parsed`, format item, component, modifier, enum constant, unit, ISO 8601 configuration and enum, and on `Rfc2822` and `Rfc3339`, answering time's `Debug` text as Rust formats it.
+- `Weekday#to_i` and `to_i` on the ISO 8601 `FormattedComponents`, `DateKind`, and `OffsetPrecision` variants and on `Modifier::TrailingInput`, Rust's `as` on a fieldless enum.
+- `deconstruct` and `to_a` on time's tuple variants, giving the field Rust leaves positional: the name on `Error::Format::InvalidComponent` and `Error::ParseFromDescription::InvalidComponent`, the held `Error::ComponentRange` on `Error::Format::ComponentRange` and `Error::TryFromParsed::ComponentRange`, `nil` on `Error::Format::StdIo`, and the held twin on every error under `Error::Parse::TryFromParsed` and `Error::Parse::ParseFromDescription`, so `in Parse::TryFromParsed[TryFromParsed::ComponentRange[range]]` reads as Rust's pattern does.
+
+### Changed
+
+- **Breaking:** `inspect` is Ruby's own on every class; time's `Debug` text, which `inspect` answered and the constants imitated with their constant paths, moved to `debug`.
+- **Breaking:** `SignedDuration#==` and `#<=>` compare with a Numeric as a std `Duration` of that many seconds, as time's `PartialEq` and `PartialOrd` with std's `Duration` do, so `Duration::MINUTE == 60`; and a number on the left of `+`, `-`, `/`, or a comparison now reaches time's std impls instead of raising.
+- **Breaking:** integer division of a `SignedDuration` by zero raises `RangeError` ("attempt to divide by zero"), Rust's panic text, instead of `ZeroDivisionError`.
+- time's `serde-human-readable` and `serde-well-known` features are no longer built, as ADR 002 drops them; neither reached Ruby.
+
+### Removed
+
+- **Breaking:** `Error::Format::InvalidComponent#component` and `ParseFromDescription::InvalidComponent#name`, readers time never names; use `to_a` or a pattern.
+- **Breaking:** `name` and `is_conditional` on `Error::Format::ComponentRange`, `Error::TryFromParsed::ComponentRange`, and `Error::Parse::TryFromParsed::ComponentRange`, readers time gives only the `ComponentRange` they hold; use `source`, `to_a`, or a pattern.
 
 ## [0.1.0.pre.4] - 2026-11-02
 

@@ -42,11 +42,11 @@ module Ferro
       def checked_sub: (SignedDuration duration) -> PlainDateTime?
       def saturating_add: (SignedDuration duration) -> PlainDateTime
       def saturating_sub: (SignedDuration duration) -> PlainDateTime
-      def +: (SignedDuration duration) -> PlainDateTime
+      def +: (SignedDuration | Numeric duration) -> PlainDateTime
       def assume_offset: (UtcOffset offset) -> OffsetDateTime
       def assume_utc: () -> OffsetDateTime
       def as_utc: () -> UtcDateTime
-      def -: (SignedDuration other) -> PlainDateTime | (PlainDateTime other) -> SignedDuration
+      def -: (SignedDuration | Numeric other) -> PlainDateTime | (PlainDateTime other) -> SignedDuration
       def replace_time: (Time time) -> PlainDateTime
       def replace_date: (Date date) -> PlainDateTime
       def replace_year: (Integer year) -> PlainDateTime
@@ -72,7 +72,7 @@ module Ferro
       def hash: () -> Integer
       def <=>: (PlainDateTime other) -> Integer | (Object other) -> Integer?
       def to_s: () -> String
-      def inspect: () -> String
+      def debug: () -> String
       def dup: () -> self
       def clone: (?freeze: bool?) -> self
     end

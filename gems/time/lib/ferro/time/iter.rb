@@ -340,8 +340,8 @@ module Ferro
         #
         #   t = Ferro::Time
         #   jan = ->(day) { t::Date.from_calendar_date(2019, t::Month::January, day) }
-        #   jan[1].iter_to(jan[3]).inspect # => "DateIter { front: 2019-01-01, back: Some(2019-01-03) }"
-        def inspect
+        #   jan[1].iter_to(jan[3]).debug # => "DateIter { front: 2019-01-01, back: Some(2019-01-03) }"
+        def debug
           Native.date_iter_debug(self)
         end
       end
@@ -533,8 +533,8 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::Iter::MonthIter.new(Ferro::Time::Month::May).inspect # => "MonthIter { current: May }"
-        def inspect
+        #   Ferro::Time::Iter::MonthIter.new(Ferro::Time::Month::May).debug # => "MonthIter { current: May }"
+        def debug
           Native.month_iter_debug(self)
         end
       end
@@ -676,8 +676,8 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::Iter::WeekdayIter.new(Ferro::Time::Weekday::Friday).inspect # => "WeekdayIter { current: Friday }"
-        def inspect
+        #   Ferro::Time::Iter::WeekdayIter.new(Ferro::Time::Weekday::Friday).debug # => "WeekdayIter { current: Friday }"
+        def debug
           Native.weekday_iter_debug(self)
         end
       end
@@ -710,7 +710,7 @@ module Ferro
       #   rev = Ferro::Time::Iter::MonthIter.new(Ferro::Time::Month::March).rev
       #   rev.first(3) # => [Ferro::Time::Month::March, Ferro::Time::Month::February, Ferro::Time::Month::January]
       #   rev.max # => Ferro::Time::Month::December
-      #   rev.inspect # => "Rev { iter: MonthIter { current: March } }"
+      #   rev.debug # => "Rev { iter: MonthIter { current: March } }"
       #   Ferro::Time::Iter::WeekdayIter.new(Ferro::Time::Weekday::Monday).rev.respond_to?(:is_sorted) # => false
       class Rev
         include Enumerable
@@ -824,7 +824,7 @@ module Ferro
         end
 
         # time's derived +Debug+.
-        def inspect
+        def debug
           Native.rev_debug(self)
         end
 

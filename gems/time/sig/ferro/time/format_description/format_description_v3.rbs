@@ -6,7 +6,7 @@ module Ferro
     module FormatDescription
       class FormatDescriptionV3
         def to_owned: () -> self
-        def inspect: () -> String
+        def debug: () -> String
         def dup: () -> self
         def clone: (?freeze: bool?) -> self
       end

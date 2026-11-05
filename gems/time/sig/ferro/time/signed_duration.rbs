@@ -35,11 +35,14 @@ module Ferro
       def self.saturating_seconds_f32: (Float seconds) -> SignedDuration
       def self.checked_seconds_f64: (Float seconds) -> SignedDuration?
       def self.checked_seconds_f32: (Float seconds) -> SignedDuration?
+      def self.try_from: (Numeric seconds) -> SignedDuration
 
       def is_zero: () -> bool
       def is_negative: () -> bool
       def is_positive: () -> bool
       def abs: () -> SignedDuration
+      def unsigned_abs: () -> Rational
+      def to_r: () -> Rational
       def whole_weeks: () -> Integer
       def whole_days: () -> Integer
       def whole_hours: () -> Integer
@@ -61,30 +64,34 @@ module Ferro
       def checked_div: (Integer rhs) -> SignedDuration?
       def saturating_mul: (Integer rhs) -> SignedDuration
       def checked_neg: () -> SignedDuration?
-      def +: (SignedDuration rhs) -> SignedDuration
-      def -: (SignedDuration rhs) -> SignedDuration
+      def +: (SignedDuration | Numeric rhs) -> SignedDuration
+      def -: (SignedDuration | Numeric rhs) -> SignedDuration
       def -@: () -> SignedDuration
       def *: (Integer | Float rhs) -> SignedDuration
-      def coerce: (Integer | Float number) -> [Scalar, SignedDuration]
+      def coerce: (Numeric number) -> [Scalar, SignedDuration]
       def /: (Integer | Float rhs) -> SignedDuration | (SignedDuration rhs) -> Float
       def ==: (Object other) -> bool
       def eql?: (Object other) -> bool
       def hash: () -> Integer
       def <=>: (SignedDuration other) -> Integer | (Object other) -> Integer?
       def to_s: (?Integer? precision) -> String
-      def inspect: () -> String
+      def debug: () -> String
       def dup: () -> self
       def clone: (?freeze: bool?) -> self
 
       class Scalar
-        @number: Integer | Float
+        @number: Numeric
 
-        def initialize: (Integer | Float number) -> void
+        def initialize: (Numeric number) -> void
         def *: (SignedDuration other) -> SignedDuration
-        def <: (Object _other) -> nil
-        def <=: (Object _other) -> nil
-        def >: (Object _other) -> nil
-        def >=: (Object _other) -> nil
+        def +: (SignedDuration other) -> SignedDuration
+        def -: (SignedDuration other) -> SignedDuration
+        def /: (SignedDuration other) -> Float
+        def <=>: (SignedDuration other) -> Integer?
+        def <: (SignedDuration other) -> bool?
+        def <=: (SignedDuration other) -> bool?
+        def >: (SignedDuration other) -> bool?
+        def >=: (SignedDuration other) -> bool?
         def method_missing: (Symbol _name, *Object) -> bot
         def respond_to_missing?: (Symbol _name, bool _include_private) -> false
       end

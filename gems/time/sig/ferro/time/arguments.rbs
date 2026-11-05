@@ -8,7 +8,13 @@ module Ferro
       def self.month_of: (Integer number) -> Month
       def self.weekday: (Weekday weekday) -> Integer
       def self.weekday_of: (Integer days) -> Weekday
+      NANOSECONDS: Integer
+      U64_MAX: Integer
+
       def self.duration: (SignedDuration duration) -> SignedDuration
+      def self.std_duration: (Numeric seconds) -> [Integer, Integer]
+      def self.std_duration_or_nil: (Object seconds) -> [Integer, Integer]?
+      def self.seconds: (Integer nanoseconds) -> Rational
       def self.calendar_date: ([Integer, Integer, Integer] parts) -> [Integer, Month, Integer]
       def self.iso_week_date: ([Integer, Integer, Integer] parts) -> [Integer, Integer, Weekday]
       def self.description: (FormatDescription::description description) -> native_description

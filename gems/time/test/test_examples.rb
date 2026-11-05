@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 #++
 
+require "tempfile"
 require "test_helper"
 
 # Every RDoc example in lib/ runs, and every <tt># => value</tt> and
@@ -26,12 +27,14 @@ class TestExamples < Minitest::Test
     attr_reader :expectations
 
     # Asserts that +actual+ equals the expectation at +index+, by +==+
-    # when it reads as Ruby and by +inspect+ otherwise.
+    # when it reads as Ruby, and otherwise by its +debug+ text, time's
+    # +Debug+, where it has one, as the gem's values do, or +inspect+.
     def __check__(actual, index, binding)
       source, line = @expectations.fetch(index)
       expected = evaluate(source, binding)
       if expected.equal?(UNREADABLE)
-        @test.assert_equal(source, actual.inspect, where(line))
+        shown = actual.respond_to?(:debug) ? actual.debug : actual.inspect
+        @test.assert_equal(source, shown, where(line))
       elsif expected.nil?
         @test.assert_nil(actual, "#{where(line)}: #{source}")
       else
@@ -139,15 +142,44 @@ class TestExamples < Minitest::Test
     match ? [match[1], match[2]] : [text, nil]
   end
 
+  # The +using+ lines of a section, which bring an Ext refinement into
+  # scope, and the section without them.
+  private def refinements(section)
+    usings, lines = section.lines.partition { |text, _| text.start_with?("using ") }
+    [usings.map(&:first), section.with(lines:)]
+  end
+
+  class << self
+    # The runner the last loaded example file left, for #run_section.
+    attr_accessor :runner
+  end
+
+  # Runs +source+ in +context+. Refinements are lexical, and +using+ works
+  # only at the top of a file or in a module body, never in a method or an
+  # eval inside one, so a section that brings one in is written to a file
+  # of its own and loaded in an anonymous module, where the refinement
+  # reaches only that section's code.
+  private def run_section(context, usings, source, file, line)
+    return context.instance_eval(source, file, line) if usings.empty?
+
+    Tempfile.create(["example", ".rb"]) do |script|
+      script.write("#{usings.join("\n")}\nTestExamples.runner = ->(context) { context.instance_exec {\n#{source}\n} }\n")
+      script.flush
+      load(script.path, true)
+    end
+    self.class.runner.call(context)
+  end
+
   sections.each do |section|
     define_method("test_#{section.file.tr('/.', '__')}_#{section.line}") do
       context = Context.new(self, section)
+      usings, section = refinements(section)
       source = program(section, context)
       deprecated = Warning[:deprecated]
       # An example may call a deprecated method; its warning is the
       # method's own test's business (TestValues).
       Warning[:deprecated] = false
-      context.instance_eval(source, section.file, section.lines.first&.last || section.line)
+      run_section(context, usings, source, section.file, section.lines.first&.last || section.line)
     ensure
       Warning[:deprecated] = deprecated
     end

@@ -54,7 +54,7 @@ module Ferro
       def checked_sub: (SignedDuration duration) -> OffsetDateTime?
       def saturating_add: (SignedDuration duration) -> OffsetDateTime
       def saturating_sub: (SignedDuration duration) -> OffsetDateTime
-      def +: (SignedDuration duration) -> OffsetDateTime
+      def +: (SignedDuration | Numeric duration) -> OffsetDateTime
       def replace_time: (Time time) -> OffsetDateTime
       def replace_date: (Date date) -> OffsetDateTime
       def replace_date_time: (PlainDateTime date_time) -> OffsetDateTime
@@ -75,7 +75,7 @@ module Ferro
       def truncate_to_second: () -> OffsetDateTime
       def truncate_to_millisecond: () -> OffsetDateTime
       def truncate_to_microsecond: () -> OffsetDateTime
-      def -: (SignedDuration other) -> OffsetDateTime | (OffsetDateTime | UtcDateTime | Timestamp | ::Time other) -> SignedDuration
+      def -: (SignedDuration | Numeric other) -> OffsetDateTime | (OffsetDateTime | UtcDateTime | Timestamp | ::Time other) -> SignedDuration
       def ==: (Object other) -> bool
       def eql?: (Object other) -> bool
       def hash: () -> Integer
@@ -84,7 +84,7 @@ module Ferro
       def format: (FormatDescription::description description) -> String
       def format_into: (String output, FormatDescription::description description) -> Integer
       def to_s: () -> String
-      def inspect: () -> String
+      def debug: () -> String
       def dup: () -> self
       def clone: (?freeze: bool?) -> self
     end

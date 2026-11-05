@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    module Ext
+      module NumericalDuration : Numeric
+        def nanoseconds: () -> SignedDuration
+        def microseconds: () -> SignedDuration
+        def milliseconds: () -> SignedDuration
+        def seconds: () -> SignedDuration
+        def minutes: () -> SignedDuration
+        def hours: () -> SignedDuration
+        def days: () -> SignedDuration
+        def weeks: () -> SignedDuration
+      end
+
+      module NumericalStdDuration : Numeric
+        def std_nanoseconds: () -> Rational
+        def std_microseconds: () -> Rational
+        def std_milliseconds: () -> Rational
+        def std_seconds: () -> Rational
+        def std_minutes: () -> Rational
+        def std_hours: () -> Rational
+        def std_days: () -> Rational
+        def std_weeks: () -> Rational
+      end
+
+      module SystemTimeExt : ::Time
+        def checked_add_signed: (SignedDuration duration) -> ::Time?
+        def checked_sub_signed: (SignedDuration duration) -> ::Time?
+        def signed_duration_since: (::Time earlier) -> SignedDuration
+      end
+    end
+  end
+end

@@ -58,8 +58,8 @@ module Ferro
         #
         # === Example
         #
-        #   Ferro::Time::FormatDescription.parse_owned(3, "[day]").inspect # => "Day { padding: Zero }"
-        def inspect
+        #   Ferro::Time::FormatDescription.parse_owned(3, "[day]").debug # => "Day { padding: Zero }"
+        def debug
           Native.format_description_debug(self)
         end
 

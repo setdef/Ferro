@@ -51,7 +51,7 @@ class TestPortDate < Minitest::Test
     [
       [date(2020, 2, 3), "2020-02-03"],
     ].each do |date, expected|
-      assert_case expected, date.inspect
+      assert_case expected, date.debug
     end
   end
 

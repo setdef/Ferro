@@ -40,8 +40,8 @@ module Ferro
       def truncate_to_second: () -> Time
       def truncate_to_millisecond: () -> Time
       def truncate_to_microsecond: () -> Time
-      def +: (SignedDuration duration) -> Time
-      def -: (SignedDuration other) -> Time | (Time other) -> SignedDuration
+      def +: (SignedDuration | Numeric duration) -> Time
+      def -: (SignedDuration | Numeric other) -> Time | (Time other) -> SignedDuration
       def format: (FormatDescription::description description) -> String
       def format_into: (String output, FormatDescription::description description) -> Integer
       def ==: (Object other) -> bool
@@ -49,7 +49,7 @@ module Ferro
       def hash: () -> Integer
       def <=>: (Time other) -> Integer | (Object other) -> Integer?
       def to_s: () -> String
-      def inspect: () -> String
+      def debug: () -> String
       def dup: () -> self
       def clone: (?freeze: bool?) -> self
     end

@@ -188,6 +188,65 @@ class TestRbsParity < Minitest::Test
     assert_equal ["RbsParityFixture::Handle#subtitle: declared in sig/ but not defined in lib/"], violations(rbs)
   end
 
+  # RBS has no syntax for a refinement, so a module of refinements declares
+  # the methods it refines as its own, as Steep reads a refine block.
+  def test_a_module_s_refined_methods_count_as_its_own
+    source = "module RbsParityFixture::Refined\n  refine Integer do\n    def doubled\n      self * 2\n    end\n  end\nend\n"
+    with_fixture(:Refined, source) do
+      rbs = "#{FAITHFUL}\nmodule RbsParityFixture::Refined\n  def doubled: () -> Integer\nend\n"
+
+      assert_empty violations(rbs)
+      missing = rbs.sub("def doubled: () -> Integer", "def doubled: () -> Integer\n  def tripled: () -> Integer")
+      assert_equal ["RbsParityFixture::Refined#tripled: declared in sig/ but not defined in lib/"], violations(missing)
+      refute_empty violations(rbs.sub("() -> Integer", "(Integer by) -> Integer"))
+    end
+  end
+
+  # Refinement modules are anonymous, so a public method one defines is
+  # found through the module that holds it, and needs a signature there.
+  def test_a_refined_method_without_a_signature_is_flagged
+    source = "module RbsParityFixture::RefinedUndeclared\n  refine Integer do\n    def doubled\n      self * 2\n    end\n\n" \
+      "    def halved\n      self / 2\n    end\n\n    private def hidden\n      0\n    end\n  end\nend\n"
+    with_fixture(:RefinedUndeclared, source) do
+      rbs = "#{FAITHFUL}\nmodule RbsParityFixture::RefinedUndeclared\n  def doubled: () -> Integer\nend\n"
+
+      assert_equal [
+        "RbsParityFixture::RefinedUndeclared#halved: public in the refinement of Integer in lib/ but has no signature",
+      ], violations(rbs)
+      assert_empty violations(rbs.sub("def doubled: () -> Integer", "def doubled: () -> Integer\n  def halved: () -> Integer"))
+    end
+  end
+
+  # RBS cannot say which refinement a module's method belongs to, so a
+  # declared method must be in every refinement the module holds, with the
+  # visibility and arguments the signature gives.
+  def test_a_refined_method_must_be_in_every_refinement
+    source = "module RbsParityFixture::RefinedEach\n  refine Integer do\n    def doubled\n      self * 2\n    end\n  end\n\n" \
+      "  refine Float do\n    def tripled\n      self * 3\n    end\n  end\n\n" \
+      "  refine String do\n    def doubled(times)\n      self * times\n    end\n\n" \
+      "    def tripled\n      self * 3\n    end\n  end\nend\n"
+    with_fixture(:RefinedEach, source) do
+      rbs = "#{FAITHFUL}\nmodule RbsParityFixture::RefinedEach\n  def doubled: () -> Integer\n  def tripled: () -> Integer\nend\n"
+
+      assert_equal [
+        "RbsParityFixture::RefinedEach#doubled: declared in sig/ but not defined in the refinement of Float in lib/",
+        "RbsParityFixture::RefinedEach#doubled: overload () passes arguments the implementation does not accept",
+        "RbsParityFixture::RefinedEach#tripled: declared in sig/ but not defined in the refinement of Integer in lib/",
+      ], violations(rbs)
+    end
+  end
+
+  def test_a_private_refined_method_declared_public_is_flagged
+    source = "module RbsParityFixture::RefinedPrivately\n  refine Integer do\n    private def doubled\n      self * 2\n    end\n  end\nend\n"
+    with_fixture(:RefinedPrivately, source) do
+      rbs = "#{FAITHFUL}\nmodule RbsParityFixture::RefinedPrivately\n  def doubled: () -> Integer\nend\n"
+
+      assert_equal [
+        "RbsParityFixture::RefinedPrivately#doubled: public in sig/ but private in the refinement of Integer in lib/",
+      ], violations(rbs)
+    end
+  end
+
   def test_a_declared_class_missing_from_lib_is_flagged
     rbs = "#{FAITHFUL}\nclass RbsParityGhost\nend\n"
 

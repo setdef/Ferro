@@ -40,8 +40,9 @@ pub enum Failure {
     Type(String),
     /// Ruby's `ArgumentError`.
     Argument(String),
-    /// Ruby's `ZeroDivisionError`, for an integer division by zero.
-    ZeroDivision,
+    /// time's `ConversionRange`, which only the conversions with std's
+    /// `Duration` return.
+    ConversionRange,
     /// A panic no check foresaw, raised as `Ferro::Time::Error`.
     Panic(String),
 }
@@ -69,8 +70,6 @@ pub enum Target {
     Type(String),
     /// `ArgumentError`.
     Argument(String),
-    /// `ZeroDivisionError`.
-    ZeroDivision,
 }
 
 /// A `ComponentRange`'s fields, as its Ruby class takes them.
@@ -233,6 +232,7 @@ impl Failure {
                 Target::Time("Error::ComponentRange", range_args(*range))
             }
             Self::IndeterminateOffset => Target::Time("Error::IndeterminateOffset", vec![]),
+            Self::ConversionRange => Target::Time("Error::ConversionRange", vec![]),
             Self::InvalidVariant => Target::Time("Error::InvalidVariant", vec![]),
             Self::Format(failure) => format_target(failure),
             Self::Parse(failure) => parse_target(*failure),
@@ -242,7 +242,6 @@ impl Failure {
             Self::Range(message) => Target::Range(message.clone()),
             Self::Type(message) => Target::Type(message.clone()),
             Self::Argument(message) => Target::Argument(message.clone()),
-            Self::ZeroDivision => Target::ZeroDivision,
             Self::Panic(message) => text("Error", &format!("time panicked: {message}")),
         }
     }
@@ -253,7 +252,6 @@ impl Failure {
             Target::Range(message) => Error::new(ruby.exception_range_error(), message),
             Target::Type(message) => Error::new(ruby.exception_type_error(), message),
             Target::Argument(message) => Error::new(ruby.exception_arg_error(), message),
-            Target::ZeroDivision => Error::new(ruby.exception_zero_div_error(), "divided by 0"),
             Target::Time(path, args) => {
                 instance(ruby, path, &args).map_or_else(|error| error, Error::from)
             }
@@ -267,7 +265,6 @@ impl Failure {
             Target::Range(message) => (ruby.exception_range_error(), message),
             Target::Type(message) => (ruby.exception_type_error(), message),
             Target::Argument(message) => (ruby.exception_arg_error(), message),
-            Target::ZeroDivision => (ruby.exception_zero_div_error(), "divided by 0".to_owned()),
         };
         class.new_instance((message,))
     }
@@ -345,6 +342,12 @@ impl From<error::InvalidFormatDescription> for Failure {
 impl From<error::IndeterminateOffset> for Failure {
     fn from(_: error::IndeterminateOffset) -> Self {
         Self::IndeterminateOffset
+    }
+}
+
+impl From<error::ConversionRange> for Failure {
+    fn from(_: error::ConversionRange) -> Self {
+        Self::ConversionRange
     }
 }
 

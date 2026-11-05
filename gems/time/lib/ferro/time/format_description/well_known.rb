@@ -58,6 +58,17 @@ module Ferro
         #   Ferro::Time::UtcDateTime.from_unix_timestamp(0).format(rfc2822) # => "Thu, 01 Jan 1970 00:00:00 +0000"
         class Rfc2822
           private_class_method :new
+
+          # time's derived +Debug+ text for the unit struct this class
+          # stands for, formatted by Rust. +inspect+ stays Ruby's (ADR 001,
+          # 2026-11-05).
+          #
+          # === Example
+          #
+          #   Ferro::Time::FormatDescription::WellKnown::Rfc2822.debug # => "Rfc2822"
+          def self.debug
+            Native.well_known_debug(:Rfc2822)
+          end
         end
 
         # The format described in RFC 3339 (https://tools.ietf.org/html/rfc3339#section-5.6).
@@ -81,6 +92,17 @@ module Ferro
         #   Ferro::Time::Date::MIN.format(rfc3339) # raises TypeError
         class Rfc3339
           private_class_method :new
+
+          # time's derived +Debug+ text for the unit struct this class
+          # stands for, formatted by Rust. +inspect+ stays Ruby's (ADR 001,
+          # 2026-11-05).
+          #
+          # === Example
+          #
+          #   Ferro::Time::FormatDescription::WellKnown::Rfc3339.debug # => "Rfc3339"
+          def self.debug
+            Native.well_known_debug(:Rfc3339)
+          end
         end
       end
 

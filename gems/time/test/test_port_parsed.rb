@@ -98,7 +98,7 @@ class TestPortParsed < Minitest::Test
       ["hour", C::Hour12.new(M::Hour12.default), "00"],
     ].each do |name, component, input|
       error = assert_raises(T::Error::ParseFromDescription::InvalidComponent) { Parsed.new.parse_component(input, component) }
-      assert_equal name, error.name
+      assert_equal name, error.to_a.first
     end
   end
 end

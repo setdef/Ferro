@@ -73,7 +73,7 @@ class TestPortFormatting < Minitest::Test
       [date(2000, 1, 1).with_hms_nano(0, 0, 0, 0).assume_offset(offset(0, 0, 1)), "offset_second"],
     ].each do |datetime, component|
       error = assert_raises(T::Error::Format::InvalidComponent) { datetime.format(WellKnown::Rfc2822) }
-      assert_equal component, error.component
+      assert_equal component, error.to_a.first
     end
   end
 
@@ -83,7 +83,7 @@ class TestPortFormatting < Minitest::Test
       [date(1885, 1, 1).with_hms_nano(1, 1, 1, 0).as_utc, "year"],
     ].each do |datetime, component|
       error = assert_raises(T::Error::Format::InvalidComponent) { datetime.format(WellKnown::Rfc2822) }
-      assert_equal component, error.component
+      assert_equal component, error.to_a.first
     end
   end
 
@@ -114,7 +114,7 @@ class TestPortFormatting < Minitest::Test
       [date(0, 1, 1).with_hms_nano(0, 0, 0, 0).assume_offset(offset(0, 0, 1)), "offset_second"],
     ].each do |datetime, component|
       error = assert_raises(T::Error::Format::InvalidComponent) { datetime.format(WellKnown::Rfc3339) }
-      assert_equal component, error.component
+      assert_equal component, error.to_a.first
     end
   end
 
@@ -159,7 +159,7 @@ class TestPortFormatting < Minitest::Test
       # left out: large-dates year +10_000
     ].each do |value, format, component|
       error = assert_raises(T::Error::Format::InvalidComponent) { value.format(format) }
-      assert_equal component, error.component
+      assert_equal component, error.to_a.first
     end
   end
 

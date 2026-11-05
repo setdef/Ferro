@@ -63,7 +63,73 @@ class TestErrors < Minitest::Test
     error = assert_raises(E::Parse::ParseFromDescription::InvalidComponent) do
       T::OffsetDateTime.parse("x", WellKnown::Rfc3339)
     end
-    assert_equal ["year", "the 'year' component could not be parsed"], [error.name, error.message]
+    assert_equal ["year", "the 'year' component could not be parsed"], [error.to_a.first.to_a.first, error.message]
+  end
+
+  # A tuple variant's field is positional, as Rust leaves it: a pattern
+  # reads it, and no reader names what the crate does not (ADR 001,
+  # 2026-11-05).
+  def test_a_tuple_variants_field_is_positional
+    [E::ParseFromDescription::InvalidComponent.new("year"), E::Format::InvalidComponent.new("year")].each do |error|
+      name = case error
+             in E::ParseFromDescription::InvalidComponent[name] then name
+             in E::Format::InvalidComponent[name] then name
+      end
+      assert_equal "year", name
+      assert_equal ["year"], error.to_a
+      refute_respond_to error, :name
+      refute_respond_to error, :component
+    end
+  end
+
+  # Format::ComponentRange(Box<ComponentRange>) and
+  # TryFromParsed::ComponentRange(ComponentRange) hold an
+  # Error::ComponentRange, the value source answers, and name no reader
+  # of their own (error/format.rs:21, error/try_from_parsed.rs:16).
+  def test_a_held_component_range_is_positional
+    [E::Format::ComponentRange.new("hour", false), E::TryFromParsed::ComponentRange.new("hour", false)].each do |error|
+      range = case error
+              in E::Format::ComponentRange[E::ComponentRange => range] then range
+              in E::TryFromParsed::ComponentRange[E::ComponentRange => range] then range
+      end
+      assert_equal ["hour", false], [range.name, range.is_conditional]
+      assert_equal [E::ComponentRange], error.to_a.map(&:class)
+      assert_equal ["hour"], error.to_a.map(&:name)
+      refute_respond_to error, :name
+      refute_respond_to error, :is_conditional
+    end
+  end
+
+  # Parse::TryFromParsed(TryFromParsed) and
+  # Parse::ParseFromDescription(ParseFromDescription) hold their twin,
+  # so a nested pattern reads as Rust's does (error/parse.rs:14-16).
+  def test_a_parse_error_holds_its_twin_positionally
+    error = assert_raises(E::Parse) { T::Date.parse("2019-02-30", Iso8601::DATE) }
+    range = case error
+            in E::Parse::TryFromParsed[E::TryFromParsed::ComponentRange[range]] then range
+    end
+    assert_equal ["day", true], [range.name, range.is_conditional]
+    refute_respond_to error, :name
+    refute_respond_to error, :is_conditional
+
+    error = assert_raises(E::Parse) { T::OffsetDateTime.parse("x", WellKnown::Rfc3339) }
+    name = case error
+           in E::Parse::ParseFromDescription[E::ParseFromDescription::InvalidComponent[name]] then name
+    end
+    assert_equal "year", name
+    refute_respond_to error, :name
+
+    insufficient = E::Parse::TryFromParsed::InsufficientInformation.new
+    assert_equal [E::TryFromParsed::InsufficientInformation], insufficient.to_a.map(&:class)
+    assert_equal [E::ParseFromDescription::InvalidLiteral], E::Parse::ParseFromDescription::InvalidLiteral.new.deconstruct.map(&:class)
+  end
+
+  # Format::StdIo(io::Error) holds a value with no Ruby counterpart, so
+  # its one field is nil, as its source is.
+  def test_an_io_error_holds_nothing_ruby_can_name
+    error = E::Format::StdIo.new("broken pipe")
+    assert_equal [nil], error.to_a
+    assert_equal [nil], error.deconstruct
   end
 
   def test_insufficient_information
@@ -75,7 +141,7 @@ class TestErrors < Minitest::Test
     error = assert_raises(E::Parse::TryFromParsed::ComponentRange) do
       T::Date.parse("2019-02-30", Iso8601::DATE)
     end
-    assert_equal ["day", true, "day was not in range"], [error.name, error.is_conditional, error.message]
+    assert_equal ["day", true, "day was not in range"], [error.source.source.name, error.source.source.is_conditional, error.message]
   end
 
   def test_an_invalid_variant
@@ -86,7 +152,7 @@ class TestErrors < Minitest::Test
   def test_an_invalid_component_while_formatting
     error = assert_raises(E::Format::InvalidComponent) { T::OffsetDateTime::UNIX_EPOCH.replace_year(1800).format(WellKnown::Rfc2822) }
     assert_equal ["year", "The year component cannot be formatted into the requested format."],
-      [error.component, error.message]
+      [error.to_a.first, error.message]
   end
 
   def test_each_messages_default_is_times_text

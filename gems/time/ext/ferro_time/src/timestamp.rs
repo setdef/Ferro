@@ -50,7 +50,7 @@ const FROM_SYSTEM_TIME: &str = "SystemTime value is out of valid range";
 /// What `Result::expect` panics with when `SignedDuration`'s
 /// `TryFrom<std::time::Duration>` fails inside its `Add` and `Sub` with a
 /// std `Duration`: the message, then the error's `Debug` text.
-const CONVERTING: &str =
+pub const CONVERTING: &str =
     "overflow converting `std::time::Duration` to `time::SignedDuration`: ConversionRange";
 
 // SPDX-SnippetEnd

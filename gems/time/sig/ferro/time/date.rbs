@@ -38,10 +38,12 @@ module Ferro
       def iter_to: (Date end_date) -> Iter::DateIter
       def checked_add: (SignedDuration duration) -> Date?
       def checked_sub: (SignedDuration duration) -> Date?
+      def checked_add_std: (Numeric duration) -> Date?
+      def checked_sub_std: (Numeric duration) -> Date?
       def saturating_add: (SignedDuration duration) -> Date
       def saturating_sub: (SignedDuration duration) -> Date
-      def +: (SignedDuration duration) -> Date
-      def -: (SignedDuration other) -> Date | (Date other) -> SignedDuration
+      def +: (SignedDuration | Numeric duration) -> Date
+      def -: (SignedDuration | Numeric other) -> Date | (Date other) -> SignedDuration
       def replace_year: (Integer year) -> Date
       def replace_month: (Month month) -> Date
       def replace_day: (Integer day) -> Date
@@ -59,7 +61,7 @@ module Ferro
       def hash: () -> Integer
       def <=>: (Date other) -> Integer | (Object other) -> Integer?
       def to_s: () -> String
-      def inspect: () -> String
+      def debug: () -> String
       def dup: () -> self
       def clone: (?freeze: bool?) -> self
     end

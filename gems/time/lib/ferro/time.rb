@@ -31,6 +31,7 @@ require_relative "time/format_description/well_known/iso8601/config"
 require_relative "time/format_description/well_known/iso8601"
 require_relative "time/parsing"
 require_relative "time/util"
+require_relative "time/ext"
 
 # Gems that bind Rust crates to Ruby one to one.
 #
@@ -59,7 +60,8 @@ module Ferro
   # UtcDateTime, OffsetDateTime, Timestamp, UtcOffset, SignedDuration, Month,
   # Weekday, the iterators of Iter, the units of time in Unit, the format
   # descriptions in every version with the format items they parse into,
-  # the well-known formats, Parsing::Parsed, every error, and Util. time's +large-dates+ feature is off, as Tauri builds it, so
+  # the well-known formats, Parsing::Parsed, every error, Util, and the
+  # extension traits of Ext, as refinements. time's +large-dates+ feature is off, as Tauri builds it, so
   # years run from -9999 to 9999.
   #
   # Ferro::Time::Time and Ferro::Time::Date are time's types, not Ruby's.

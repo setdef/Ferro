@@ -76,11 +76,26 @@ class TestIso8601 < Minitest::Test
     assert_equal bytes.reduce(0) { |sum, byte| (sum << 8) | byte }, Config::DEFAULT.encode
   end
 
+  # Rust's `as` on these exhaustive, fieldless enums reads each variant's
+  # discriminant, which to_i answers (ADR 001, 2026-11-05).
+  def test_fieldless_enums_answer_their_discriminant
+    assert_equal (0..6).to_a, %i[None Date Time Offset DateTime DateTimeOffset TimeOffset].map { |name| Iso8601::FormattedComponents.const_get(name).to_i }
+    assert_equal [0, 1, 2], %i[Calendar Week Ordinal].map { |name| Iso8601::DateKind.const_get(name).to_i }
+    assert_equal [0, 1], %i[Hour Minute].map { |name| Iso8601::OffsetPrecision.const_get(name).to_i }
+  end
+
   def test_debug_texts
     assert_equal "Config { formatted_components: DateTimeOffset, use_separators: true, year_is_six_digits: false, " \
       "date_kind: Calendar, time_precision: Second { decimal_digits: Some(9) }, offset_precision: Minute }",
-      Config::DEFAULT.inspect
-    assert_equal "Iso8601 { config: #{Config::DEFAULT.inspect} }", Iso8601::DEFAULT.inspect
+      Config::DEFAULT.debug
+    assert_equal "Iso8601 { config: #{Config::DEFAULT.debug} }", Iso8601::DEFAULT.debug
+    assert_equal "DateTime", Iso8601::FormattedComponents::DateTime.debug
+    assert_equal "Ordinal", Iso8601::DateKind::Ordinal.debug
+    assert_equal "Minute", Iso8601::OffsetPrecision::Minute.debug
+    assert_equal "Second { decimal_digits: None }", Iso8601::TimePrecision::Second.new(decimal_digits: nil).debug
+    assert_equal "Hour { decimal_digits: Some(255) }", Iso8601::TimePrecision::Hour.new(decimal_digits: 255).debug
+    assert_equal "Rfc2822", WellKnown::Rfc2822.debug
+    assert_equal "Rfc3339", WellKnown::Rfc3339.debug
   end
 
   def test_a_setting_rust_cannot_hold_is_refused

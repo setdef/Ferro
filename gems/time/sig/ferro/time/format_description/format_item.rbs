@@ -8,7 +8,7 @@ module Ferro
 
       module Item : Object
         def initialize: (**Object fields) -> void
-        def inspect: () -> String
+        def debug: () -> String
       end
 
       module BorrowedFormatItem : Object

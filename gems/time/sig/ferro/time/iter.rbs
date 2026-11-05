@@ -39,7 +39,7 @@ module Ferro
         def reverse_each: () { (Date) -> void } -> self
                         | () -> Enumerator[Date, self]
         def ==: (Object other) -> bool
-        def inspect: () -> String
+        def debug: () -> String
       end
 
       class MonthIter
@@ -69,7 +69,7 @@ module Ferro
         def each: () { (Month) -> void } -> self
                 | () -> Enumerator[Month, self]
         def ==: (Object other) -> bool
-        def inspect: () -> String
+        def debug: () -> String
       end
 
       class WeekdayIter
@@ -90,7 +90,7 @@ module Ferro
         def each: () { (Weekday) -> void } -> self
                 | () -> Enumerator[Weekday, self]
         def ==: (Object other) -> bool
-        def inspect: () -> String
+        def debug: () -> String
       end
 
       class Rev
@@ -111,7 +111,7 @@ module Ferro
         def each: () { (Month | Weekday) -> void } -> self
                 | () -> Enumerator[Month | Weekday, self]
         def ==: (Object other) -> bool
-        def inspect: () -> String
+        def debug: () -> String
 
         private
 

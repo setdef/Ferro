@@ -68,8 +68,8 @@ module Ferro
       def replace_millisecond: (Integer millisecond) -> Timestamp
       def replace_microsecond: (Integer microsecond) -> Timestamp
       def replace_nanosecond: (Integer nanosecond) -> Timestamp
-      def +: (SignedDuration duration) -> Timestamp
-      def -: (SignedDuration other) -> Timestamp | (Timestamp | UtcDateTime | OffsetDateTime | ::Time other) -> SignedDuration
+      def +: (SignedDuration | Numeric duration) -> Timestamp
+      def -: (SignedDuration | Numeric other) -> Timestamp | (Timestamp | UtcDateTime | OffsetDateTime | ::Time other) -> SignedDuration
       def ==: (Object other) -> bool
       def eql?: (Object other) -> bool
       def hash: () -> Integer
@@ -78,7 +78,7 @@ module Ferro
       def format: (FormatDescription::description description) -> String
       def format_into: (String output, FormatDescription::description description) -> Integer
       def to_s: () -> String
-      def inspect: () -> String
+      def debug: () -> String
       def dup: () -> self
       def clone: (?freeze: bool?) -> self
     end

@@ -128,9 +128,10 @@ class TestUnit < Minitest::Test
     assert_raises(ArgumentError) { U::Second < 1 }
   end
 
-  def test_inspect_names_the_constant
-    assert_equal "Ferro::Time::Unit::Minute", U::Minute.inspect
-    assert_equal "Ferro::Time::Unit::Unit::Minute", U::Unit::Minute.inspect
+  def test_debug_is_time_cores_debug
+    assert_equal "Minute", U::Minute.debug
+    assert_equal "Minute", U::Unit::Minute.debug
+    assert_equal "Nanosecond", U::Nanosecond.debug
   end
 
   def test_units_and_variants_are_frozen_and_shareable

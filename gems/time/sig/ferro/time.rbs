@@ -94,6 +94,28 @@ module Ferro
       def self.duration_scale_float: (SignedDuration value, :* | :/ name, Float rhs) -> SignedDuration
       def self.duration_ratio: (SignedDuration value, SignedDuration other) -> Float
 
+      def self.std_from_secs_f64: (Float seconds) -> [Integer, Integer]
+      def self.duration_unsigned_abs: (SignedDuration value) -> Integer
+      def self.duration_to_std: (SignedDuration value) -> Integer
+      def self.duration_try_from_std: ([Integer, Integer] std) -> SignedDuration
+      def self.duration_std: (SignedDuration value, :+ | :- | :rsub name, [Integer, Integer] std) -> SignedDuration
+      def self.duration_std_eq: (SignedDuration value, [Integer, Integer] std) -> bool
+      def self.duration_std_cmp: (SignedDuration value, [Integer, Integer] std) -> Integer?
+      def self.std_duration_cmp: ([Integer, Integer] std, SignedDuration value) -> Integer?
+      def self.std_duration_ratio: ([Integer, Integer] std, SignedDuration value) -> Float
+      def self.date_std: (Date value, :checked_add_std | :checked_sub_std name, [Integer, Integer] std) -> Date?
+                       | (Date value, :+ | :- name, [Integer, Integer] std) -> Date
+      def self.time_std: (Time value, :+ | :- name, [Integer, Integer] std) -> Time
+      def self.plain_std: (PlainDateTime value, :+ | :- name, [Integer, Integer] std) -> PlainDateTime
+      def self.utc_std: (UtcDateTime value, :+ | :- name, [Integer, Integer] std) -> UtcDateTime
+      def self.offset_date_time_std: (OffsetDateTime value, :+ | :- name, [Integer, Integer] std) -> OffsetDateTime
+      def self.timestamp_std: (Timestamp value, :+ | :- name, [Integer, Integer] std) -> Timestamp
+      def self.numerical_duration_float: (Symbol name, Float value) -> SignedDuration
+      def self.numerical_std_integer: (Symbol name, Integer value) -> Integer
+      def self.numerical_std_float: (Symbol name, Float value) -> Integer
+      def self.system_time_checked_signed: (Integer seconds, Integer nanoseconds, :checked_add_signed | :checked_sub_signed name, SignedDuration duration) -> [Integer, Integer]?
+      def self.system_time_signed_duration_since: (Integer seconds, Integer nanoseconds, Integer earlier_seconds, Integer earlier_nanoseconds) -> SignedDuration
+
       def self.utc_offset_constant: (Symbol name) -> UtcOffset
       def self.utc_offset_from_hms: (Integer hours, Integer minutes, Integer seconds) -> UtcOffset
       def self.utc_offset_from_whole_seconds: (Integer seconds) -> UtcOffset
@@ -308,6 +330,15 @@ module Ferro
       def self.utc_offset_try_from_parsed: (Parsing::Parsed parsed) -> UtcOffset
       def self.utc_offset_parse_with_defaults: (String input, native_description description, Parsing::Parsed defaults) -> UtcOffset
       def self.format_item_debug: (Integer kind, encoded_item | encoded_component encoded) -> String
+      def self.modifier_enum_debug: (Symbol name, Integer index) -> String
+      def self.trailing_input_to_i: (Integer index) -> Integer
+      def self.month_debug: (Integer number) -> String
+      def self.weekday_debug: (Integer days) -> String
+      def self.unit_debug: (Symbol name, bool variant) -> String
+      def self.iso8601_enum_debug: (Symbol kind, Integer index, Integer digits) -> String
+      def self.well_known_debug: (Symbol name) -> String
+      def self.weekday_to_i: (Integer days) -> Integer
+      def self.iso8601_enum_to_i: (Symbol kind, Integer index) -> Integer
       def self.iso8601_debug: (settings settings) -> String
       def self.iso8601_encode: (settings settings) -> Integer
       def self.iso8601_config_debug: (settings settings) -> String

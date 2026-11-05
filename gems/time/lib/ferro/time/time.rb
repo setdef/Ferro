@@ -452,23 +452,33 @@ module Ferro
       # <tt>Add<SignedDuration> for Time</tt>
       # (<tt>src/time.rs:1086-1101</tt>).
       #
-      # [duration] SignedDuration.
+      # Given Numeric seconds, it adds the part of a std +Duration+ shorter
+      # than a day, as <tt>Add<std::time::Duration> for Time</tt> does
+      # (<tt>src/time.rs:1110-1125</tt>); SignedDuration says how a number
+      # is read (ADR 001, 2026-11-05).
+      #
+      # [duration] SignedDuration, or Numeric seconds.
       #
       # === Example
       #
       #   (Ferro::Time::Time.from_hms(12, 0, 0) + Ferro::Time::Duration.hours(2)).to_s # => "14:00:00.0"
+      #   (Ferro::Time::Time.from_hms(23, 0, 0) + 7_200.5).to_s # => "1:00:00.5"
       #   (Ferro::Time::Time.from_hms(0, 0, 1) + Ferro::Time::Duration.seconds(-2)).to_s # => "23:59:59.0"
       def +(duration)
+        return Native.time_std(self, :+, Arguments.std_duration(duration)) if duration.is_a?(Numeric)
+
         Native.time_arith(self, :+, Arguments.duration(duration))
       end
 
       # Subtracts the part of a SignedDuration shorter than a day, wrapping
       # past midnight, as time's <tt>Sub<SignedDuration></tt> does; or, given
       # another Time, returns the signed span between the two within one day,
-      # as <tt>Sub for Time</tt> does. Mirrors time's <tt>Sub for Time</tt>
-      # (<tt>src/time.rs:1134-1225</tt>).
+      # as <tt>Sub for Time</tt> does. Given Numeric seconds, it subtracts
+      # the part of a std +Duration+ shorter than a day, as
+      # <tt>Sub<std::time::Duration></tt> does. Mirrors time's <tt>Sub for
+      # Time</tt> (<tt>src/time.rs:1134-1225</tt>).
       #
-      # [other] SignedDuration or Time.
+      # [other] SignedDuration, Time, or Numeric seconds.
       #
       # === Example
       #
@@ -478,6 +488,7 @@ module Ferro
         case other
         when SignedDuration then Native.time_arith(self, :-, other)
         when Time then Native.time_between(self, :-, other)
+        when Numeric then Native.time_std(self, :-, Arguments.std_duration(other))
         else raise TypeError, "no implicit conversion of #{other.class} into Ferro::Time::SignedDuration"
         end
       end
@@ -591,8 +602,8 @@ module Ferro
       # === Example
       #
       #   time = Ferro::Time::Time.from_hms_nano(12, 30, 45, 123_456_789)
-      #   time.inspect # => "12:30:45.123456789"
-      def inspect
+      #   time.debug # => "12:30:45.123456789"
+      def debug
         Native.time_debug(self)
       end
 

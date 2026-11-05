@@ -159,7 +159,7 @@ module Ferro
         end
 
         # time's derived +Debug+ for Parsed, every field as time stores it.
-        def inspect
+        def debug
           Native.parsed_debug(self)
         end
 

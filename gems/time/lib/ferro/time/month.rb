@@ -190,13 +190,15 @@ module Ferro
         Native.month_display(@number)
       end
 
-      # The constant that holds this month.
+      # time's derived +Debug+ text for this month, formatted by Rust: the
+      # variant's name. +inspect+ stays Ruby's (ADR 001, 2026-11-05). Mirrors time's derived +Debug+ for
+      # +Month+ (<tt>src/month.rs:13</tt>).
       #
       # === Example
       #
-      #   Ferro::Time::Month::March.inspect # => "Ferro::Time::Month::March"
-      def inspect
-        "Ferro::Time::Month::#{@name}"
+      #   Ferro::Time::Month::March.debug # => "March"
+      def debug
+        Native.month_debug(@number)
       end
 
       # January.

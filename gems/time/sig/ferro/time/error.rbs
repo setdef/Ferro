@@ -36,20 +36,26 @@ module Ferro
         end
 
         class InvalidComponent < Format
-          attr_reader component: String
+          @component: String
 
           def initialize: (String component) -> void
+          def deconstruct: () -> [String]
+          def to_a: () -> [String]
         end
 
         class ComponentRange < Format
-          attr_reader name: String
-          attr_reader is_conditional: bool
+          @name: String
+          @is_conditional: bool
 
           def initialize: (String name, bool is_conditional) -> void
           def source: () -> Error::ComponentRange
+          def deconstruct: () -> [Error::ComponentRange]
+          def to_a: () -> [Error::ComponentRange]
         end
 
         class StdIo < Format
+          def deconstruct: () -> [nil]
+          def to_a: () -> [nil]
         end
       end
 
@@ -60,9 +66,11 @@ module Ferro
         end
 
         class InvalidComponent < ParseFromDescription
-          attr_reader name: String
+          @name: String
 
           def initialize: (String name) -> void
+          def deconstruct: () -> [String]
+          def to_a: () -> [String]
         end
 
         class UnexpectedTrailingCharacters < ParseFromDescription
@@ -77,11 +85,13 @@ module Ferro
         end
 
         class ComponentRange < TryFromParsed
-          attr_reader name: String
-          attr_reader is_conditional: bool
+          @name: String
+          @is_conditional: bool
 
           def initialize: (String name, bool is_conditional) -> void
           def source: () -> Error::ComponentRange
+          def deconstruct: () -> [Error::ComponentRange]
+          def to_a: () -> [Error::ComponentRange]
         end
       end
 
@@ -90,28 +100,34 @@ module Ferro
 
         class TryFromParsed < Parse
           def source: () -> Error::TryFromParsed
+          def deconstruct: () -> [Error::TryFromParsed]
+          def to_a: () -> [Error::TryFromParsed]
 
           class InsufficientInformation < TryFromParsed
           end
 
           class ComponentRange < TryFromParsed
-            attr_reader name: String
-            attr_reader is_conditional: bool
+            @name: String
+            @is_conditional: bool
 
             def initialize: (String name, bool is_conditional) -> void
+            def source: () -> Error::TryFromParsed::ComponentRange
           end
         end
 
         class ParseFromDescription < Parse
           def source: () -> Error::ParseFromDescription
+          def deconstruct: () -> [Error::ParseFromDescription]
+          def to_a: () -> [Error::ParseFromDescription]
 
           class InvalidLiteral < ParseFromDescription
           end
 
           class InvalidComponent < ParseFromDescription
-            attr_reader name: String
+            @name: String
 
             def initialize: (String name) -> void
+            def source: () -> Error::ParseFromDescription::InvalidComponent
           end
 
           class UnexpectedTrailingCharacters < ParseFromDescription

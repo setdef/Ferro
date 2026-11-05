@@ -371,8 +371,8 @@ module Ferro
       # === Example
       #
       #   offset = Ferro::Time::UtcOffset.from_hms(-1, -2, -3)
-      #   offset.inspect # => "-01:02:03"
-      def inspect
+      #   offset.debug # => "-01:02:03"
+      def debug
         Native.utc_offset_debug(self)
       end
 
