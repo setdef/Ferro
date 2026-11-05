@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 #++
 
+require_relative "ferro_arboard"
+
 module Ferro
   module Arboard
     #--
@@ -31,7 +33,12 @@ module Ferro
     # inside arboard, with the message <tt>arboard panicked: ...</tt>,
     # which would otherwise end the Ruby process.
     #
-    # Mirrors arboard's +Error+ (<tt>src/common.rs:14-53</tt>).
+    # Each subclass answers #debug with arboard's +Debug+ text for its
+    # variant, which Rust formats; +inspect+ stays Ruby's. This class
+    # itself is no variant of arboard's, so it has no +debug+.
+    #
+    # Mirrors arboard's +Error+ (<tt>src/common.rs:14-53</tt>), and its
+    # +Debug+ (<tt>src/common.rs:69-90</tt>).
     #
     # === Examples
     #
@@ -70,6 +77,18 @@ module Ferro
           super(message || "The clipboard contents were not available in the requested format or the clipboard " \
             "is empty.")
         end
+
+        # arboard's +Debug+ text for this variant, formatted by Rust:
+        # the variant's name, then arboard's message in quotes, whatever
+        # message this error carries.
+        #
+        # === Example
+        #
+        #   Ferro::Arboard::Error::ContentNotAvailable.new.debug
+        #   # => 'ContentNotAvailable - "The clipboard contents were not available ..."'
+        def debug
+          Native.error_debug(:ContentNotAvailable, nil)
+        end
       end
 
       # The selected clipboard is not supported by the current system or
@@ -99,6 +118,18 @@ module Ferro
         def initialize(message = nil)
           super(message || "The selected clipboard is not supported with the current system configuration.")
         end
+
+        # arboard's +Debug+ text for this variant, formatted by Rust:
+        # the variant's name, then arboard's message in quotes, whatever
+        # message this error carries.
+        #
+        # === Example
+        #
+        #   Ferro::Arboard::Error::ClipboardNotSupported.new.debug
+        #   # => 'ClipboardNotSupported - "The selected clipboard is not supported ..."'
+        def debug
+          Native.error_debug(:ClipboardNotSupported, nil)
+        end
       end
 
       # The native clipboard is held by another party.
@@ -127,6 +158,18 @@ module Ferro
         #   raise Ferro::Arboard::Error::ClipboardOccupied
         def initialize(message = nil)
           super(message || "The native clipboard is not accessible due to being held by another party.")
+        end
+
+        # arboard's +Debug+ text for this variant, formatted by Rust:
+        # the variant's name, then arboard's message in quotes, whatever
+        # message this error carries.
+        #
+        # === Example
+        #
+        #   Ferro::Arboard::Error::ClipboardOccupied.new.debug
+        #   # => 'ClipboardOccupied - "The native clipboard is not accessible ..."'
+        def debug
+          Native.error_debug(:ClipboardOccupied, nil)
         end
       end
 
@@ -160,6 +203,18 @@ module Ferro
           super(message || "The image or the text that was about the be transferred to/from the clipboard could " \
             "not be converted to the appropriate format.")
         end
+
+        # arboard's +Debug+ text for this variant, formatted by Rust:
+        # the variant's name, then arboard's message in quotes, whatever
+        # message this error carries.
+        #
+        # === Example
+        #
+        #   Ferro::Arboard::Error::ConversionFailure.new.debug
+        #   # => 'ConversionFailure - "The image or the text that was about the be ..."'
+        def debug
+          Native.error_debug(:ConversionFailure, nil)
+        end
       end
 
       # Any failure that fits none of the other classes.
@@ -187,6 +242,18 @@ module Ferro
         def initialize(description = "")
           @description = description
           super("Unknown error while interacting with the clipboard: #{description}")
+        end
+
+        # arboard's +Debug+ text for an +Unknown+, formatted by Rust:
+        # <tt>Unknown { .. }</tt>, the pattern arboard names it by, then
+        # arboard's message for #description in quotes.
+        #
+        # === Example
+        #
+        #   Ferro::Arboard::Error::Unknown.new("pasteboard unavailable").debug
+        #   # => 'Unknown { .. } - "Unknown error while interacting with the clipboard: pasteboard unavailable"'
+        def debug
+          Native.error_debug(:Unknown, description)
         end
       end
     end

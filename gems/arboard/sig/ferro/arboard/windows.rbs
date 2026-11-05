@@ -3,7 +3,7 @@
 
 module Ferro
   module Arboard
-    module SetExtWindows
+    module SetExtWindows : Builder
       @exclude_from_history: bool
       @exclude_from_monitoring: bool
       @exclude_from_cloud: bool

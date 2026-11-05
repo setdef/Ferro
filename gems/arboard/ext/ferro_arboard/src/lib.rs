@@ -7,7 +7,10 @@
 //! `Ferro::Arboard::Clipboard`, its constructor, and one private method per
 //! terminal operation of arboard's `Get`, `Set`, and `Clear` builders. Each
 //! private method takes the settings the Ruby builder collected, rebuilds
-//! arboard's builder, and completes it (plan 001, decision 1).
+//! arboard's builder, and completes it (plan 001, decision 1). Beside it,
+//! the private module `Ferro::Arboard::Native` formats arboard's `Debug`
+//! texts, so Ruby's `debug` methods cannot drift from the crate (plan 001,
+//! decision 9).
 //!
 //! Two rules hold for every method:
 //!
@@ -269,6 +272,12 @@ mod platform {
         ))
     }
 
+    /// `LinuxClipboardKind#debug`: the `Debug` arboard derives for it
+    /// (`src/platform/linux/mod.rs:104`), formatted by Rust.
+    pub fn linux_clipboard_kind_debug(ruby: &Ruby, name: Symbol) -> Result<String, Error> {
+        kind(ruby, name).map(|selection| super::debug_text(&selection))
+    }
+
     fn wait(ruby: &Ruby, value: Value) -> Result<Wait, Error> {
         if value.is_nil() {
             return Ok(Wait::None);
@@ -505,6 +514,50 @@ mod platform {
             set
         }
     }
+}
+
+/// `value`'s `Debug` text, as `{:?}` formats it.
+fn debug_text(value: &impl std::fmt::Debug) -> String {
+    format!("{value:?}")
+}
+
+/// The `arboard::Error` variant `name`, with `description` for `Unknown`.
+/// Ruby's error classes send only their own names.
+fn arboard_error(
+    ruby: &Ruby,
+    name: Symbol,
+    description: Option<String>,
+) -> Result<arboard::Error, Error> {
+    match name.name()?.as_ref() {
+        "ContentNotAvailable" => Ok(arboard::Error::ContentNotAvailable),
+        "ClipboardNotSupported" => Ok(arboard::Error::ClipboardNotSupported),
+        "ClipboardOccupied" => Ok(arboard::Error::ClipboardOccupied),
+        "ConversionFailure" => Ok(arboard::Error::ConversionFailure),
+        "Unknown" => Ok(arboard::Error::Unknown {
+            description: description.unwrap_or_default(),
+        }),
+        other => Err(Error::new(
+            ruby.exception_arg_error(),
+            format!("unknown arboard::Error variant {other}"),
+        )),
+    }
+}
+
+/// `Error#debug` for the variant `name`: arboard's hand-written `Debug`
+/// (`src/common.rs:69-90`), formatted by Rust.
+fn error_debug(ruby: &Ruby, name: Symbol, description: Option<String>) -> Result<String, Error> {
+    arboard_error(ruby, name, description).map(|error| debug_text(&error))
+}
+
+/// `ImageData#debug`: the `Debug` arboard derives for `ImageData`
+/// (`src/common.rs:126`), formatted by Rust over the same fields.
+fn image_data_debug(width: usize, height: usize, bytes: RString) -> String {
+    let bytes = bytes.to_bytes();
+    debug_text(&arboard::ImageData {
+        width,
+        height,
+        bytes: Cow::Borrowed(&bytes),
+    })
 }
 
 /// A path from Ruby, byte for byte, as Unix allows.
@@ -766,16 +819,37 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         method!(Clipboard::native_set_file_list, 2),
     )?;
     class.define_private_method("native_gvl_releases", method!(native_gvl_releases, 0))?;
+
+    let native = arboard.define_module("Native")?;
+    native.define_singleton_method("error_debug", function!(error_debug, 2))?;
+    native.define_singleton_method("image_data_debug", function!(image_data_debug, 3))?;
+    #[cfg(all(
+        unix,
+        not(any(target_os = "macos", target_os = "android", target_os = "emscripten"))
+    ))]
+    native.define_singleton_method(
+        "linux_clipboard_kind_debug",
+        function!(platform::linux_clipboard_kind_debug, 1),
+    )?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        capture, class_and_message, deadline, is_drawable_by_core_graphics, is_drawable_rgba,
-        Failure,
+        capture, class_and_message, deadline, debug_text, is_drawable_by_core_graphics,
+        is_drawable_rgba, panic_message, Failure,
     };
+    use std::borrow::Cow;
+    use std::panic::{self, AssertUnwindSafe};
     use std::time::{Duration, Instant};
+
+    /// The message `operation` panics with, or `None` if it returns.
+    fn panic_text<T>(operation: impl FnOnce() -> T) -> Option<String> {
+        panic::catch_unwind(AssertUnwindSafe(operation))
+            .err()
+            .map(|payload| panic_message(payload.as_ref()))
+    }
 
     // The three is_drawable_rgba tests come from Tokra, relicensed with the
     // function they test.
@@ -922,6 +996,158 @@ mod tests {
             deadline(now, huge),
             Err("overflow when adding duration to instant".to_owned())
         );
+    }
+
+    #[test]
+    fn error_debug_is_arboards_debug_text() {
+        // arboard's hand-written Debug: the variant, then the Display text
+        // in quotes, and `Unknown { .. }` for the struct variant
+        // (`src/common.rs:69-90`).
+        let cases = [
+            (
+                arboard::Error::ContentNotAvailable,
+                "ContentNotAvailable - \"The clipboard contents were not available in the requested format or the clipboard is empty.\"",
+            ),
+            (
+                arboard::Error::ClipboardNotSupported,
+                "ClipboardNotSupported - \"The selected clipboard is not supported with the current system configuration.\"",
+            ),
+            (
+                arboard::Error::ClipboardOccupied,
+                "ClipboardOccupied - \"The native clipboard is not accessible due to being held by another party.\"",
+            ),
+            (
+                arboard::Error::ConversionFailure,
+                "ConversionFailure - \"The image or the text that was about the be transferred to/from the clipboard could not be converted to the appropriate format.\"",
+            ),
+            (
+                arboard::Error::Unknown {
+                    description: "x".to_owned(),
+                },
+                "Unknown { .. } - \"Unknown error while interacting with the clipboard: x\"",
+            ),
+        ];
+        for (error, text) in cases {
+            assert_eq!(debug_text(&error), text);
+            assert_eq!(debug_text(&error), format!("{error:?}"));
+        }
+    }
+
+    #[test]
+    fn image_data_debug_is_arboards_derived_debug() {
+        let bytes = [255, 0, 0, 255, 0, 255, 0, 255];
+        let image = arboard::ImageData {
+            width: 2,
+            height: 1,
+            bytes: Cow::Borrowed(&bytes),
+        };
+        assert_eq!(
+            debug_text(&image),
+            "ImageData { width: 2, height: 1, bytes: [255, 0, 0, 255, 0, 255, 0, 255] }"
+        );
+        assert_eq!(debug_text(&image), format!("{image:?}"));
+    }
+
+    #[cfg(all(
+        unix,
+        not(any(target_os = "macos", target_os = "android", target_os = "emscripten"))
+    ))]
+    #[test]
+    fn linux_clipboard_kind_debug_is_arboards_derived_debug() {
+        use arboard::LinuxClipboardKind;
+        assert_eq!(debug_text(&LinuxClipboardKind::Clipboard), "Clipboard");
+        assert_eq!(debug_text(&LinuxClipboardKind::Primary), "Primary");
+        assert_eq!(debug_text(&LinuxClipboardKind::Secondary), "Secondary");
+    }
+
+    /// The shapes the guard refuses on Linux and Windows are the ones the
+    /// PNG encoder arboard calls there panics on (image 0.25.10
+    /// `src/codecs/png.rs:740-746`, from arboard
+    /// `src/platform/linux/mod.rs:38-46` and `src/platform/windows.rs:132-144`),
+    /// or ones arboard refuses itself with `ConversionFailure`: on Linux
+    /// any empty buffer or zero dimension (`linux/mod.rs:33-35`), on Windows
+    /// an empty zero-size image the encoder returns an error for.
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn refused_images_are_ones_arboards_png_encoder_panics_on() {
+        use image::ImageEncoder as _;
+        let encode = |len: usize, width: u32, height: u32| {
+            panic_text(|| {
+                let mut png = Vec::new();
+                image::codecs::png::PngEncoder::new(&mut png).write_image(
+                    &vec![0; len],
+                    width,
+                    height,
+                    image::ExtendedColorType::Rgba8,
+                )
+            })
+        };
+        for (len, width, height) in [(4, 2, 1), (12, 2, 1), (5, 1, 1), (4, 0, 1), (4, 1, 0)] {
+            assert!(!is_drawable_rgba(len, width as usize, height as usize));
+            let expected = u64::from(width) * u64::from(height) * 4;
+            assert_eq!(
+                encode(len, width, height),
+                Some(format!(
+                    "assertion `left == right` failed: Invalid buffer length: expected {expected} got {len} for {width}x{height} image\n  left: {expected}\n right: {len}"
+                ))
+            );
+        }
+        assert!(!is_drawable_rgba(0, 0, 0));
+        assert_eq!(encode(0, 0, 0), None);
+        assert!(is_drawable_rgba(8, 2, 1));
+        assert_eq!(encode(8, 2, 1), None);
+    }
+
+    /// The shapes the guard refuses on macOS are the ones arboard panics on
+    /// there: an empty buffer, whose `CGDataProviderCreateWithData` arboard
+    /// unwraps (`src/platform/osx.rs:58-69`), and a width whose `4 * width`
+    /// overflows (`osx.rs:86`), a panic in a build with overflow checks, as
+    /// this test's is. arboard clears the pasteboard only after converting
+    /// the image (`osx.rs:343-347`), so the clipboard keeps what it held.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn refused_images_are_ones_arboard_panics_on_with_core_graphics() {
+        let set = |width: usize, height: usize, bytes: &[u8]| {
+            panic_text(|| {
+                arboard::Clipboard::new()
+                    .expect("a pasteboard")
+                    .set()
+                    .image(arboard::ImageData {
+                        width,
+                        height,
+                        bytes: Cow::Borrowed(bytes),
+                    })
+            })
+        };
+        assert!(!is_drawable_by_core_graphics(0, 1, 1));
+        assert_eq!(
+            set(1, 1, &[]),
+            Some("called `Option::unwrap()` on a `None` value".to_owned())
+        );
+        assert!(!is_drawable_by_core_graphics(4, usize::MAX / 4 + 1, 1));
+        assert_eq!(
+            set(usize::MAX / 4 + 1, 1, &[0; 4]),
+            Some("attempt to multiply with overflow".to_owned())
+        );
+    }
+
+    /// `deadline` refuses what `Instant + Duration::from_secs_f64` would
+    /// panic on, with the panic's own text (core `Duration::from_secs_f64`,
+    /// std `Instant`'s `Add`), which Ruby raises as `RangeError`.
+    #[test]
+    fn deadline_refusals_carry_the_panics_text() {
+        let now = Instant::now();
+        for seconds in [f64::NAN, f64::INFINITY] {
+            let panicked = panic_text(|| now + Duration::from_secs_f64(seconds));
+            assert!(panicked.is_some());
+            assert_eq!(deadline(now, seconds).err(), panicked);
+        }
+        #[cfg(unix)]
+        {
+            let panicked = panic_text(|| now + Duration::from_secs_f64(1.0e19));
+            assert!(panicked.is_some());
+            assert_eq!(deadline(now, 1.0e19).err(), panicked);
+        }
     }
 
     /// The Ruby error classes copy these messages (`lib/ferro/arboard/error.rb`);

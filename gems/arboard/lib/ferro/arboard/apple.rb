@@ -49,6 +49,7 @@ module Ferro
       #
       #   clipboard.set.exclude_from_history.text(password)
       def exclude_from_history
+        live!
         @exclude_from_history = true
         self
       end

@@ -139,8 +139,40 @@ class TestLinux < Minitest::Test
     assert_equal "cannot convert float seconds to Duration: value is either too big or NaN", error.message
   end
 
-  def test_wait_until_takes_a_number
-    assert_raises(TypeError) { clipboard.set.wait_until("soon") }
+  # arboard's wait_until takes an Instant (src/platform/linux/mod.rs:344);
+  # any Numeric number of seconds on the monotonic clock stands for one
+  # (ADR 001, 2026-11-05, the Duration row).
+  def test_wait_until_takes_any_numeric
+    error = assert_raises(TypeError) { clipboard.set.wait_until("soon") }
+    assert_equal "wrong argument type String (expected Numeric)", error.message
+
+    now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    [now.floor - 1, Rational(now.floor - 1), now - 1].each do |past|
+      set = clipboard.set
+      assert_same set, set.wait_until(past)
+      set.text("no waiting")
+    end
+  end
+
+  def test_a_consumed_builder_refuses_the_linux_options
+    clipboard.set_text("read once")
+    get = clipboard.get
+    get.clipboard(kinds::Clipboard).text
+    set = clipboard.set
+    set.clipboard(kinds::Primary).text("once")
+    clear = clipboard.clear_with
+    clear.clipboard(kinds::Primary)
+
+    assert_raises(IOError) { get.clipboard(kinds::Primary) }
+    %i[wait wait_once exclude_from_history].each do |option|
+      error = assert_raises(IOError, option.to_s) { set.public_send(option) }
+      assert_equal "Ferro::Arboard::Set consumed by Set#text", error.message
+    end
+    assert_raises(IOError) { set.wait_until(0) }
+    assert_raises(IOError) { set.clipboard(kinds::Clipboard) }
+    error = assert_raises(IOError) { clear.clipboard(kinds::Primary) }
+    assert_equal "Ferro::Arboard::Clear consumed by ClearExtLinux#clipboard", error.message
+    assert_raises(IOError) { clear.default }
   end
 
   def test_clear_with_a_selection_clears_only_it
@@ -193,11 +225,17 @@ class TestLinux < Minitest::Test
   end
 
   def test_the_kinds_are_three_frozen_values
-    assert_equal %w[Clipboard Primary Secondary].map { |name| "Ferro::Arboard::LinuxClipboardKind::#{name}" },
-      [kinds::Clipboard, kinds::Primary, kinds::Secondary].map(&:inspect)
     refute_respond_to kinds::Primary, :to_sym, "arboard's enum has no such method"
     assert Ractor.shareable?(kinds::Primary)
     assert_raises(NoMethodError) { kinds.new(:Tertiary) }
+  end
+
+  # LinuxClipboardKind derives Debug (src/platform/linux/mod.rs:104), which
+  # Rust formats; inspect stays Ruby's (ADR 001, 2026-11-05).
+  def test_the_kinds_debug_as_arboards_variants
+    assert_equal %w[Clipboard Primary Secondary], [kinds::Clipboard, kinds::Primary, kinds::Secondary].map(&:debug)
+    assert_match(/\A#<Ferro::Arboard::LinuxClipboardKind[ :]/, kinds::Primary.inspect)
+    refute_equal "Ferro::Arboard::LinuxClipboardKind::Primary", kinds::Primary.inspect
   end
 
   def test_a_selection_must_be_a_kind

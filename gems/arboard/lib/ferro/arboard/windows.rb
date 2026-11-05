@@ -49,6 +49,7 @@ module Ferro
       #
       #   clipboard.set.exclude_from_monitoring.text(password)
       def exclude_from_monitoring
+        live!
         @exclude_from_monitoring = true
         self
       end
@@ -62,6 +63,7 @@ module Ferro
       #
       #   clipboard.set.exclude_from_cloud.text(password)
       def exclude_from_cloud
+        live!
         @exclude_from_cloud = true
         self
       end
@@ -74,6 +76,7 @@ module Ferro
       #
       #   clipboard.set.exclude_from_history.text(password)
       def exclude_from_history
+        live!
         @exclude_from_history = true
         self
       end

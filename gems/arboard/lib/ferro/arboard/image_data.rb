@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 #++
 
+require_relative "ferro_arboard"
+
 module Ferro
   module Arboard
     #--
@@ -56,6 +58,20 @@ module Ferro
       # :attr_reader: bytes
       # The pixels as a binary String: four bytes (red, green, blue, alpha)
       # per pixel, row by row from the top-left corner.
+
+      # The +Debug+ text arboard derives for +ImageData+
+      # (<tt>src/common.rs:126</tt>), formatted by Rust: each field, with
+      # the bytes as a list of numbers. +inspect+ stays Data's. Raises
+      # +RangeError+ or +TypeError+ for a field arboard's struct could not
+      # hold, such as a negative width.
+      #
+      # === Example
+      #
+      #   Ferro::Arboard::ImageData.new(width: 1, height: 1, bytes: [255, 0, 0, 255].pack("C*")).debug
+      #   # => "ImageData { width: 1, height: 1, bytes: [255, 0, 0, 255] }"
+      def debug
+        Native.image_data_debug(width, height, bytes)
+      end
     end
 
     #--

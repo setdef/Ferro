@@ -6,24 +6,29 @@ module Ferro
     class Error < StandardError
       class ContentNotAvailable < Error
         def initialize: (?String? message) -> void
+        def debug: () -> String
       end
 
       class ClipboardNotSupported < Error
         def initialize: (?String? message) -> void
+        def debug: () -> String
       end
 
       class ClipboardOccupied < Error
         def initialize: (?String? message) -> void
+        def debug: () -> String
       end
 
       class ConversionFailure < Error
         def initialize: (?String? message) -> void
+        def debug: () -> String
       end
 
       class Unknown < Error
         attr_reader description: String
 
         def initialize: (?String description) -> void
+        def debug: () -> String
       end
     end
   end

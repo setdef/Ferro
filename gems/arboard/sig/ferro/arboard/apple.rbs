@@ -3,7 +3,7 @@
 
 module Ferro
   module Arboard
-    module SetExtApple
+    module SetExtApple : Builder
       @exclude_from_history: bool
 
       def exclude_from_history: () -> self

@@ -12,8 +12,15 @@ own API. Releases are tagged `ferro-arboard/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `debug` on each `Error` variant, `ImageData`, and (Linux) `LinuxClipboardKind`, answering arboard's `Debug` text as Rust formats it.
+
 ### Changed
 
+- **Breaking:** `Get`, `Set`, and `Clear` work once, as arboard's builders do: the method that finishes one uses it up, even when it raises, and any later call on it, options included, raises `IOError`.
+- **Breaking:** `LinuxClipboardKind#inspect` is Ruby's default, naming the class, instead of the constant path; arboard's `Debug` text moved to `debug`.
+- `SetExtLinux#wait_until` given a non-`Numeric` raises `TypeError` saying it expects a `Numeric`, not a `Float`.
 - On macOS, `set_image` hands arboard a buffer longer than `width * height * 4`, which arboard draws from its first bytes, instead of raising `ConversionFailure`; it still refuses an empty buffer or a size that overflows.
 
 ### Fixed

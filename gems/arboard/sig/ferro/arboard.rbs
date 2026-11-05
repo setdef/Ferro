@@ -4,5 +4,10 @@
 module Ferro
   module Arboard
     VERSION: String
+
+    module Native
+      def self.error_debug: (Symbol name, String? description) -> String
+      def self.image_data_debug: (Integer width, Integer height, String bytes) -> String
+    end
   end
 end

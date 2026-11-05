@@ -4,12 +4,15 @@
 module Ferro
   module Arboard
     class Set
+      include Builder
+
       @clipboard: Clipboard
       @selection: Symbol?
       @wait: (:forever | :once | Float)?
       @exclude_from_history: bool
       @exclude_from_monitoring: bool
       @exclude_from_cloud: bool
+      @consumed_by: String?
 
       private def self.new: (Clipboard clipboard) -> instance
 

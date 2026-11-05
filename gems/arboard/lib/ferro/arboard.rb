@@ -48,6 +48,6 @@ module Ferro
   #   clipboard.set_image(Ferro::Arboard::ImageData.new(width: 1, height: 1, bytes: pixel))
   #   clipboard.get_image.width # => 1
   module Arboard
-    private_constant :PLATFORM
+    private_constant :PLATFORM, :Native
   end
 end

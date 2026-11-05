@@ -4,7 +4,10 @@
 module Ferro
   module Arboard
     class Clear
+      include Builder
+
       @clipboard: Clipboard
+      @consumed_by: String?
 
       private def self.new: (Clipboard clipboard) -> instance
 

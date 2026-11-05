@@ -27,13 +27,62 @@ class TestBuilders < Minitest::Test
     assert_equal "through the builder", clipboard.get.text
   end
 
-  def test_a_get_reads_afresh_each_time
+  # arboard's terminal methods take self (src/lib.rs:189-212, :227-263,
+  # :275; ClearExtLinux::clipboard, src/platform/linux/mod.rs:452-456), so
+  # a builder works once. Here a used builder raises IOError, as a closed
+  # IO does (ADR 001, 2026-11-05).
+  def test_a_get_is_consumed_by_its_terminal_method
     get = clipboard.get
     clipboard.set_text("first")
     assert_equal "first", get.text
 
+    %i[text html image file_list].each do |terminal|
+      error = assert_raises(IOError, terminal.to_s) { get.public_send(terminal) }
+      assert_equal "Ferro::Arboard::Get consumed by Get#text", error.message
+    end
+  end
+
+  def test_a_set_is_consumed_by_its_terminal_method
+    set = clipboard.set
+    set.text("first")
+
+    error = assert_raises(IOError) { set.text("second") }
+    assert_equal "Ferro::Arboard::Set consumed by Set#text", error.message
+    assert_raises(IOError) { set.html("<b>x</b>", nil) }
+    assert_raises(IOError) { set.image(Ferro::Arboard::ImageData.new(width: 1, height: 1, bytes: "\x00" * 4)) }
+    assert_raises(IOError) { set.file_list([__FILE__]) }
+    assert_raises(IOError) { set.exclude_from_history }
+    assert_equal "first", clipboard.get_text
+  end
+
+  def test_a_clear_is_consumed_by_its_terminal_method
+    clipboard.set_text("cleared")
+    clear = clipboard.clear_with
+    clear.default
+
+    # No text is set after the clear: on X11 the clear's late SelectionClear
+    # event can drop it (Clipboard#clear).
+    error = assert_raises(IOError) { clear.default }
+    assert_equal "Ferro::Arboard::Clear consumed by Clear#default", error.message
+    assert_no_text
+  end
+
+  # Rust consumes the builder whatever the terminal method returns.
+  def test_a_terminal_method_that_raises_still_consumes_its_builder
+    clipboard.clear
+    get = clipboard.get
+
+    assert_raises(Ferro::Arboard::Error::ContentNotAvailable) { get.text }
+    error = assert_raises(IOError) { get.html }
+    assert_equal "Ferro::Arboard::Get consumed by Get#text", error.message
+  end
+
+  def test_each_clipboard_call_builds_a_fresh_builder
+    clipboard.set_text("first")
     clipboard.set_text("second")
-    assert_equal "second", get.text
+
+    assert_equal "second", clipboard.get_text
+    assert_equal "second", clipboard.get_text
   end
 
   def test_set_html_through_the_builder_sets_alt_text

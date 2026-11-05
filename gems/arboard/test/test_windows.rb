@@ -26,4 +26,14 @@ class TestWindows < Minitest::Test
     set.text("excluded everywhere")
     assert_equal "excluded everywhere", clipboard.get_text
   end
+
+  def test_a_consumed_set_refuses_every_exclusion
+    set = clipboard.set
+    set.text("once")
+
+    %i[exclude_from_monitoring exclude_from_cloud exclude_from_history].each do |option|
+      error = assert_raises(IOError, option.to_s) { set.public_send(option) }
+      assert_equal "Ferro::Arboard::Set consumed by Set#text", error.message
+    end
+  end
 end

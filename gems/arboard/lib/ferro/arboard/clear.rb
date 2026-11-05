@@ -6,6 +6,7 @@
 #++
 
 require_relative "ferro_arboard"
+require_relative "builder"
 require_relative "error"
 
 module Ferro
@@ -27,7 +28,10 @@ module Ferro
     # So Clipboard#clear_with returns this builder. Finish it with
     # #default, or on Linux with ClearExtLinux#clipboard.
     #
-    # Mirrors arboard's +Clear+ (<tt>src/lib.rs:266-278</tt>).
+    # Mirrors arboard's +Clear+ (<tt>src/lib.rs:266-278</tt>). arboard's
+    # finishing methods take +self+, so a builder works once: here any call
+    # on a Clear that one has used, even one that raised, raises +IOError+,
+    # as a closed IO does.
     #
     # === Examples
     #
@@ -37,6 +41,8 @@ module Ferro
     #   # On Linux, empty the middle-click selection.
     #   clipboard.clear_with.clipboard(Ferro::Arboard::LinuxClipboardKind::Primary)
     class Clear
+      include Builder
+
       private_class_method :new
 
       # Creates a clear of +clipboard+. Use Clipboard#clear_with.
@@ -44,6 +50,7 @@ module Ferro
       # [clipboard] Clipboard, the clipboard to clear.
       def initialize(clipboard)
         @clipboard = clipboard
+        @consumed_by = nil
       end
 
       # Removes whatever the default clipboard holds, in any format.
@@ -55,6 +62,7 @@ module Ferro
       #
       #   clipboard.clear_with.default
       def default
+        consume("Clear#default")
         @clipboard.__send__(:native_clear, nil)
       end
     end

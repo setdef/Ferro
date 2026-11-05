@@ -4,8 +4,11 @@
 module Ferro
   module Arboard
     class Get
+      include Builder
+
       @clipboard: Clipboard
       @selection: Symbol?
+      @consumed_by: String?
 
       private def self.new: (Clipboard clipboard) -> instance
 

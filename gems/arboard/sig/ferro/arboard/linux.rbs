@@ -14,16 +14,20 @@ module Ferro
       private def self.variant: (Object selection) -> Symbol
 
       def initialize: (Symbol name) -> void
-      def inspect: () -> String
+      def debug: () -> String
     end
 
-    module GetExtLinux
+    module Native
+      def self.linux_clipboard_kind_debug: (Symbol name) -> String
+    end
+
+    module GetExtLinux : Builder
       @selection: Symbol?
 
       def clipboard: (LinuxClipboardKind selection) -> self
     end
 
-    module SetExtLinux
+    module SetExtLinux : Builder
       @selection: Symbol?
       @wait: (:forever | :once | Float)?
       @exclude_from_history: bool
@@ -35,7 +39,7 @@ module Ferro
       def exclude_from_history: () -> self
     end
 
-    module ClearExtLinux
+    module ClearExtLinux : Builder
       @clipboard: Clipboard
 
       def clipboard: (LinuxClipboardKind selection) -> void

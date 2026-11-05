@@ -10,6 +10,8 @@ module Ferro
 
       def self.new: (Integer width, Integer height, String bytes) -> instance
                   | (width: Integer, height: Integer, bytes: String) -> instance
+
+      def debug: () -> String
     end
   end
 end

@@ -61,14 +61,15 @@ module Ferro
         freeze
       end
 
-      # The constant that holds this selection.
+      # The +Debug+ text arboard derives for this variant
+      # (<tt>src/platform/linux/mod.rs:104</tt>), formatted by Rust: its
+      # name. +inspect+ stays Ruby's.
       #
       # === Example
       #
-      #   Ferro::Arboard::LinuxClipboardKind::Primary.inspect
-      #   # => "Ferro::Arboard::LinuxClipboardKind::Primary"
-      def inspect
-        "#{self.class}::#{@name}"
+      #   Ferro::Arboard::LinuxClipboardKind::Primary.debug # => "Primary"
+      def debug
+        Native.linux_clipboard_kind_debug(@name)
       end
 
       # The selection explicit cut, copy, and paste use, as on Windows and
@@ -125,6 +126,7 @@ module Ferro
       #
       #   clipboard.get.clipboard(Ferro::Arboard::LinuxClipboardKind::Secondary).text
       def clipboard(selection)
+        live!
         @selection = LinuxClipboardKind.__send__(:variant, selection)
         self
       end
@@ -180,6 +182,7 @@ module Ferro
       #     in: File::NULL, out: File::NULL, err: File::NULL, chdir: "/")
       #   Process.detach(pid)
       def wait
+        live!
         @wait = :forever
         self
       end
@@ -187,11 +190,14 @@ module Ferro
       # Waits, after setting the contents, until they are replaced or
       # +deadline+ passes, whichever comes first. Returns the Set.
       #
-      # +deadline+ is a time on the monotonic clock, as
+      # +deadline+ is a time on the monotonic clock, in seconds, as
       # <tt>Process.clock_gettime(Process::CLOCK_MONOTONIC)</tt> returns it,
-      # which is what arboard's +Instant+ measures. A deadline already past
-      # waits for nothing. One that is NaN, infinite, or too far off for the
-      # clock raises +RangeError+ when the write runs.
+      # which is what arboard's +Instant+ measures. Any +Numeric+ works, as
+      # any number of seconds stands for a Rust +Duration+; anything else
+      # raises +TypeError+. A deadline already past waits for nothing. One
+      # that is NaN, infinite, or too far off for the clock raises
+      # +RangeError+ when the write runs, with the text Rust panics with
+      # for it.
       #
       # This suits short-lived programs that should not block until the
       # user copies something new. It replaces any earlier #wait or
@@ -202,7 +208,8 @@ module Ferro
       #   in_ten_seconds = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
       #   clipboard.set.wait_until(in_ten_seconds).text("pasteable for ten seconds")
       def wait_until(deadline)
-        raise TypeError, "wrong argument type #{deadline.class} (expected Float)" unless deadline.is_a?(Numeric)
+        live!
+        raise TypeError, "wrong argument type #{deadline.class} (expected Numeric)" unless deadline.is_a?(Numeric)
 
         @wait = Float(deadline)
         self
@@ -215,6 +222,7 @@ module Ferro
       #
       #   clipboard.set.wait_once.text("paste me once")
       def wait_once
+        live!
         @wait = :once
         self
       end
@@ -230,6 +238,7 @@ module Ferro
       #   clipboard.set.clipboard(Ferro::Arboard::LinuxClipboardKind::Clipboard).text("for Ctrl+V")
       #   clipboard.set.clipboard(Ferro::Arboard::LinuxClipboardKind::Primary).text("for middle-click")
       def clipboard(selection)
+        live!
         @selection = LinuxClipboardKind.__send__(:variant, selection)
         self
       end
@@ -244,6 +253,7 @@ module Ferro
       #
       #   clipboard.set.exclude_from_history.text(password)
       def exclude_from_history
+        live!
         @exclude_from_history = true
         self
       end
@@ -271,6 +281,7 @@ module Ferro
       #
       #   clipboard.clear_with.clipboard(Ferro::Arboard::LinuxClipboardKind::Primary)
       def clipboard(selection)
+        consume("ClearExtLinux#clipboard")
         @clipboard.__send__(:native_clear, LinuxClipboardKind.__send__(:variant, selection))
       end
     end

@@ -12,12 +12,22 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-# Every arboard feature is on (ADR 001, section 2): image-data implies
-# core-graphics, image, and windows-sys; wayland-data-control implies
-# wl-clipboard-rs.
+# Every arboard feature is built in (ADR 002, decision 1; plan 001,
+# decision 15): image-data, the default, adds ImageData and the image
+# methods, and implies core-graphics, image, and windows-sys;
+# wayland-data-control adds the Wayland clipboard, whose client is pure
+# Rust, and implies wl-clipboard-rs. Ruby reaches each, none excludes
+# another, and none needs a system library, so none is dropped or offered,
+# and the crate declares no [features] of its own.
 arboard = { version = "=3.7.0", features = ["image-data", "wayland-data-control"] }
 magnus = { version = "0.9.3", features = ["bytes", "rb-sys"] }
 rb-sys = "0.9.130"
+
+# The PNG encoder arboard uses on Linux and Windows, at the version
+# Cargo.lock pins and with the feature arboard enables there, so a Rust
+# test can drive the panic the image guard refuses (plan 001, decision 4).
+[target.'cfg(not(target_os = "macos"))'.dev-dependencies]
+image = { version = "=0.25.10", default-features = false, features = ["png"] }
 
 # Each crate states its lints itself instead of inheriting them with
 # `workspace = true`: an installed gem ships only its own workspace.

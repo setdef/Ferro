@@ -117,12 +117,17 @@ The API is arboard's, translated where Rust has no Ruby meaning:
 * Strings are Strings; byte buffers are binary Strings; paths are Strings
   (Set#file_list also takes anything with +to_path+).
 * Builders hold their clipboard, so <tt>clipboard.get().text()</tt> becomes
-  <tt>clipboard.get.text</tt>. A builder keeps its options and may be
-  finished more than once.
-* An +Instant+ is a Float on Ruby's monotonic clock, as
-  <tt>Process.clock_gettime(Process::CLOCK_MONOTONIC)</tt> returns it.
+  <tt>clipboard.get.text</tt>. A builder works once, as arboard's does: the
+  method that finishes it uses it up, and any later call on it raises
+  +IOError+, as a closed IO does.
+* +Debug+ is <tt>debug</tt>, which answers arboard's text exactly, as Rust formats
+  it, on each Error variant, ImageData, and LinuxClipboardKind; +inspect+
+  stays Ruby's.
+* An +Instant+ is any +Numeric+ number of seconds on Ruby's monotonic clock,
+  as <tt>Process.clock_gettime(Process::CLOCK_MONOTONIC)</tt> returns it.
 * Every arboard feature is built in: images, and Wayland's data-control
-  protocol on Linux.
+  protocol on Linux. Ruby reaches both and neither needs a system library,
+  so the gem offers no build options.
 
 Three things differ from calling arboard from Rust:
 

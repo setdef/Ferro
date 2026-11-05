@@ -6,6 +6,7 @@
 #++
 
 require_relative "ferro_arboard"
+require_relative "builder"
 require_relative "error"
 require_relative "image_data"
 
@@ -34,8 +35,10 @@ module Ferro
     # clipboard is empty or holds another format.
     #
     # Mirrors arboard's +Get+ (<tt>src/lib.rs:176-213</tt>). arboard's
-    # builder works once; this one may be finished again, reading the
-    # clipboard afresh each time.
+    # format methods take +self+, so a builder works once: here any call on
+    # a Get that a format method has used, even one that raised, raises
+    # +IOError+, as a closed IO does. Take a fresh one from Clipboard#get
+    # for each read.
     #
     # === Examples
     #
@@ -46,6 +49,8 @@ module Ferro
     #   # On Linux, read the selection the middle mouse button pastes.
     #   clipboard.get.clipboard(Ferro::Arboard::LinuxClipboardKind::Primary).text
     class Get
+      include Builder
+
       private_class_method :new
 
       # Creates a read from +clipboard+. Use Clipboard#get.
@@ -54,6 +59,7 @@ module Ferro
       def initialize(clipboard)
         @clipboard = clipboard
         @selection = nil
+        @consumed_by = nil
       end
 
       # Reads UTF-8 text.
@@ -64,6 +70,7 @@ module Ferro
       #
       #   clipboard.get.text # => "copied text"
       def text
+        consume("Get#text")
         @clipboard.__send__(:native_get_text, @selection)
       end
 
@@ -80,6 +87,7 @@ module Ferro
       #   image = clipboard.get.image
       #   image.width # => 640
       def image
+        consume("Get#image")
         width, height, bytes = @clipboard.__send__(:native_get_image, @selection)
         ImageData.new(width:, height:, bytes:)
       end
@@ -96,6 +104,7 @@ module Ferro
       #
       #   clipboard.get.html # => "<b>bold</b>"
       def html
+        consume("Get#html")
         @clipboard.__send__(:native_get_html, @selection)
       end
 
@@ -112,6 +121,7 @@ module Ferro
       #
       #   clipboard.get.file_list # => ["/path/to/report.pdf"]
       def file_list
+        consume("Get#file_list")
         @clipboard.__send__(:native_get_file_list, @selection)
       end
     end

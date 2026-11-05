@@ -6,6 +6,7 @@
 #++
 
 require_relative "ferro_arboard"
+require_relative "builder"
 require_relative "error"
 require_relative "image_data"
 
@@ -32,8 +33,10 @@ module Ferro
     # them: SetExtLinux, SetExtApple, and SetExtWindows.
     #
     # Mirrors arboard's +Set+ (<tt>src/lib.rs:215-264</tt>). arboard's
-    # builder works once; this one keeps its options and may be finished
-    # again.
+    # format methods take +self+, so a builder works once: here any call on
+    # a Set that a format method has used, even one that raised, raises
+    # +IOError+, as a closed IO does, options included. Take a fresh one
+    # from Clipboard#set for each write.
     #
     # === Examples
     #
@@ -44,6 +47,8 @@ module Ferro
     #   # Keep a one-time code out of clipboard managers.
     #   clipboard.set.exclude_from_history.text("492 117")
     class Set
+      include Builder
+
       private_class_method :new
 
       # Creates a write to +clipboard+. Use Clipboard#set.
@@ -56,6 +61,7 @@ module Ferro
         @exclude_from_history = false
         @exclude_from_monitoring = false
         @exclude_from_cloud = false
+        @consumed_by = nil
       end
 
       # Puts +text+ on the clipboard. Any valid UTF-8 string works; a
@@ -68,6 +74,7 @@ module Ferro
       #
       #   clipboard.set.text("Copied!")
       def text(text)
+        consume("Set#text")
         @clipboard.__send__(:native_set_text, text, options)
       end
 
@@ -87,6 +94,7 @@ module Ferro
       #
       #   clipboard.set.html("<h1>Title</h1>", "Title")
       def html(html, alt_text)
+        consume("Set#html")
         @clipboard.__send__(:native_set_html, html, alt_text, options)
       end
 
@@ -110,6 +118,7 @@ module Ferro
       #   white = ([255] * 16).pack("C*")
       #   clipboard.set.image(Ferro::Arboard::ImageData.new(width: 2, height: 2, bytes: white))
       def image(image)
+        consume("Set#image")
         raise TypeError, "wrong argument type #{image.class} (expected #{ImageData})" unless image.is_a?(ImageData)
 
         @clipboard.__send__(:native_set_image, image.width, image.height, image.bytes, options)
@@ -129,6 +138,7 @@ module Ferro
       #
       #   clipboard.set.file_list(["report.pdf", Pathname("chart.png")])
       def file_list(paths)
+        consume("Set#file_list")
         list = Array.try_convert(paths) or raise TypeError, "no implicit conversion of #{paths.class} into Array"
         @clipboard.__send__(:native_set_file_list, list.map { |path| File.path(path) }, options)
       end
