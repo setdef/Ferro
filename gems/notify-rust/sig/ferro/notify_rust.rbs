@@ -30,6 +30,7 @@ module Ferro
       def self.hint_as_i32: (hint_tag tag) -> Integer?
       def self.hint_as_str: (hint_tag tag) -> String?
       def self.urgency_debug: (urgency_tag tag) -> String
+      def self.urgency_to_i: (urgency_tag tag) -> Integer
       def self.timeout_debug: (timeout_tag tag) -> String
       def self.close_reason_debug: (close_reason_tag tag) -> String
       def self.notification_response_debug: (response_tag tag) -> String

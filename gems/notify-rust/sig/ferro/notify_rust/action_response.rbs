@@ -5,6 +5,7 @@ module Ferro
   module NotifyRust
     module ActionResponse : Object
       class Custom < Data
+        include TupleVariant
         include ActionResponse
 
         attr_reader key: String
@@ -18,6 +19,7 @@ module Ferro
       end
 
       class Closed < Data
+        include TupleVariant
         include ActionResponse
 
         attr_reader reason: CloseReason

@@ -46,6 +46,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::ActionResponse::Custom.new("default")
       class Custom < Data.define(:key)
+        include TupleVariant
         include ActionResponse
 
         ##
@@ -63,6 +64,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::ActionResponse::Closed.new(Ferro::NotifyRust::CloseReason::Expired)
       class Closed < Data.define(:reason)
+        include TupleVariant
         include ActionResponse
 
         ##

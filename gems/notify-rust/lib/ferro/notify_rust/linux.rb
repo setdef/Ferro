@@ -273,6 +273,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::ImageData.new(Ferro::NotifyRust::Image.from_rgb(1, 1, "abc"))
       class ImageData < Data.define(:value)
+        include TupleVariant
         include Hint
 
         ##

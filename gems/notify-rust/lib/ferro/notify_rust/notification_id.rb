@@ -43,6 +43,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::NotificationId::Xdg.new(42)
       class Xdg < Data.define(:value)
+        include TupleVariant
         include NotificationId
 
         ##
@@ -60,6 +61,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::NotificationId::Mac.new("my-app.status")
       class Mac < Data.define(:value)
+        include TupleVariant
         include NotificationId
 
         ##

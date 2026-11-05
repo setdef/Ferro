@@ -13,15 +13,24 @@ A program that finishes a long job, or hears about something the user
 cares about, should say so where the user looks: a notification in the
 corner of the screen. Each system has its own way to show one: the XDG
 notification server over D-Bus on Linux and the BSDs, the notification
-center on macOS, toasts on Windows.
+center on macOS, toasts on Windows. Ruby's standard library has none of
+them.
 
 ferro-notify-rust binds notify-rust (https://github.com/hoodie/notify-rust)
-one to one. It keeps notify-rust's names and behavior and adds nothing of
-its own. Use it to tell the user a build finished, ask them to approve
-something with an action button, or keep a progress notification up to
-date.
+one to one. It keeps notify-rust's names and behavior. Where Rust has no
+Ruby meaning it translates, and it adds little: Ferro::NotifyRust::Future,
+which stands in for the Rust futures of Linux's async calls, and
+Ferro::NotifyRust::Builder, the setters a Notification shares with a Linux
+or Windows handle, as Rust's +Deref+ shares them. Use it to tell the user a
+build finished, ask them to approve something with an action button, or
+change a notification already on screen.
+
+ferro-notify-rust binds notify-rust 4.18.2. The gem's version follows its
+own API; its +notify_rust_version+ metadata names the notify-rust release.
 
 == Install
+
+Add the gem to your Gemfile, with a version, or let Bundler write the line:
 
 --
 SPDX-SnippetBegin
@@ -29,32 +38,56 @@ SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
 SPDX-License-Identifier: MIT-0
 ++
 
-  bundle add ferro-notify-rust
+  gem "ferro-notify-rust", "~> 0.1"
+
+  # or, from the command line:
+  bundle add ferro-notify-rust --version "~> 0.1"
 
 --
 SPDX-SnippetEnd
 ++
 
-The gem compiles a Rust extension when it installs, so the machine that
-installs it needs Rust and Cargo: Rust 1.89 or newer (notify-rust's
-+rust-version+), and 1.99 or newer on macOS 27, where earlier toolchains
-strip the extension in a way the new loader rejects. The build runs
-<tt>cargo --locked</tt>, so it compiles exactly the dependency versions
-this gem was tested with. To build against newer ones anyway, set
-+RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will do); it replaces
-<tt>--locked</tt>.
+The gem needs Ruby 4.0 or newer. It compiles a Rust extension when it
+installs, so the machine that installs it needs:
 
-On Linux, notify-rust talks to D-Bus through zbus, pure Rust, so building
-needs no system libraries. Showing a notification needs a session bus and
-a notification server, which desktops run (GNOME Shell, Plasma, dunst,
-mako, and others).
+* Rust and Cargo, 1.89 or newer (the highest +rust-version+ among the
+  locked dependencies). On Windows, use Rust's
+  +x86_64-pc-windows-gnu+ toolchain, since RubyInstaller's Ruby is a MinGW
+  build and rb-sys refuses to build it with the MSVC target.
+* libclang, which rb-sys's bindgen reads Ruby's headers with
+  (<tt>libclang-dev</tt> on Debian and Ubuntu, +clang+ with the Xcode
+  command line tools on macOS, LLVM on Windows).
+
+The build runs <tt>cargo --locked</tt>, so it compiles exactly the
+dependency versions this gem was tested with. To build against newer ones
+anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will do); it
+replaces <tt>--locked</tt>.
+
+Showing a notification needs more than the build does:
+
+[Linux and the BSDs] A D-Bus session bus and a notification server on it,
+                     which desktops run (GNOME Shell, Plasma, dunst, mako,
+                     and others). notify-rust talks to D-Bus through zbus,
+                     pure Rust, so no libdbus is linked at build time or
+                     run time. With no session bus or no server, +show+
+                     raises a Ferro::NotifyRust::Error.
+[macOS]              Nothing to install. A notification comes from the
+                     application notify-rust names, Finder unless you
+                     choose another (see below), so it follows that
+                     application's notification settings.
+[Windows]            Nothing to install. A toast needs an application's
+                     <tt>System.AppUserModel.ID</tt>. Without one,
+                     notify-rust uses PowerShell's, so the toast reports
+                     PowerShell as its origin. Pass your app's own with
+                     +app_id+.
 
 == Use
 
 --
 SPDX-SnippetBegin
-SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
-SPDX-License-Identifier: MIT-0
+SPDX-SnippetCopyrightText: 2017 Hendrik Sollich
+SPDX-License-Identifier: MIT OR Apache-2.0
+SPDX-SnippetComment: Translated from notify-rust 4.18.2 src/lib.rs:15-26
 ++
 
   require "ferro/notify_rust"
@@ -72,16 +105,35 @@ SPDX-SnippetEnd
 
 Each setter returns the notification, so calls chain, and +show+ sends it.
 Without an argument, a method with a field of the same name returns it:
-+summary+ returns the summary.
-
-=== Actions
-
-On Linux, +show+ returns a NotificationHandle, which can wait for the user.
++summary+ returns the summary. A failure raises a subclass of
+Ferro::NotifyRust::Error with notify-rust's message:
 
 --
 SPDX-SnippetBegin
 SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
 SPDX-License-Identifier: MIT-0
+++
+
+  begin
+    Ferro::NotifyRust::Urgency.try_from("urgent")
+  rescue Ferro::NotifyRust::Error::Conversion => e
+    e.message # => "Conversion Error: invalid input \"urgent\""
+    e.debug   # => "Error { kind: Conversion(\"invalid input \\\"urgent\\\"\") }"
+  end
+
+--
+SPDX-SnippetEnd
+++
+
+=== Actions
+
++show+ returns a NotificationHandle, which can wait for the user. On Linux:
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2017 Hendrik Sollich
+SPDX-License-Identifier: MIT OR Apache-2.0
+SPDX-SnippetComment: Translated from notify-rust 4.18.2 src/lib.rs:46-62
 ++
 
   Ferro::NotifyRust::Notification.new
@@ -159,8 +211,28 @@ mac-notification-sys.
 A wait needs the main thread's run loop. On the main thread, it runs the
 loop itself; on any other thread it finishes only while the main thread
 runs its run loop, as a windowed app's event loop does, and otherwise
-blocks indefinitely. macOS does not let a program set a notification's
-icon, timeout, or app name; +hint+ and +urgency+ do not exist there.
+blocks indefinitely. On macOS notify-rust uses a notification's summary,
+subtitle, body, sound, image path, and actions (as buttons named by their
+labels), and ignores its icon, timeout, app name, and id; +hint+ and
++urgency+ do not exist there.
+
+=== Windows
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  Ferro::NotifyRust::Notification.new.summary("Build done").app_id("Example.App").show
+
+--
+SPDX-SnippetEnd
+++
+
++app_id+ exists only on Windows, and +urgency+ only on Windows and Linux.
+On Windows, a critical urgency makes the toast a reminder, which stays on
+screen until the user dismisses it.
 
 == How it maps notify-rust
 
@@ -174,9 +246,12 @@ The API is notify-rust's, translated where Rust has no Ruby meaning:
 * Enums are constants (Urgency::Critical, Timeout::Never,
   CloseReason::Dismissed); variants with data are Data classes
   (Timeout::Milliseconds, Hint::Category, NotificationResponse::Action).
-  +Default+ is <tt>.default</tt>. Conversions keep notify-rust's rules:
-  <tt>From</tt> is +from+, <tt>TryFrom</tt> is +try_from+, <tt>FromStr</tt>
-  is +from_str+, and <tt>i32::from(timeout)</tt> is Timeout#to_i.
+  A variant's fields are positional, through +deconstruct+ and +to_a+, as
+  a Rust pattern reads them. +Default+ is <tt>.default</tt>. Conversions keep
+  notify-rust's rules: <tt>From</tt> is +from+, <tt>TryFrom</tt> is
+  +try_from+, <tt>FromStr</tt> is +from_str+, and
+  <tt>i32::from(timeout)</tt> is Timeout#to_i, and
+  <tt>Urgency::Critical as u8</tt> is Urgency#to_i.
 * A Rust +Duration+ is a Numeric number of seconds. Timeout.from and
   Notification#timeout read an Integer as milliseconds
   (<tt>From<i32></tt>) and any other Numeric as a +Duration+, so
@@ -234,16 +309,24 @@ replaces the macOS backend with +UNUserNotificationCenter+, a preview that
 needs a signed app bundle.
 
 The extension is Ractor-safe, and a frozen Notification, Image, or value may
-cross Ractors. On Windows, Ruby 4.0.9 can hang when a Ractor starts a
-garbage collection while the main Ractor has another thread asleep; the bug
-is Ruby's (ferro-arboard's README says more).
+cross Ractors. One caveat belongs to Ruby, not to the gem: on Windows,
+Ruby 4.0.9 can hang when a Ractor starts a garbage collection while the
+main Ractor has another thread asleep; ferro-arboard's README says more.
 
-ferro-notify-rust 0.1.0.pre.1 binds notify-rust 4.18.2. The gem's version
-follows its own API; its +notify_rust_version+ metadata names the
-notify-rust release.
+== Links
+
+* Source: https://github.com/setdef/Ferro/tree/trunk/gems/notify-rust
+* Changelog: https://github.com/setdef/Ferro/blob/trunk/gems/notify-rust/CHANGELOG.md
+* The translation rules every Ferro gem follows (ADR 001):
+  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/adr/001.md
+* notify-rust: https://github.com/hoodie/notify-rust
+* The XDG notification specification:
+  https://specifications.freedesktop.org/notification-spec/latest/
 
 == License
 
 ferro-notify-rust's code is MIT OR Apache-2.0, as notify-rust's is. This
-README is CC-BY-SA-4.0, and its code examples are MIT-0, so paste them
-freely. The lockfile is CC0-1.0. The license texts are in LICENSES/.
+README is CC-BY-SA-4.0. Its first and third code examples come from
+notify-rust's rustdoc and are MIT OR Apache-2.0, as notify-rust's code is;
+the other examples are MIT-0, so paste them freely. The lockfile is
+CC0-1.0. The license texts are in LICENSES/.

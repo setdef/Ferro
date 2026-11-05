@@ -170,6 +170,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     native.define_singleton_method("hint_as_i32", function!(values::hint_as_i32, 1))?;
     native.define_singleton_method("hint_as_str", function!(values::hint_as_str, 1))?;
     native.define_singleton_method("urgency_debug", function!(values::urgency_debug, 1))?;
+    native.define_singleton_method("urgency_to_i", function!(values::urgency_to_i, 1))?;
     native.define_singleton_method("timeout_debug", function!(values::timeout_debug, 1))?;
     native.define_singleton_method(
         "close_reason_debug",

@@ -18,6 +18,7 @@ module Ferro
 
       def initialize: (urgency_tag name) -> void
       def debug: () -> String
+      def to_i: () -> Integer
 
       private
 

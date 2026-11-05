@@ -66,6 +66,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Timeout::Milliseconds.new(6000)
       class Milliseconds < Data.define(:value)
+        include TupleVariant
         include Timeout
 
         ##

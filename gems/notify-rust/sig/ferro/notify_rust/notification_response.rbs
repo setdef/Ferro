@@ -19,6 +19,7 @@ module Ferro
       Default: Unit
 
       class Action < Data
+        include TupleVariant
         include NotificationResponse
 
         attr_reader key: String
@@ -32,6 +33,7 @@ module Ferro
       end
 
       class Reply < Data
+        include TupleVariant
         include NotificationResponse
 
         attr_reader text: String
@@ -45,6 +47,7 @@ module Ferro
       end
 
       class Closed < Data
+        include TupleVariant
         include NotificationResponse
 
         attr_reader reason: CloseReason

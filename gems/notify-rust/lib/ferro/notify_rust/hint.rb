@@ -54,6 +54,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::ActionIcons.new(true)
       class ActionIcons < Data.define(:value)
+        include TupleVariant
         include Hint
 
         ##
@@ -68,6 +69,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::Category.new("email")
       class Category < Data.define(:value)
+        include TupleVariant
         include Hint
 
         ##
@@ -83,6 +85,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::DesktopEntry.new("firefox")
       class DesktopEntry < Data.define(:value)
+        include TupleVariant
         include Hint
 
         ##
@@ -96,6 +99,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::ImagePath.new("/usr/share/icons/hicolor/48x48/apps/firefox.png")
       class ImagePath < Data.define(:value)
+        include TupleVariant
         include Hint
 
         ##
@@ -110,6 +114,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::Resident.new(true)
       class Resident < Data.define(:value)
+        include TupleVariant
         include Hint
 
         ##
@@ -123,6 +128,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::SoundFile.new("/usr/share/sounds/freedesktop/stereo/message.oga")
       class SoundFile < Data.define(:value)
+        include TupleVariant
         include Hint
 
         ##
@@ -139,6 +145,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::SoundName.new("message-new-instant")
       class SoundName < Data.define(:value)
+        include TupleVariant
         include Hint
 
         ##
@@ -152,6 +159,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::SuppressSound.new(true)
       class SuppressSound < Data.define(:value)
+        include TupleVariant
         include Hint
 
         ##
@@ -166,6 +174,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::Transient.new(true)
       class Transient < Data.define(:value)
+        include TupleVariant
         include Hint
 
         ##
@@ -180,6 +189,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::X.new(100)
       class X < Data.define(:value)
+        include TupleVariant
         include Hint
 
         ##
@@ -194,6 +204,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::Y.new(100)
       class Y < Data.define(:value)
+        include TupleVariant
         include Hint
 
         ##
@@ -207,6 +218,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::Urgency.new(Ferro::NotifyRust::Urgency::Critical)
       class Urgency < Data.define(:value)
+        include TupleVariant
         include Hint
 
         ##
@@ -222,6 +234,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::Custom.new("x-canonical-private-synchronous", "volume")
       class Custom < Data.define(:key, :value)
+        include TupleVariant
         include Hint
 
         ##
@@ -240,6 +253,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::Hint::CustomInt.new("value", 42)
       class CustomInt < Data.define(:key, :value)
+        include TupleVariant
         include Hint
 
         ##

@@ -8,6 +8,7 @@
 require_relative "notify_rust/version"
 require_relative "notify_rust/ferro_notify_rust"
 require_relative "notify_rust/error"
+require_relative "notify_rust/tuple_variant"
 require_relative "notify_rust/urgency"
 require_relative "notify_rust/timeout"
 require_relative "notify_rust/close_reason"

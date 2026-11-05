@@ -5,6 +5,7 @@ module Ferro
   module NotifyRust
     module NotificationId : Object
       class Xdg < Data
+        include TupleVariant
         include NotificationId
 
         attr_reader value: Integer
@@ -18,6 +19,7 @@ module Ferro
       end
 
       class Mac < Data
+        include TupleVariant
         include NotificationId
 
         attr_reader value: String

@@ -72,6 +72,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::CloseReason.from(4) # => #<data Ferro::NotifyRust::CloseReason::Other raw_reason=4>
       class Other < Data.define(:raw_reason)
+        include TupleVariant
         include CloseReason
 
         ##

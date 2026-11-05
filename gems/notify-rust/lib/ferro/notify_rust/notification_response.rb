@@ -75,6 +75,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::NotificationResponse::Action.new("reply")
       class Action < Data.define(:key)
+        include TupleVariant
         include NotificationResponse
 
         ##
@@ -94,6 +95,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::NotificationResponse::Reply.new("On my way")
       class Reply < Data.define(:text)
+        include TupleVariant
         include NotificationResponse
 
         ##
@@ -111,6 +113,7 @@ module Ferro
       #
       #   Ferro::NotifyRust::NotificationResponse::Closed.new(Ferro::NotifyRust::CloseReason::Dismissed)
       class Closed < Data.define(:reason)
+        include TupleVariant
         include NotificationResponse
 
         ##

@@ -21,6 +21,7 @@ module Ferro
       CloseAction: Unit
 
       class Other < Data
+        include TupleVariant
         include CloseReason
 
         attr_reader raw_reason: Integer

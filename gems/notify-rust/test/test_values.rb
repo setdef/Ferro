@@ -88,6 +88,44 @@ class TestValues < Minitest::Test
     assert_equal '#<data Ferro::NotifyRust::Hint::Category value="email">', NotifyRust::Hint::Category.new("email").inspect
   end
 
+  # Rust reads a tuple variant by position (ADR 001, 2026-11-05), and
+  # deconstruct and to_a give the fields in Rust order.
+  def test_tuple_variants_are_positional_through_deconstruct_and_to_a
+    close = NotifyRust::CloseReason
+    hint = NotifyRust::Hint
+    {
+      NotifyRust::Timeout::Milliseconds.new(6000) => [6000],
+      hint::Category.new("email") => ["email"],
+      hint::Resident.new(true) => [true],
+      hint::X.new(-12) => [-12],
+      hint::Urgency.new(urgency::Critical) => [urgency::Critical],
+      hint::Custom.new("k", "v") => %w[k v],
+      hint::CustomInt.new("n", 40) => ["n", 40],
+      close::Other.new(7) => [7],
+      NotifyRust::NotificationResponse::Action.new("ok") => ["ok"],
+      NotifyRust::NotificationResponse::Closed.new(close::Expired) => [close::Expired],
+      NotifyRust::ActionResponse::Custom.new("clicked_a") => ["clicked_a"],
+      NotifyRust::ActionResponse::Closed.new(close::Dismissed) => [close::Dismissed],
+      NotifyRust::NotificationId::Xdg.new(42) => [42],
+    }.each do |variant, fields|
+      assert_equal fields, variant.to_a, variant.inspect
+      assert_equal variant.deconstruct, variant.to_a
+    end
+
+    case NotifyRust::Timeout::Milliseconds.new(6000)
+    in NotifyRust::Timeout::Milliseconds[milliseconds] then assert_equal 6000, milliseconds
+    end
+    ms, = NotifyRust::Timeout::Milliseconds.new(9).to_a
+    assert_equal 9, ms
+  end
+
+  # Rust gives each variant the discriminant src/urgency.rs:27-35 declares,
+  # and the gem asks Rust for it.
+  def test_urgency_to_i_is_the_discriminant
+    assert_equal [0, 1, 2], [urgency::Low, urgency::Normal, urgency::Critical].map(&:to_i)
+    assert_equal [urgency::Low, urgency::Normal, urgency::Critical], (0..2).map { |n| urgency.from(n) }
+  end
+
   def test_urgency_from_int
     assert_equal urgency::Low, urgency.from(0)
     assert_equal urgency::Normal, urgency.from(1)

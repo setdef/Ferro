@@ -72,6 +72,17 @@ module Ferro
         Native.urgency_debug(@name)
       end
 
+      # The urgency's integer value, Rust's <tt>Urgency::Critical as
+      # u8</tt>: the discriminant notify-rust declares (<tt>src/urgency.rs:27-35</tt>),
+      # Low 0, Normal 1, and Critical 2, as Rust computes it.
+      #
+      # === Example
+      #
+      #   Ferro::NotifyRust::Urgency::Critical.to_i # => 2
+      def to_i
+        Native.urgency_to_i(@name)
+      end
+
       # The behavior for +Low+ urgency depends on the notification server.
       Low = new(:Low)
 

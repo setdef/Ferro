@@ -14,6 +14,8 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 
 ### Added
 
+- `to_a` on every variant that carries data (`Timeout::Milliseconds`, `Hint::Category` and the other `Hint` variants, `CloseReason::Other`, `NotificationResponse::Action`, `Reply`, and `Closed`, `ActionResponse::Custom` and `Closed`, `NotificationId::Xdg` and `Mac`), answering what `deconstruct` does.
+- `Urgency#to_i`, the integer Rust's `as` gives each variant: Low 0, Normal 1, Critical 2.
 - `Notification.default`, notify-rust's `impl Default for Notification`.
 - On Linux, `SPEC_VERSION`, notify-rust's own lazily read specification version, loaded the first time it is named, as a `Version` with `major` and `minor` that compares as notify-rust's does.
 - `debug` on `Notification`, `NotificationHandle`, every value (`Urgency`, `Timeout`, `CloseReason`, `NotificationResponse`, `ActionResponse`, `Hint`, `NotificationId`, `ServerInformation`; on Linux `Image`, `DbusStack`, `Version`), and every error, answering notify-rust's `Debug` text as Rust formats it; an error notify-rust raised keeps the text of the value it returned.

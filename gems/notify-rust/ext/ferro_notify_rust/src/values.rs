@@ -341,6 +341,12 @@ pub fn urgency_debug(ruby: &Ruby, tag: Value) -> Result<String, Error> {
     Ok(format!("{:?}", urgency_from_ruby(ruby, tag)?))
 }
 
+/// `Native.urgency_to_i`: `Urgency::Critical as u8` (`src/urgency.rs:27-35`),
+/// the explicit discriminants 0, 1, and 2.
+pub fn urgency_to_i(ruby: &Ruby, tag: Value) -> Result<u8, Error> {
+    Ok(urgency_from_ruby(ruby, tag)? as u8)
+}
+
 /// `Native.timeout_debug` (`src/timeout.rs:13`).
 pub fn timeout_debug(ruby: &Ruby, tag: Value) -> Result<String, Error> {
     Ok(format!("{:?}", timeout_from_ruby(ruby, tag)?))
