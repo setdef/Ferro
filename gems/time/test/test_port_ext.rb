@@ -162,7 +162,16 @@ class TestExt < Minitest::Test
     assert_equal ::Time.at(999, 400, :nsec), at.checked_add_signed(-Duration.new(1, 100))
     assert_nil at.checked_add_signed(Duration::MAX)
     assert_raises(TypeError) { at.checked_add_signed(1) }
-    assert_equal Duration::MAX, ::Time.at(2 ** 62).signed_duration_since(::Time.at(-(2 ** 62)))
+    far, near = ::Time.at(2 ** 62), ::Time.at(-(2 ** 62))
+    if Gem.win_platform?
+      # Windows' SystemTime holds about 29,000 years either side of 1601,
+      # so these times do not become one: std panics converting them,
+      # and the gem refuses with that panic's text.
+      error = assert_raises(RangeError) { far.signed_duration_since(near) }
+      assert_equal "overflow when adding duration to `SystemTime`", error.message
+    else
+      assert_equal Duration::MAX, far.signed_duration_since(near)
+    end
   end
 
   # A refinement reaches only the files that ask for it; this file asks,
