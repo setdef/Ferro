@@ -76,9 +76,12 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     // all `Sync`. Its one wrapped type, `Native::Manager`, is never made
     // shareable, and global-hotkey's manager takes `&self` with its own
     // locks (macOS), a channel (Linux), or Win32 calls that fail off the
-    // window's thread (Windows; see `manager.rs`). Every other value a
-    // function touches is an argument, which Ruby guarantees is the calling
-    // Ractor's own or shareable (extension.rdoc:2260-2261).
+    // window's thread (Windows; see `manager.rs`). The unblocking function
+    // `gvl.rs` gives Ruby may run on another Ractor's thread, and touches
+    // only the wait's own cancel channel, a crossbeam `Sender`, which is
+    // `Sync`. Every other value a function touches is an argument, which
+    // Ruby guarantees is the calling Ractor's own or shareable
+    // (extension.rdoc:2260-2261).
     // `rb_ext_ractor_safe` takes a plain flag, called from `Init_` as
     // extension.rdoc:2218-2220 asks.
     #[allow(unsafe_code)]

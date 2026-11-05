@@ -166,9 +166,11 @@ The API is global-hotkey's, translated where Rust has no Ruby meaning:
 What differs from calling global-hotkey from Rust:
 
 * The handler runs on a Ruby thread, not on the thread that saw the key.
-* +recv+ and +recv_timeout+ release Ruby's global VM lock, and Ctrl-C,
-  <tt>Thread#raise</tt>, and +Timeout+ end them; an event that arrives at
-  the very moment of the interrupt can be lost. Registering keeps the lock
+* +recv+ and +recv_timeout+ always wait with Ruby's global VM lock
+  released, and Ctrl-C, <tt>Thread#raise</tt>, <tt>Thread#kill</tt>, and
+  +Timeout+ end them; an event the wait has taken when the interrupt
+  raises is discarded and cannot be read again, as Ruby's own IO discards
+  what a read took. Registering keeps the lock
   and cannot be interrupted: on Linux it waits for the X11 thread, which
   looks for work every 50 ms, and blocks with no limit if the X connection
   hangs.

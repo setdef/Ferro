@@ -45,6 +45,43 @@ module HotkeySuite
   GlobalHotkey = Ferro::GlobalHotkey
   Hotkey = Ferro::GlobalHotkey::Hotkey
 
+  # Defines WhileRaising in a child: an exception that runs a block from
+  # its own #backtrace, and keeps what the block returned. Ruby asks an
+  # exception for its backtrace while raising it, with the thread marked
+  # as raising (setup_exception, eval.c:542-543, and rb_get_backtrace,
+  # error.c:1929, at v4.0.9), and a thread so marked runs no interrupts
+  # (thread.c:2625), so one the block makes pending stays pending.
+  # rb_thread_call_without_gvl2 skips its work while any interrupt is
+  # pending (thread.c:320-327), so the gem used to poll the channel with
+  # the GVL held, in a loop, stalling every other thread. The block must
+  # not raise: an exception raised there becomes a fatal jump that the
+  # outer raise drops (eval.c:542, :561, :612-615), so it reads the
+  # native wait's tagged result rather than calling recv, which raises on
+  # a timeout. The child keeps Ruby's raising state out of the test run.
+  # ferro-rfd's test_helper.rb has the same class.
+  WHILE_RAISING = <<~RUBY
+    class WhileRaising < StandardError
+      attr_reader :value
+
+      def self.run(&block)
+        raise new(&block)
+      rescue WhileRaising => e
+        e.value
+      end
+
+      def initialize(&block)
+        super("raising")
+        @block = block
+      end
+
+      def backtrace
+        block, @block = @block, nil
+        @value = block.call if block
+        super
+      end
+    end
+  RUBY
+
   private def skip_unless_platform(platform)
     skip "#{platform} only; this extension was built for #{PLATFORM}" unless PLATFORM == platform
   end

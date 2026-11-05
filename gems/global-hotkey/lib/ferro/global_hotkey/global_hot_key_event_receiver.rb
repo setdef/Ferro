@@ -27,11 +27,12 @@ module Ferro
     # as long as the process, read both ways: try_recv and try_iter never
     # wait, while recv, recv_timeout, and iter wait for the next event with
     # Ruby's global VM lock released, so other threads run, and Ctrl-C,
-    # <tt>Thread#raise</tt>, and +Timeout+ end the wait. An event that
-    # arrives during the wait usually stays in the channel for the next
-    # read; one that arrives at the very moment of the interrupt can be
-    # lost, as the interrupt's exception replaces the value the wait was
-    # returning.
+    # <tt>Thread#raise</tt>, <tt>Thread#kill</tt>, and +Timeout+ end the
+    # wait. An event that arrives during the wait usually stays in the
+    # channel for the next read. One the wait has already taken when the
+    # interrupt raises is discarded with the value the wait was returning,
+    # and cannot be read again, as Ruby's own IO discards what a read took
+    # when an interrupt raises just after it.
     #
     # Every receiver reads the one channel, so a copy (+dup+, +clone+) is
     # the same receiver, frozen like it, and a receiver can be shared with

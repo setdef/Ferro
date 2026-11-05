@@ -18,7 +18,7 @@ global-hotkey = { version = "=0.9.0", features = ["serde", "tracing"] }
 # global-hotkey's own channel crate, for a wait Ruby can interrupt and the
 # handler's channel (plan 004, decisions 5 and 6).
 crossbeam-channel = "0.5"
-magnus = { version = "0.9.3", features = ["bytes"] }
+magnus = { version = "0.9.3", features = ["bytes", "rb-sys"] }
 rb-sys = "0.9.130"
 
 # Each crate states its lints itself instead of inheriting them with

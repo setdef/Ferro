@@ -54,6 +54,29 @@ class TestLinuxEvents < Minitest::Test
     assert_equal press_and_release(id), events
   end
 
+  # A recv begun with an interrupt pending that Ruby will not run yet
+  # waits with the GVL released and returns the event that arrives
+  # (HotkeySuite::WHILE_RAISING). The presser presses only once the reader
+  # sleeps in the wait, so the event shows it ran during the wait; a wait
+  # that held the GVL would never end, and the child would be killed.
+  def test_a_recv_begun_while_raising_with_an_interrupt_pending_returns_the_event
+    (id, outcome), = run_child(<<~RUBY)
+      #{WHILE_RAISING}
+      native = G.const_get(:Native)
+      reader = Thread.current
+      presser = Thread.new do
+        Thread.pass until reader.status == "sleep"
+        press
+      end
+      outcome = WhileRaising.run { Thread.current.wakeup; native.receiver_recv(nil) }
+      presser.join
+      MANAGER.unregister(HOTKEY)
+      [HOTKEY.id, outcome]
+    RUBY
+
+    assert_equal [:ok, [id, :Pressed]], outcome
+  end
+
   def test_an_unregistered_hotkey_sends_nothing
     events, = run_child(<<~RUBY)
       MANAGER.unregister(HOTKEY)

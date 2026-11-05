@@ -25,6 +25,7 @@ its own API. Releases are tagged `ferro-global-hotkey/vX.Y.Z`.
 
 ### Fixed
 
+- `recv`, `recv_timeout`, `iter`, and the `set_event_handler` thread no longer stall every Ruby thread until an event arrives or the timeout passes when started with an interrupt pending that Ruby holds back (as inside a custom `Exception#backtrace`): the gem never waits with the GVL held.
 - `GlobalHotKeyEventReceiver#dup` returns a frozen, Ractor-shareable receiver, as documented.
 - A handler block or an `iter` or `try_iter` consumer block that raises `StopIteration` no longer ends delivery or iteration silently; the exception propagates like any other.
 

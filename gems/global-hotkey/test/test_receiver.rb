@@ -70,6 +70,85 @@ class TestReceiver < Minitest::Test
     assert_equal "stop waiting", message
   end
 
+  def test_thread_kill_ends_recv
+    status, = in_child(<<~RUBY)
+      waiter = Thread.new { Ferro::GlobalHotkey::GlobalHotKeyEvent.receiver.recv }
+      Thread.pass until waiter.status == "sleep"
+      waiter.kill
+      status = waiter.join(5) ? waiter.status : "the kill did not end the wait"
+      $stdout.binmode.write(Marshal.dump(status))
+      $stdout.flush
+      exit!(0)
+    RUBY
+
+    assert_equal false, status
+  end
+
+  # A wait begun with an interrupt pending that Ruby will not run yet
+  # still waits with the GVL released (HotkeySuite::WHILE_RAISING). The
+  # helper marks only while the reader sleeps in the wait, so a mark shows
+  # it ran during the wait; a wait that held the GVL would run it only
+  # after, when the reader no longer sleeps. No event comes here, so the
+  # timeout ends each wait. Nothing ends one sooner (a wakeup only restarts
+  # it, and a raise stays pending), so the waits run in growing steps that
+  # stop at the first mark: a passing run is quick, and the steps total 10 s
+  # of scheduling budget for the helper, which costs wall time only when
+  # the helper never marks.
+  # test_linux_events.rb has the variant an event ends.
+  def test_a_wait_begun_while_raising_with_an_interrupt_pending_releases_the_gvl
+    (ran_during, outcome), = in_child(<<~RUBY)
+      #{WHILE_RAISING}
+      native = Ferro::GlobalHotkey.const_get(:Native)
+      reader = Thread.current
+      ran_during = false
+      helper = Thread.new do
+        Thread.pass until reader.status == "sleep"
+        ran_during = true
+      end
+      outcome = nil
+      [0.5, 1.5, 8].each do |seconds|
+        outcome = WhileRaising.run { Thread.current.wakeup; native.receiver_recv(seconds) }
+        break if ran_during
+      end
+      during = ran_during
+      helper.kill
+      [during, outcome.first(2)]
+    RUBY
+
+    assert ran_during, "no other thread ran while the wait waited"
+    assert_equal [:error, "GlobalHotKeyEventReceiver::RecvTimeoutError::Timeout"], outcome
+  end
+
+  # An interrupt that raises nothing (Thread#wakeup) restarts the wait
+  # with the deadline it began with, so wakeups arriving throughout do
+  # not end the wait early or stretch it (gvl.rs, recv; events.rs,
+  # receiver_recv). The lower bound is the check: a restart that ended
+  # the wait would be too short, one that took a fresh timeout would
+  # never finish before the child limit.
+  def test_wakeups_during_recv_timeout_keep_its_deadline
+    (elapsed, outcome), = in_child(<<~RUBY)
+      reader = Thread.current
+      waker = Thread.new do
+        loop do
+          sleep 0.2
+          reader.wakeup
+        end
+      end
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      outcome = begin
+        Ferro::GlobalHotkey::GlobalHotKeyEvent.receiver.recv_timeout(1)
+      rescue Exception => e
+        e.class.name
+      end
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+      waker.kill
+      [elapsed, outcome]
+    RUBY
+
+    assert_equal "Ferro::GlobalHotkey::GlobalHotKeyEventReceiver::RecvTimeoutError::Timeout", outcome
+    assert_operator elapsed, :>=, 1
+  end
+
   # A timeout too long for an Instant waits forever, as crossbeam's does,
   # rather than overflow (events.rs, deadline), and an interrupt still
   # ends it.
