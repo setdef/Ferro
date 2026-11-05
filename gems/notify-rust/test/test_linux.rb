@@ -49,10 +49,11 @@ class TestLinux < Minitest::Test
     end
   end
 
-  # Sends NotificationClosed for +handle+ with the specification's
-  # +reason+ code, as the server does when a notification expires.
-  private def closed(handle, reason)
-    Server.signal("NotificationClosed", "uint32:#{handle.id}", "uint32:#{reason}")
+  # Sends NotificationClosed for the notification +id+ with the
+  # specification's +reason+ code, as the server does when a notification
+  # expires.
+  private def closed(id, reason)
+    Server.signal("NotificationClosed", "uint32:#{id}", "uint32:#{reason}")
   end
 
   def test_the_server_is_dunst_and_says_what_it_can_do
@@ -201,10 +202,12 @@ class TestLinux < Minitest::Test
 
   # wait_for_action takes the handle (src/xdg/mod.rs:101), so a second
   # wait on it raises IOError before it reaches the server; the second
-  # notification is another handle.
+  # notification is another handle. The signal's id is read before the
+  # wait, as Rust could not read it from a handle moved into the wait.
   def test_wait_for_action_passes_a_named_action_and_closed
     handle = notification("click me").action("clicked_a", "button a").show
-    sender = once_listening { Server.signal("ActionInvoked", "uint32:#{handle.id}", "string:clicked_a") }
+    id = handle.id
+    sender = once_listening { Server.signal("ActionInvoked", "uint32:#{id}", "string:clicked_a") }
     actions = []
     handle.wait_for_action { |action| actions << action }
     sender.join
@@ -242,10 +245,13 @@ class TestLinux < Minitest::Test
     assert_equal [NotifyRust::NotificationResponse::Default], responses
   end
 
+  # on_close takes the handle (src/xdg/mod.rs:269), so the expiry's id is
+  # read before the wait, as Rust could not read it from a moved handle.
   def test_on_close_passes_each_reason
     reasons = []
     expiring = notification("Time is running out").show
-    expiry = once_listening { closed(expiring, 1) }
+    id = expiring.id
+    expiry = once_listening { closed(id, 1) }
     expiring.on_close { |reason| reasons << reason }
     expiry.join
     # The test sent the signal, so dunst still shows the notification;
@@ -299,14 +305,16 @@ class TestLinux < Minitest::Test
 
   # A wait that takes the handle uses it up when it starts, as Rust moves
   # the handle into the call: a setter on another thread meanwhile raises
-  # IOError at once rather than waiting.
+  # IOError at once rather than waiting. The waiter's status is read
+  # before the close, which ends its wait.
   def test_a_setter_during_a_wait_that_takes_the_handle_raises_io_error
     handle = notification("taken").timeout(NotifyRust::Timeout::Never).show
     waiter = nil
     setter = once_listening do
       error = assert_raises(IOError) { handle.summary("changed") }
+      waiting = waiter.status
       Server.run("dunstctl", "close")
-      [error.message, waiter.status]
+      [error.message, waiting]
     end
     waiter = Thread.new { handle.on_close { |reason| reason } }
 
@@ -492,7 +500,11 @@ class TestLinux < Minitest::Test
 
   # An interrupt that ends a Future's wait drops the work, as dropping a
   # Rust future does, and leaves both the borrowed handle and the Future
-  # usable: the next value waits again.
+  # usable: the next value waits again. notify-rust adds its match rules
+  # with AddMatch and never removes them (src/xdg/zbus_rs.rs:135-145;
+  # zbus 5.19.0 src/fdo/dbus.rs:312-314), so the dropped wait's rules stay
+  # on the handle's connection, which the borrow keeps, as they would in
+  # Rust; the next wait adds its own beside them.
   def test_an_interrupted_future_waits_again_on_the_next_value
     handle = notification("never answered").timeout(NotifyRust::Timeout::Never).show
     responses = []
@@ -506,17 +518,7 @@ class TestLinux < Minitest::Test
     waiter.raise(Interrupt)
 
     assert_raises(Interrupt) { waiter.join(5) || flunk("the interrupt did not end the wait") }
-    # The dropped wait's match rule may linger a moment; the next wait
-    # counts from what is left. The bounds are generous, so only a rule
-    # that never goes, or a value that never returns, fails them.
-    gone = 600.times.any? do
-      next true unless Server.listening_since?("NotificationClosed", before)
-
-      sleep 0.05
-      false
-    end
-
-    assert gone, "the interrupted wait's match rule stayed past 30 s"
+    assert Server.listening_since?("NotificationClosed", before), "the dropped wait's match rule stays"
     closer = once_listening { Server.run("dunstctl", "close") }
     again = Thread.new { future.value }
     again.report_on_exception = false
