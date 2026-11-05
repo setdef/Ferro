@@ -313,6 +313,41 @@ pub fn uts46_process(
     })
 }
 
+/// The `ProcessingSuccess` variant named `name` (`src/uts46.rs:403-419`).
+fn processing_success(ruby: &Ruby, name: Symbol) -> Result<ProcessingSuccess, Error> {
+    match name.name()?.as_ref() {
+        "Passthrough" => Ok(ProcessingSuccess::Passthrough),
+        "WroteToSink" => Ok(ProcessingSuccess::WroteToSink),
+        other => Err(unknown(ruby, "ProcessingSuccess", other)),
+    }
+}
+
+/// The `ProcessingError` variant named `name` (`src/uts46.rs:421-433`).
+fn processing_error(ruby: &Ruby, name: Symbol) -> Result<ProcessingError, Error> {
+    match name.name()?.as_ref() {
+        "ValidityError" => Ok(ProcessingError::ValidityError),
+        "SinkError" => Ok(ProcessingError::SinkError),
+        other => Err(unknown(ruby, "ProcessingError", other)),
+    }
+}
+
+/// The `Debug` text of `ProcessingSuccess` variant `name` (`src/uts46.rs:404`),
+/// formatted by Rust.
+pub fn processing_success_debug(ruby: &Ruby, name: Symbol) -> Result<String, Error> {
+    processing_success(ruby, name).map(|value| debug_text(&value))
+}
+
+/// The `Debug` text of `ProcessingError` variant `name` (`src/uts46.rs:422`),
+/// formatted by Rust.
+pub fn processing_error_debug(ruby: &Ruby, name: Symbol) -> Result<String, Error> {
+    processing_error(ruby, name).map(|value| debug_text(&value))
+}
+
+/// `value`'s `Debug` text.
+fn debug_text(value: &impl std::fmt::Debug) -> String {
+    format!("{value:?}")
+}
+
 /// The path, under `Uts46`, of the value or class `outcome` names.
 const fn outcome_name(outcome: Result<ProcessingSuccess, ProcessingError>) -> &'static str {
     match outcome {
@@ -325,7 +360,7 @@ const fn outcome_name(outcome: Result<ProcessingSuccess, ProcessingError>) -> &'
 
 #[cfg(test)]
 mod tests {
-    use super::{outcome_name, refusal};
+    use super::{debug_text, outcome_name, refusal};
     use idna::uts46::{AsciiDenyList, ProcessingError, ProcessingSuccess};
 
     /// The message `AsciiDenyList::new` panics with for `deny_list`.
@@ -348,6 +383,23 @@ mod tests {
         assert_eq!(refusal(""), None);
         assert_eq!(refusal("%#/:<>?@[\\]^|"), None);
         assert!(AsciiDenyList::new(true, "%#/:<>?@[\\]^|") == AsciiDenyList::URL);
+    }
+
+    #[test]
+    fn debug_texts_are_idnas_own() {
+        assert_eq!(debug_text(&ProcessingSuccess::Passthrough), "Passthrough");
+        assert_eq!(debug_text(&ProcessingSuccess::WroteToSink), "WroteToSink");
+        assert_eq!(debug_text(&ProcessingError::ValidityError), "ValidityError");
+        assert_eq!(debug_text(&ProcessingError::SinkError), "SinkError");
+        for success in [
+            ProcessingSuccess::Passthrough,
+            ProcessingSuccess::WroteToSink,
+        ] {
+            assert_eq!(debug_text(&success), format!("{success:?}"));
+        }
+        for error in [ProcessingError::ValidityError, ProcessingError::SinkError] {
+            assert_eq!(debug_text(&error), format!("{error:?}"));
+        }
     }
 
     #[test]

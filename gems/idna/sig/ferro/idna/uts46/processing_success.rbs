@@ -13,7 +13,7 @@ module Ferro
         private def self.new: (Symbol name) -> instance
 
         def initialize: (Symbol name) -> void
-        def inspect: () -> String
+        def debug: () -> String
 
         private
 

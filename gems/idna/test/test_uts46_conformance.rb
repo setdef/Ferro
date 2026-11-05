@@ -11,13 +11,12 @@ require "test_helper"
 # SPDX-SnippetBegin
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-SnippetCopyrightText: 2013-2025 The rust-url developers
-# SPDX-SnippetComment: ported from idna 1.1.0 tests/uts46.rs and
-#   tests/deprecated.rs, over its IdnaTestV2.txt
+# SPDX-SnippetComment: ported from idna 1.1.0 tests/uts46.rs
 #++
 
 # idna's UTS 46 conformance tests, ported: every line of Unicode's
 # IdnaTestV2.txt through Uts46#to_unicode, #to_ascii, and #process with
-# both sinks, and through the deprecated Config, with idna's own skips.
+# both sinks, with idna's own skips.
 #
 # idna 1.1.0 ships IdnaTestV2.txt for Unicode 16.0.0, and the
 # idna_adapter 1.2.2 that Cargo locks reads ICU4X 2.4's newer Unicode
@@ -31,27 +30,6 @@ class TestUts46Conformance < Minitest::Test
 
   # The lines idna's own tests/uts46.rs fails at this lockfile.
   RUST_FAILS_UTS46 = [3386, 4219, 4220, 4405, 5858, 5859, 5860].freeze
-
-  # The lines idna's own tests/deprecated.rs fails at this lockfile.
-  RUST_FAILS_DEPRECATED = [
-    3384,
-    3385,
-    3386,
-    4219,
-    4220,
-    4401,
-    4402,
-    4403,
-    4404,
-    4405,
-    4408,
-    4409,
-    4410,
-    4411,
-    5858,
-    5859,
-    5860,
-].freeze
 
   # One line of IdnaTestV2.txt.
   Line = Data.define(:number, :source, :to_unicode, :to_unicode_status, :to_ascii_n, :to_ascii_n_status,
@@ -161,24 +139,6 @@ class TestUts46Conformance < Minitest::Test
     end
   rescue Uts46::ProcessingError::ValidityError
     [nil, nil]
-  end
-
-  def test_every_line_through_the_deprecated_config
-    config = config_class.default.use_std3_ascii_rules(true).verify_dns_length(true).check_hyphens(true)
-    unicode_ignores = -> (error) { %w[X4_2 V2].include?(error) }
-    ascii_ignores = -> (error) { %w[V2 A4_2].include?(error) }
-    failing = self.class.lines.reject do |line|
-      [
-        check(line.to_unicode, line.to_unicode_status,
-          ok(config.transitional_processing(false).to_unicode(line.source)), unicode_ignores),
-        check(line.to_ascii_n, line.to_ascii_n_status,
-          or_nil { config.transitional_processing(false).to_ascii(line.source) }, ascii_ignores),
-        check(line.to_ascii_t, line.to_ascii_t_status,
-          or_nil { config.transitional_processing(true).to_ascii(line.source) }, ascii_ignores),
-      ].all?
-    end
-
-    assert_equal RUST_FAILS_DEPRECATED, failing.map(&:number)
   end
 end
 

@@ -5,6 +5,7 @@ module Ferro
   module Idna
     class Errors < StandardError
       def initialize: (?String? message) -> void
+      def debug: () -> String
     end
   end
 end

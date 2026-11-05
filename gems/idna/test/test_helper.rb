@@ -50,24 +50,6 @@ module IdnaSuite
     File.read(File.join(crate_dir, "tests", name), encoding: "UTF-8")
   end
 
-  # Names a deprecated constant quietly, since the tests run under -w.
-  private def quietly
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = false
-    yield
-  ensure
-    Warning[:deprecated] = deprecated
-  end
-
-  # The deprecated Config and Idna, named quietly.
-  private def config_class
-    quietly { Idna::Config }
-  end
-
-  private def idna_class
-    quietly { Idna::Idna }
-  end
-
   # Runs +script+ in a fresh Ruby with the gem loaded, and returns the
   # value its last expression marshals to standard output.
   private def in_child(script)

@@ -26,6 +26,9 @@ module Ferro
       # +non_exhaustive+, so a later idna may add more. Variants compare by
       # identity, as idna derives +PartialEq+.
       #
+      # idna derives no +Debug+ for it, so it has no #debug; +inspect+ is
+      # Ruby's.
+      #
       # Mirrors idna's <tt>uts46::ErrorPolicy</tt>
       # (<tt>src/uts46.rs:391-401</tt>).
       #
@@ -42,15 +45,6 @@ module Ferro
         def initialize(name)
           @name = name
           freeze
-        end
-
-        # The constant that holds this variant.
-        #
-        # === Example
-        #
-        #   Ferro::Idna::Uts46::ErrorPolicy::FailFast.inspect # => "Ferro::Idna::Uts46::ErrorPolicy::FailFast"
-        def inspect
-          "Ferro::Idna::Uts46::ErrorPolicy::#{@name}"
         end
 
         # The variant's name, for the native layer.

@@ -28,9 +28,8 @@ module Ferro
     # an instance rather than raising one, beside text that marks each
     # error with U+FFFD.
     #
-    # A panic inside idna raises this class too, with the message
-    # <tt>idna panicked: ...</tt>, which would otherwise end the Ruby
-    # process.
+    # Only what idna returns raises this class. A panic inside idna raises
+    # Error, with the message <tt>idna panicked: ...</tt>.
     #
     # Mirrors idna's +Errors+ (<tt>src/lib.rs:63-84</tt>).
     #
@@ -55,6 +54,18 @@ module Ferro
       #   Ferro::Idna::Errors.new.message # => "Errors"
       def initialize(message = nil)
         super(message || "Errors")
+      end
+
+      # idna's +Debug+ text for an +Errors+, <tt>Errors</tt>, which Rust
+      # formats. Whatever the message, an +Errors+ is idna's one value.
+      # +inspect+ stays Ruby's. Mirrors idna's <tt>#[derive(Debug)]</tt>
+      # on +Errors+ (<tt>src/lib.rs:64</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Idna::Errors.new.debug # => "Errors"
+      def debug
+        Native.errors_debug
       end
     end
 

@@ -104,17 +104,18 @@ The API is idna's, translated where Rust has no Ruby meaning:
   gets each label and the TLD as Strings.
 * A Rust +char+ is a one-character String: Punycode.decode returns an
   Array of them, as String#chars does, and Punycode.encode takes one.
-* The deprecated Config and Idna warn in Ruby's <tt>:deprecated</tt>
-  category. A Config is a frozen value whose setters return a new one,
-  as Rust's do on a +Copy+ value.
+* idna's deprecated +Config+ and +Idna+ are not bound.
+* A type that implements +Debug+ in idna (+Errors+, +ProcessingSuccess+,
+  +ProcessingError+) has +debug+, which answers idna's +Debug+ text as
+  Rust formats it; +inspect+ stays Ruby's.
 
 What differs from calling idna from Rust:
 
 * idna panics for an AsciiDenyList that names a letter, a digit, a hyphen,
-  a dot, or non-ASCII, and for <tt>use_idna_2008_rules(true)</tt>. The gem
-  raises +ArgumentError+ with idna's message instead. Any other panic
-  inside idna raises Ferro::Idna::Errors with <tt>idna panicked: ...</tt>
-  rather than ending your Ruby process.
+  a dot, or non-ASCII. The gem raises +ArgumentError+ with idna's message
+  instead. Any other panic inside idna raises Ferro::Idna::Error (not
+  +Errors+) with <tt>idna panicked: ...</tt> rather than ending your Ruby
+  process.
 * +verify_dns_length+ asserts its argument is ASCII only in debug builds.
   The gem is a release build, so it answers for any String.
 

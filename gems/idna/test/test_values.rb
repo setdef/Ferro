@@ -8,8 +8,8 @@
 require "test_helper"
 
 # What the binding adds around idna's functions: deny lists, enum values,
-# the Result-in-a-tuple pairs, callbacks, sinks, the deprecated API's
-# values, and the refusals of inputs idna panics on (plan 006).
+# the Result-in-a-tuple pairs, callbacks, sinks, Debug texts, and the
+# refusals of inputs idna panics on (plan 006).
 class TestValues < Minitest::Test
   include IdnaSuite
 
@@ -82,13 +82,57 @@ class TestValues < Minitest::Test
   end
 
   def test_enum_values_are_frozen_constants
-    assert_equal "Ferro::Idna::Uts46::Hyphens::CheckFirstLast", Uts46::Hyphens::CheckFirstLast.inspect
-    assert_equal "Ferro::Idna::Uts46::DnsLength::VerifyAllowRootDot", Uts46::DnsLength::VerifyAllowRootDot.inspect
-    assert_equal "Ferro::Idna::Uts46::ErrorPolicy::MarkErrors", Uts46::ErrorPolicy::MarkErrors.inspect
-    assert_equal "Ferro::Idna::Uts46::ProcessingSuccess::WroteToSink", Uts46::ProcessingSuccess::WroteToSink.inspect
     assert_predicate Uts46::Hyphens::Allow, :frozen?
     assert_raises(NoMethodError) { Uts46::Hyphens.new(:Allow) }
     refute_equal Uts46::Hyphens::Allow, Uts46::Hyphens::Check
+  end
+
+  def test_inspect_stays_rubys_and_names_the_class
+    [
+      Uts46::Hyphens::CheckFirstLast,
+      Uts46::DnsLength::Verify,
+      Uts46::ErrorPolicy::MarkErrors,
+      Uts46::ProcessingSuccess::WroteToSink,
+      Idna::Errors.new,
+      Uts46::ProcessingError::ValidityError.new,
+].each do |value|
+      assert_match(/\A#<#{Regexp.escape(value.class.name)}[ :]/, value.inspect)
+    end
+  end
+
+  # Each of these is the crate's Debug text, computed by Rust (the Rust
+  # tests in ext/ferro_idna/src pin the same strings against idna).
+  def test_debug_is_idnas_debug_text
+    assert_equal "Errors", Idna::Errors.new.debug
+    assert_equal "Errors", Idna::Errors.new("other").debug
+    assert_equal "Passthrough", Uts46::ProcessingSuccess::Passthrough.debug
+    assert_equal "WroteToSink", Uts46::ProcessingSuccess::WroteToSink.debug
+    assert_equal "ValidityError", Uts46::ProcessingError::ValidityError.new.debug
+    assert_equal "SinkError", Uts46::ProcessingError::SinkError.new("other").debug
+  end
+
+  def test_a_type_without_debug_in_idna_has_no_debug
+    [
+      Uts46::Hyphens::Allow,
+      Uts46::DnsLength::Ignore,
+      Uts46::ErrorPolicy::FailFast,
+      Uts46::AsciiDenyList::URL,
+      Uts46::Uts46.new,
+      Uts46::ProcessingError.new,
+].each do |value|
+      refute_respond_to value, :debug
+    end
+  end
+
+  def test_the_deprecated_api_is_not_bound
+    refute Idna.const_defined?(:Config, false)
+    refute Idna.const_defined?(:Idna, false)
+  end
+
+  def test_a_caught_panic_raises_the_gems_base_error_not_the_crates
+    assert_operator Idna::Error, :<, StandardError
+    refute_operator Idna::Errors, :<, Idna::Error
+    refute_operator Idna::Error, :<, Idna::Errors
   end
 
   def test_each_option_reaches_idna
@@ -209,57 +253,6 @@ class TestValues < Minitest::Test
   def test_uts46_is_a_frozen_default
     assert_predicate Uts46::Uts46.new, :frozen?
     assert_instance_of Uts46::Uts46, Uts46::Uts46.default
-  end
-
-  def test_config_setters_return_a_new_config_and_keep_the_receiver
-    base = config_class.default
-    strict = base.use_std3_ascii_rules(true)
-
-    refute_same base, strict
-    assert_predicate strict, :frozen?
-    assert_equal "a_b.example", base.to_ascii("a_b.example")
-    assert_raises(Idna::Errors) { strict.to_ascii("a_b.example") }
-    assert_same base, base.use_idna_2008_rules(false)
-    assert_equal ["☕.example", nil], base.to_unicode("xn--53h.example")
-    assert_raises(NoMethodError) { config_class.new(false, false, false, false) }
-  end
-
-  def test_use_idna_2008_rules_true_raises_idnas_message
-    error = assert_raises(ArgumentError) { config_class.default.use_idna_2008_rules(true) }
-
-    assert_equal "IDNA 2008 rules are no longer supported", error.message
-  end
-
-  def test_idna_appends_to_out_and_checks_its_whole_length
-    out = +"host: "
-
-    assert_nil idna_class.default.to_ascii("☕.example", out)
-    assert_equal "host: xn--53h.example", out
-
-    long = +("a" * 250)
-    checking = idna_class.new(config_class.default.verify_dns_length(true))
-    assert_raises(Idna::Errors) { checking.to_ascii("ü.example", long) }
-    assert_equal "#{'a' * 250}xn--tda.example", long
-  end
-
-  def test_idna_to_unicode_marks_errors_in_out
-    out = +""
-
-    assert_raises(Idna::Errors) { idna_class.default.to_unicode("xn--a.example", out) }
-    assert_equal "�.example", out
-    assert_raises(FrozenError) { idna_class.default.to_unicode("a", "frozen") }
-    assert_raises(TypeError) { idna_class.new(:config) }
-  end
-
-  def test_the_deprecated_constants_warn
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = true
-    _, warnings = capture_io { [Idna::Config, Idna::Idna] }
-
-    assert_match "constant Ferro::Idna::Config is deprecated", warnings
-    assert_match "constant Ferro::Idna::Idna is deprecated", warnings
-  ensure
-    Warning[:deprecated] = deprecated
   end
 
   def test_errors_defaults_to_idnas_message

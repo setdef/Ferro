@@ -26,6 +26,9 @@ module Ferro
       # enum +non_exhaustive+, so a later idna may add more. Variants
       # compare by identity, as idna derives +PartialEq+.
       #
+      # idna derives no +Debug+ for it, so it has no #debug; +inspect+ is
+      # Ruby's.
+      #
       # Mirrors idna's <tt>uts46::DnsLength</tt>
       # (<tt>src/uts46.rs:378-389</tt>).
       #
@@ -44,15 +47,6 @@ module Ferro
         def initialize(name)
           @name = name
           freeze
-        end
-
-        # The constant that holds this variant.
-        #
-        # === Example
-        #
-        #   Ferro::Idna::Uts46::DnsLength::Ignore.inspect # => "Ferro::Idna::Uts46::DnsLength::Ignore"
-        def inspect
-          "Ferro::Idna::Uts46::DnsLength::#{@name}"
         end
 
         # The variant's name, for the native layer.

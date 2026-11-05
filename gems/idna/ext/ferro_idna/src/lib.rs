@@ -6,16 +6,15 @@
 //! Ruby owns the public API (`lib/ferro/idna`). The functions here live on
 //! `Ferro::Idna::Native`, a private module, beside `Native::AsciiDenyList`,
 //! which holds one of idna's deny lists. Enum values cross as their
-//! variant names, and a deprecated `Config` as its four flags.
+//! variant names.
 //!
 //! No panic reaches magnus, which would turn it into Ruby's uncatchable
 //! `fatal` (magnus 0.9.3 `src/error.rs:292-296`): every call into idna
-//! runs under `catch_unwind` and raises `Ferro::Idna::Errors` instead, and
+//! runs under `catch_unwind` and raises `Ferro::Idna::Error` instead, and
 //! the inputs idna is known to panic on are refused first (plan 006,
 //! decisions 7, 8, and 15).
 
 mod callback;
-mod deprecated;
 mod uts46;
 
 use std::any::Any;
@@ -47,7 +46,7 @@ fn panic_message(payload: &(dyn Any + Send)) -> String {
         .unwrap_or_else(|| "Box<dyn Any>".to_owned())
 }
 
-/// The message of the `Errors` a panic raises (plan 006, decision 3).
+/// The message of the `Error` a panic raises (plan 006, decision 3).
 pub(crate) fn panicked(panic: &Panic) -> String {
     format!("idna panicked: {}", panic.0)
 }
@@ -78,12 +77,31 @@ pub(crate) fn errors(ruby: &Ruby, error: &idna::Errors) -> Error {
     raise(ruby, "Errors", error.to_string())
 }
 
-/// Runs `operation` under `catch_unwind`, raising `Errors` for a panic.
+/// The class a caught panic raises, under `Ferro::Idna`: the gem's base
+/// `Error`, never the crate's `Errors`, which idna's own results raise
+/// (ADR 001, 2026-11-05, the error rule).
+pub(crate) const PANIC_CLASS: &str = "Error";
+
+/// `Errors`' `Debug` text (`src/lib.rs:64`), formatted by Rust so Ruby's
+/// `Errors#debug` cannot drift from it.
+pub(crate) fn errors_debug() -> String {
+    format!("{:?}", idna::Errors::default())
+}
+
+/// The class path and message of the exception a caught panic raises.
+pub(crate) fn panic_exception(panic: &Panic) -> (&'static str, String) {
+    (PANIC_CLASS, panicked(panic))
+}
+
+/// Runs `operation` under `catch_unwind`, raising `Error` for a panic.
 pub(crate) fn guarded<T>(
     ruby: &Ruby,
     operation: impl FnOnce() -> Result<T, Error>,
 ) -> Result<T, Error> {
-    capture(operation).unwrap_or_else(|panic| Err(raise(ruby, "Errors", panicked(&panic))))
+    capture(operation).unwrap_or_else(|panic| {
+        let (path, message) = panic_exception(&panic);
+        Err(raise(ruby, path, message))
+    })
 }
 
 #[magnus::init]
@@ -161,23 +179,21 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     )?;
     native.define_singleton_method("uts46_process", function!(uts46::uts46_process, 6))?;
 
+    native.define_singleton_method("errors_debug", function!(errors_debug, 0))?;
     native.define_singleton_method(
-        "config_use_idna_2008_rules",
-        function!(deprecated::config_use_idna_2008_rules, 1),
+        "processing_success_debug",
+        function!(uts46::processing_success_debug, 1),
     )?;
-    native.define_singleton_method("config_to_ascii", function!(deprecated::config_to_ascii, 2))?;
     native.define_singleton_method(
-        "config_to_unicode",
-        function!(deprecated::config_to_unicode, 2),
+        "processing_error_debug",
+        function!(uts46::processing_error_debug, 1),
     )?;
-    native.define_singleton_method("idna_to_ascii", function!(deprecated::idna_to_ascii, 3))?;
-    native.define_singleton_method("idna_to_unicode", function!(deprecated::idna_to_unicode, 3))?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{capture, panicked, Panic};
+    use super::{capture, errors_debug, panic_exception, panicked, Panic};
 
     #[test]
     fn capture_passes_values_through() {
@@ -203,6 +219,27 @@ mod tests {
     }
 
     #[test]
+    fn a_panic_raises_the_gems_base_error_not_the_crates() {
+        let str_panic = capture::<()>(|| panic!("boom")).unwrap_err();
+        assert_eq!(
+            panic_exception(&str_panic),
+            ("Error", "idna panicked: boom".to_owned())
+        );
+        let string_panic = capture::<()>(|| {
+            panic!(
+                "{} {}",
+                std::hint::black_box("bad"),
+                std::hint::black_box(7)
+            )
+        })
+        .unwrap_err();
+        assert_eq!(
+            panic_exception(&string_panic),
+            ("Error", "idna panicked: bad 7".to_owned())
+        );
+    }
+
+    #[test]
     fn a_panic_reads_as_idnas() {
         assert_eq!(panicked(&Panic("boom".to_owned())), "idna panicked: boom");
     }
@@ -216,6 +253,12 @@ mod tests {
     #[test]
     fn errors_displays_its_debug_text() {
         assert_eq!(idna::Errors::default().to_string(), "Errors");
+    }
+
+    #[test]
+    fn errors_debug_is_idnas_debug_text() {
+        assert_eq!(errors_debug(), "Errors");
+        assert_eq!(errors_debug(), format!("{:?}", idna::Errors::default()));
     }
 
     // SPDX-SnippetEnd

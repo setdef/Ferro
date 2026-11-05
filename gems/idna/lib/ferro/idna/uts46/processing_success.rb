@@ -46,13 +46,16 @@ module Ferro
           freeze
         end
 
-        # The constant that holds this variant.
+        # idna's +Debug+ text for this variant, which Rust formats: the
+        # variant's name. +inspect+ stays Ruby's. Mirrors idna's
+        # <tt>#[derive(Debug)]</tt> on +ProcessingSuccess+
+        # (<tt>src/uts46.rs:404</tt>).
         #
         # === Example
         #
-        #   Ferro::Idna::Uts46::ProcessingSuccess::Passthrough.inspect # => "Ferro::Idna::Uts46::ProcessingSuccess::Passthrough"
-        def inspect
-          "Ferro::Idna::Uts46::ProcessingSuccess::#{@name}"
+        #   Ferro::Idna::Uts46::ProcessingSuccess::Passthrough.debug # => "Passthrough"
+        def debug
+          Native.processing_success_debug(@name)
         end
 
         # The variant's name, for the native layer.

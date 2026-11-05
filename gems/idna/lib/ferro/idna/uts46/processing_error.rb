@@ -62,6 +62,18 @@ module Ferro
           def initialize(message = nil)
             super(message || "ValidityError")
           end
+
+          # idna's +Debug+ text for this variant, which Rust formats:
+          # <tt>ValidityError</tt>. +inspect+ stays Ruby's. Mirrors idna's
+          # <tt>#[derive(Debug)]</tt> on +ProcessingError+
+          # (<tt>src/uts46.rs:422</tt>).
+          #
+          # === Example
+          #
+          #   Ferro::Idna::Uts46::ProcessingError::ValidityError.new.debug # => "ValidityError"
+          def debug
+            Native.processing_error_debug(:ValidityError)
+          end
         end
 
         # The sink failed. The partial output written to the sinks must not
@@ -84,6 +96,18 @@ module Ferro
           #   Ferro::Idna::Uts46::ProcessingError::SinkError.new
           def initialize(message = nil)
             super(message || "SinkError")
+          end
+
+          # idna's +Debug+ text for this variant, which Rust formats:
+          # <tt>SinkError</tt>. +inspect+ stays Ruby's. Mirrors idna's
+          # <tt>#[derive(Debug)]</tt> on +ProcessingError+
+          # (<tt>src/uts46.rs:422</tt>).
+          #
+          # === Example
+          #
+          #   Ferro::Idna::Uts46::ProcessingError::SinkError.new.debug # => "SinkError"
+          def debug
+            Native.processing_error_debug(:SinkError)
           end
         end
       end

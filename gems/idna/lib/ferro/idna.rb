@@ -7,12 +7,11 @@
 
 require_relative "idna/version"
 require_relative "idna/ferro_idna"
+require_relative "idna/error"
 require_relative "idna/errors"
 require_relative "idna/arguments"
 require_relative "idna/uts46"
 require_relative "idna/punycode"
-require_relative "idna/config"
-require_relative "idna/idna"
 
 # Gems that bind Rust crates to Ruby one to one.
 #

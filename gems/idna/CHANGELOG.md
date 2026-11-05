@@ -12,6 +12,20 @@ own API. Releases are tagged `ferro-idna/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `debug` on `Errors`, `Uts46::ProcessingSuccess` variants, and `Uts46::ProcessingError` variants, answering idna's `Debug` text as Rust formats it.
+- `Ferro::Idna::Error`, raised for a panic inside idna.
+
+### Changed
+
+- `inspect` on `Hyphens`, `DnsLength`, `ErrorPolicy`, and `ProcessingSuccess` values is Ruby's default, naming the class, instead of the constant path.
+- A panic inside idna raises `Error` ("idna panicked: ..."), not `Errors`, which is raised only for what idna returns.
+
+### Removed
+
+- The deprecated `Config` and `Idna`, which idna marks `#[deprecated]`.
+
 ## [0.1.0.pre.1] - 2026-10-27
 
 ### Added

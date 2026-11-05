@@ -7,10 +7,12 @@ module Ferro
       class ProcessingError < StandardError
         class ValidityError < ProcessingError
           def initialize: (?String? message) -> void
+          def debug: () -> String
         end
 
         class SinkError < ProcessingError
           def initialize: (?String? message) -> void
+          def debug: () -> String
         end
       end
     end
