@@ -34,6 +34,15 @@ module Ferro
     # the Ruby process. The inputs time is known to panic on raise
     # +RangeError+ with time's message before time runs.
     #
+    # Because the classes nest as Rust's enums do, one failure can reach
+    # Ruby as more than one class: a component out of range is
+    # Error::ComponentRange from a constructor, but
+    # Error::Parse::TryFromParsed::ComponentRange from a parse. time's
+    # +From+ and +TryFrom+ conversions between its error types relate
+    # them (ComponentRange.try_from, TryFromParsed.try_from,
+    # ParseFromDescription.try_from, Parse.from, Format.from,
+    # TryFromParsed.from), and #source names the error one holds.
+    #
     # Mirrors time's +Error+ (<tt>src/error/mod.rs:40-132</tt>).
     #
     # === Examples
@@ -49,6 +58,46 @@ module Ferro
       # [message] String, or +nil+ for the class name.
       def initialize(message = nil)
         super
+      end
+
+      # Raises NoMethodError, worded as Ruby words a missing class method,
+      # unless the receiver is +owner+. time's conversions exist on the
+      # enum type only, never on a variant, so a variant class, which
+      # inherits the method here, refuses it.
+      def self.refuse_unless_enum(owner, name)
+        return if equal?(owner)
+
+        raise NoMethodError.new("undefined method '#{name}' for class '#{self}'", name, receiver: self) # steep:ignore ArgumentTypeMismatch
+      end
+      private_class_method :refuse_unless_enum
+
+      # The error this one holds, as its own top-level class, or +nil+
+      # when it holds none. Mirrors time's <tt>Error::source</tt>
+      # (<tt>src/error/mod.rs:109-132</tt>, <tt>format.rs:82-91</tt>,
+      # <tt>parse.rs:41-51</tt>, <tt>try_from_parsed.rs:50-58</tt>).
+      #
+      # Error::Format::ComponentRange and
+      # Error::TryFromParsed::ComponentRange hold an Error::ComponentRange,
+      # and each error under Error::Parse holds its twin under
+      # Error::TryFromParsed or Error::ParseFromDescription; each answers a
+      # new error each call. Every other error answers +nil+. A direct
+      # variant of +Error+, such as Error::ComponentRange, is one class for
+      # Rust's variant and the type it holds (plan 007, decision 14), so it
+      # answers +nil+, the type's own source, where Rust's
+      # <tt>Error::ComponentRange(e).source()</tt> would answer +e+.
+      # Error::Format::StdIo holds a <tt>std::io::Error</tt>, which has no
+      # Ruby value here, so it answers +nil+ too.
+      #
+      # === Example
+      #
+      #   begin
+      #     Ferro::Time::Date.parse("2019-02-30", Ferro::Time::FormatDescription::WellKnown::Iso8601::DATE)
+      #   rescue Ferro::Time::Error::Parse => e
+      #     e.source.class # => Ferro::Time::Error::TryFromParsed::ComponentRange
+      #     e.source.source.class # => Ferro::Time::Error::ComponentRange
+      #   end
+      def source
+        nil
       end
 
       # An error type indicating that a conversion failed because the
@@ -90,6 +139,35 @@ module Ferro
       #     [e.name, e.is_conditional] # => ["day", true]
       #   end
       class ComponentRange < Error
+        # The ComponentRange +error+ holds: +error+ itself, or a new one
+        # with the name and conditionality of an
+        # Error::Format::ComponentRange or
+        # Error::TryFromParsed::ComponentRange. Any other Error raises
+        # DifferentVariant, and anything else +TypeError+.
+        #
+        # Mirrors time's <tt>TryFrom<Error></tt>, <tt>TryFrom<Format></tt>,
+        # and <tt>TryFrom<TryFromParsed></tt> for +ComponentRange+
+        # (<tt>src/error/component_range.rs:66-76</tt>,
+        # <tt>format.rs:58-68</tt>, <tt>try_from_parsed.rs:38-48</tt>). A
+        # Ruby error is both its Rust type and the +Error+ variant that
+        # holds it, so a nested ComponentRange converts from its own type,
+        # which succeeds, rather than as an +Error+, which would not.
+        #
+        # [error] Error.
+        #
+        # === Example
+        #
+        #   held = Ferro::Time::Error::TryFromParsed::ComponentRange.new("day", true)
+        #   Ferro::Time::Error::ComponentRange.try_from(held).message # => "day was not in range"
+        def self.try_from(error)
+          case error
+          when ComponentRange then error
+          when Format::ComponentRange, TryFromParsed::ComponentRange then new(error.name, error.is_conditional)
+          when Error then raise DifferentVariant
+          else raise TypeError, "no implicit conversion of #{error.class} into Ferro::Time::Error"
+          end
+        end
+
         # The name of the component whose value was out of range.
         attr_reader :name
 
@@ -131,9 +209,11 @@ module Ferro
       # original value was of a different variant.
       #
       # Mirrors time's <tt>error::DifferentVariant</tt>
-      # (<tt>src/error/different_variant.rs</tt>). Its only sources are the
-      # conversions between time's error types, which Ruby's +rescue+ and
-      # +is_a?+ replace (plan 007, decision 14), so nothing raises it.
+      # (<tt>src/error/different_variant.rs</tt>). Raised by
+      # FormatDescription::Component.try_from for a format item that is not
+      # a component, and by the conversions between time's error types
+      # (ComponentRange.try_from, TryFromParsed.try_from,
+      # ParseFromDescription.try_from) for an error of another variant.
       #
       # === Example
       #
@@ -179,6 +259,28 @@ module Ferro
       #   hour = Ferro::Time::FormatDescription.parse_owned(3, "[hour]")
       #   Ferro::Time::Date::MIN.format(hour) # raises Ferro::Time::Error::Format::InsufficientTypeInformation
       class Format < Error
+        # An Error::Format::ComponentRange with the name and conditionality
+        # of +component_range+. Anything else raises +TypeError+.
+        #
+        # Mirrors time's <tt>From<ComponentRange> for Format</tt>
+        # (<tt>src/error/format.rs:44-49</tt>). Its
+        # <tt>From<std::io::Error></tt> has no Ruby value to take.
+        #
+        # [component_range] Error::ComponentRange.
+        #
+        # === Example
+        #
+        #   range = Ferro::Time::Error::ComponentRange.new("hour", false)
+        #   Ferro::Time::Error::Format.from(range).class # => Ferro::Time::Error::Format::ComponentRange
+        def self.from(component_range)
+          refuse_unless_enum(Format, :from)
+          unless component_range.is_a?(Error::ComponentRange)
+            raise TypeError, "no implicit conversion of #{component_range.class} into Ferro::Time::Error::ComponentRange"
+          end
+
+          ComponentRange.new(component_range.name, component_range.is_conditional)
+        end
+
         # The type being formatted does not contain sufficient information
         # to format a component.
         #
@@ -239,6 +341,17 @@ module Ferro
             @is_conditional = is_conditional
             super("#{name} was not in range")
           end
+
+          # The Error::ComponentRange this holds, as time's
+          # <tt>Format::source</tt> answers it (<tt>src/error/format.rs:82-91</tt>).
+          #
+          # === Example
+          #
+          #   Ferro::Time::Error::Format::ComponentRange.new("year", false).source.class
+          #   # => Ferro::Time::Error::ComponentRange
+          def source
+            Error::ComponentRange.new(name, is_conditional)
+          end
         end
 
         # A value of <tt>std::io::Error</tt> was returned internally. The
@@ -272,6 +385,36 @@ module Ferro
       #   Ferro::Time::Error::ParseFromDescription::InvalidComponent.new("year").message
       #   # => "the 'year' component could not be parsed"
       class ParseFromDescription < Error
+        # The ParseFromDescription +error+ holds: +error+ itself, or the
+        # twin of an Error::Parse::ParseFromDescription, the same variant
+        # with the same fields. Any other Error raises DifferentVariant,
+        # and anything else +TypeError+.
+        #
+        # Mirrors time's <tt>TryFrom<Error></tt> and <tt>TryFrom<Parse></tt>
+        # for +ParseFromDescription+
+        # (<tt>src/error/parse_from_description.rs:45-55</tt>,
+        # <tt>parse.rs:79-89</tt>).
+        #
+        # [error] Error.
+        #
+        # === Example
+        #
+        #   held = Ferro::Time::Error::Parse::ParseFromDescription::InvalidComponent.new("year")
+        #   Ferro::Time::Error::ParseFromDescription.try_from(held).class
+        #   # => Ferro::Time::Error::ParseFromDescription::InvalidComponent
+        def self.try_from(error)
+          refuse_unless_enum(ParseFromDescription, :try_from)
+          case error
+          when ParseFromDescription then error
+          when Parse::ParseFromDescription::InvalidLiteral then InvalidLiteral.new
+          when Parse::ParseFromDescription::InvalidComponent then InvalidComponent.new(error.name)
+          when Parse::ParseFromDescription::UnexpectedTrailingCharacters then UnexpectedTrailingCharacters.new
+          when Parse::ParseFromDescription then ParseFromDescription.new(error.message)
+          when Error then raise DifferentVariant
+          else raise TypeError, "no implicit conversion of #{error.class} into Ferro::Time::Error"
+          end
+        end
+
         # A string literal was not what was expected.
         #
         # === Example
@@ -335,6 +478,58 @@ module Ferro
       #
       #   Ferro::Time::Error::TryFromParsed::ComponentRange.new("hour", false).message # => "hour was not in range"
       class TryFromParsed < Error
+        # The TryFromParsed +error+ holds: +error+ itself, or the twin of an
+        # Error::Parse::TryFromParsed, the same variant with the same
+        # fields. Any other Error raises DifferentVariant, and anything
+        # else +TypeError+.
+        #
+        # Mirrors time's <tt>TryFrom<Error></tt> and <tt>TryFrom<Parse></tt>
+        # for +TryFromParsed+ (<tt>src/error/try_from_parsed.rs:67-77</tt>,
+        # <tt>parse.rs:60-70</tt>).
+        #
+        # [error] Error.
+        #
+        # === Example
+        #
+        #   begin
+        #     Ferro::Time::Date.parse("2021-02-30", Ferro::Time::FormatDescription.parse_owned(3, "[year]-[month]-[day]"))
+        #   rescue Ferro::Time::Error::Parse => e
+        #     Ferro::Time::Error::TryFromParsed.try_from(e).class # => Ferro::Time::Error::TryFromParsed::ComponentRange
+        #   end
+        def self.try_from(error)
+          refuse_unless_enum(TryFromParsed, :try_from)
+          case error
+          when TryFromParsed then error
+          when Parse::TryFromParsed::InsufficientInformation then InsufficientInformation.new
+          when Parse::TryFromParsed::ComponentRange then ComponentRange.new(error.name, error.is_conditional)
+          when Parse::TryFromParsed then TryFromParsed.new(error.message)
+          when Error then raise DifferentVariant
+          else raise TypeError, "no implicit conversion of #{error.class} into Ferro::Time::Error"
+          end
+        end
+
+        # An Error::TryFromParsed::ComponentRange with the name and
+        # conditionality of +component_range+. Anything else raises
+        # +TypeError+.
+        #
+        # Mirrors time's <tt>From<ComponentRange> for TryFromParsed</tt>
+        # (<tt>src/error/try_from_parsed.rs:31-36</tt>).
+        #
+        # [component_range] Error::ComponentRange.
+        #
+        # === Example
+        #
+        #   range = Ferro::Time::Error::ComponentRange.new("hour", false)
+        #   Ferro::Time::Error::TryFromParsed.from(range).class # => Ferro::Time::Error::TryFromParsed::ComponentRange
+        def self.from(component_range)
+          refuse_unless_enum(TryFromParsed, :from)
+          unless component_range.is_a?(Error::ComponentRange)
+            raise TypeError, "no implicit conversion of #{component_range.class} into Ferro::Time::Error::ComponentRange"
+          end
+
+          ComponentRange.new(component_range.name, component_range.is_conditional)
+        end
+
         # The +Parsed+ struct did not include enough information to
         # construct the type.
         #
@@ -373,6 +568,18 @@ module Ferro
             @is_conditional = is_conditional
             super("#{name} was not in range")
           end
+
+          # The Error::ComponentRange this holds, as time's
+          # <tt>TryFromParsed::source</tt> answers it
+          # (<tt>src/error/try_from_parsed.rs:50-58</tt>).
+          #
+          # === Example
+          #
+          #   Ferro::Time::Error::TryFromParsed::ComponentRange.new("hour", false).source.class
+          #   # => Ferro::Time::Error::ComponentRange
+          def source
+            Error::ComponentRange.new(name, is_conditional)
+          end
         end
       end
 
@@ -395,6 +602,42 @@ module Ferro
       #     e.message # => "day was not in range"
       #   end
       class Parse < Error
+        # The Parse variant that holds +error+: the twin under
+        # Error::Parse::TryFromParsed of an Error::TryFromParsed, or under
+        # Error::Parse::ParseFromDescription of an
+        # Error::ParseFromDescription, the same variant with the same
+        # fields. An Error::Parse is returned as it is, as Rust's
+        # <tt>From<T> for T</tt> does. Anything else raises +TypeError+.
+        #
+        # Mirrors time's <tt>From<TryFromParsed></tt> and
+        # <tt>From<ParseFromDescription></tt> for +Parse+
+        # (<tt>src/error/parse.rs:53-58</tt>, <tt>:72-77</tt>).
+        #
+        # [error] Error::TryFromParsed or Error::ParseFromDescription.
+        #
+        # === Example
+        #
+        #   insufficient = Ferro::Time::Error::TryFromParsed::InsufficientInformation.new
+        #   Ferro::Time::Error::Parse.from(insufficient).class
+        #   # => Ferro::Time::Error::Parse::TryFromParsed::InsufficientInformation
+        def self.from(error)
+          refuse_unless_enum(Parse, :from)
+          return error if error.is_a?(Parse)
+
+          case error
+          when Error::TryFromParsed::InsufficientInformation then TryFromParsed::InsufficientInformation.new
+          when Error::TryFromParsed::ComponentRange
+            TryFromParsed::ComponentRange.new(error.name, error.is_conditional)
+          when Error::TryFromParsed then TryFromParsed.new(error.message)
+          when Error::ParseFromDescription::InvalidLiteral then ParseFromDescription::InvalidLiteral.new
+          when Error::ParseFromDescription::InvalidComponent then ParseFromDescription::InvalidComponent.new(error.name)
+          when Error::ParseFromDescription::UnexpectedTrailingCharacters
+            ParseFromDescription::UnexpectedTrailingCharacters.new
+          when Error::ParseFromDescription then ParseFromDescription.new(error.message)
+          else raise TypeError, "no implicit conversion of #{error.class} into Ferro::Time::Error::Parse"
+          end
+        end
+
         # The input matched the description but described a value the
         # type cannot hold, or not enough of one.
         #
@@ -403,6 +646,18 @@ module Ferro
         #   year = Ferro::Time::FormatDescription.parse_owned(3, "[year]")
         #   Ferro::Time::Date.parse("2020", year) # raises Ferro::Time::Error::Parse::TryFromParsed::InsufficientInformation
         class TryFromParsed < Parse
+          # The Error::TryFromParsed this holds, the same variant with the
+          # same fields, as time's <tt>Parse::source</tt> answers it
+          # (<tt>src/error/parse.rs:41-51</tt>).
+          #
+          # === Example
+          #
+          #   Ferro::Time::Error::Parse::TryFromParsed::InsufficientInformation.new.source.class
+          #   # => Ferro::Time::Error::TryFromParsed::InsufficientInformation
+          def source
+            Error::TryFromParsed.try_from(self)
+          end
+
           # The parsed input did not include enough information to
           # construct the type.
           #
@@ -452,6 +707,17 @@ module Ferro
         #   Ferro::Time::Date.parse("x", Ferro::Time::FormatDescription::WellKnown::Iso8601::DATE)
         #   # raises Ferro::Time::Error::Parse::ParseFromDescription::InvalidComponent
         class ParseFromDescription < Parse
+          # The Error::ParseFromDescription this holds, the same variant
+          # with the same fields, as time's <tt>Parse::source</tt> answers
+          # it (<tt>src/error/parse.rs:41-51</tt>).
+          #
+          # === Example
+          #
+          #   Ferro::Time::Error::Parse::ParseFromDescription::InvalidComponent.new("year").source.name # => "year"
+          def source
+            Error::ParseFromDescription.try_from(self)
+          end
+
           # A string literal was not what was expected.
           #
           # === Example

@@ -54,6 +54,26 @@ class TestParsed < Minitest::Test
     assert_raises(Ractor::Error) { Ractor.make_shareable(Parsed.new) }
   end
 
+  # The native layer refuses a frozen Parsed too, as the iterators' does,
+  # so no path past the Ruby guard can change one (plan 009, decision 12).
+  def test_the_native_layer_refuses_a_frozen_parsed
+    native = T.const_get(:Native)
+    arguments = T.const_get(:Arguments)
+    parsed = Parsed.new.freeze
+    year = [:item, arguments.encode_item(arguments.any_item(FD.parse_owned(2, "[year]")))]
+    day = [:item, [2, FD::Component::Day.new(FD::Modifier::Day.default).__send__(:encode)]]
+    [
+      -> { native.parsed_set_year(parsed, 2020) },
+      -> { native.parsed_set_day(parsed, 3) },
+      -> { native.parsed_set_year_century(parsed, 20, false) },
+      -> { native.parsed_parse_items(parsed, "2020", year) },
+      -> { native.parsed_parse_component(parsed, "07", day) },
+    ].each { |change| assert_raises(FrozenError, &change) }
+    assert_nil parsed.year
+    assert_nil parsed.day
+    assert_nil parsed.year_century
+  end
+
   def test_arguments_are_checked_as_rust_types_them
     parsed = Parsed.new
     error = assert_raises(RangeError) { parsed.set_day(0) }

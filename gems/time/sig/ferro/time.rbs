@@ -52,6 +52,7 @@ module Ferro
       def self.duration_eq: (SignedDuration left, SignedDuration right) -> bool
       def self.duration_hash: (SignedDuration value) -> Integer
       def self.duration_display: (SignedDuration value) -> String
+      def self.duration_display_precision: (SignedDuration value, Integer precision) -> String
       def self.duration_debug: (SignedDuration value) -> String
       def self.duration_cmp: (SignedDuration left, SignedDuration right) -> Integer
 

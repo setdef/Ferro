@@ -113,6 +113,9 @@ module Ferro
       # not known to be sound: time runs it only on illumos, NetBSD, and
       # macOS, whose environment functions are thread-safe, or in a
       # single-threaded process, which a Ruby process on Linux never is.
+      # On a system that is not Unix, such as Windows, time's fallback has
+      # nothing to refresh and returns +true+ having done nothing
+      # (<tt>src/sys/refresh_tz/mod.rs:1-2</tt>, <tt>imp.rs:1-11</tt>).
       # Rust's <tt>Option<()></tt> is +true+ or +nil+ here, since Ruby's
       # +nil+ alone could not tell the two apart (plan 007, decision 13).
       #

@@ -748,6 +748,39 @@ class TestPortDuration < Minitest::Test
     end
   end
 
+  # <tt>duration.rs:643</tt>, +display_precision+: Rust's
+  # <tt>format!("{duration:.precision$}")</tt> is <tt>to_s(precision)</tt>.
+  def test_display_precision
+    [
+      [Duration.seconds(0), 3, "0.000s"],
+      [Duration.days(60), 3, "60.000d"],
+      [Duration.hours(-48), 3, "-2.000d"],
+      [Duration.hours(48), 3, "2.000d"],
+      [Duration.minutes(1), 3, "1.000m"],
+      [Duration.minutes(10), 3, "10.000m"],
+      [Duration.seconds(1), 3, "1.000s"],
+      [Duration.seconds(10), 3, "10.000s"],
+      [Duration.milliseconds(1), 3, "1.000ms"],
+      [Duration.milliseconds(10), 3, "10.000ms"],
+      [Duration.milliseconds(100), 3, "100.000ms"],
+      [Duration.microseconds(1), 3, "1.000µs"],
+      [Duration.microseconds(10), 3, "10.000µs"],
+      [Duration.microseconds(100), 3, "100.000µs"],
+      [Duration.nanoseconds(1), 3, "1.000ns"],
+      [Duration.nanoseconds(10), 3, "10.000ns"],
+      [Duration.nanoseconds(100), 3, "100.000ns"],
+      [Duration.days(1), 3, "1.000d"],
+      [Duration.hours(26), 3, "1.083d"],
+      [Duration.minutes(1_563), 4, "1.0854d"],
+      [Duration.seconds(93_784), 5, "1.08546d"],
+      [Duration.milliseconds(93_784_005), 6, "1.085463d"],
+      [Duration.microseconds(93_784_005_006), 9, "1.085463021d"],
+      [Duration.nanoseconds(93_784_005_006_007), 12, "1.085463020903d"],
+    ].each do |duration, precision, expected|
+      assert_case expected, duration.to_s(precision)
+    end
+  end
+
   # <tt>duration.rs:688</tt>, +add+.
   def test_add
     [

@@ -134,8 +134,10 @@ macro_rules! accessors {
             }
 
             /// The setter of the same name (`src/parsing/parsed.rs:814-928`):
-            /// `true` when time set the value, `nil` when it refused.
-            fn $set(ruby: &Ruby, parsed: &NParsed, value: <$type as Component>::Ruby) -> Result<Option<bool>, Error> {
+            /// `true` when time set the value, `nil` when it refused. A
+            /// frozen `Parsed` raises Ruby's `FrozenError` first.
+            fn $set(ruby: &Ruby, parsed: Obj<NParsed>, value: <$type as Component>::Ruby) -> Result<Option<bool>, Error> {
+                parsed.check_frozen()?;
                 let value = <$type as Component>::from_ruby(ruby, value)?;
                 let mut copy = parsed.get();
                 let set = guarded(ruby, || Ok(copy.$set(value)))?;
@@ -206,8 +208,10 @@ macro_rules! centuries {
 
             /// The setter of the same name, whose sign comes from
             /// `is_negative` only when `value` is zero
-            /// (`src/parsing/parsed.rs:838-875`).
-            fn $set(ruby: &Ruby, parsed: &NParsed, value: i16, is_negative: bool) -> Result<Option<bool>, Error> {
+            /// (`src/parsing/parsed.rs:838-875`). A frozen `Parsed` raises
+            /// Ruby's `FrozenError` first.
+            fn $set(ruby: &Ruby, parsed: Obj<NParsed>, value: i16, is_negative: bool) -> Result<Option<bool>, Error> {
+                parsed.check_frozen()?;
                 let mut copy = parsed.get();
                 let set = guarded(ruby, || Ok(copy.$set(value, is_negative)))?;
                 parsed.set(copy);
@@ -252,13 +256,15 @@ fn remaining(ruby: &Ruby, rest: &[u8]) -> Value {
 }
 
 /// `Parsed::parse_item` or `parse_items` (`src/parsing/parsed.rs:548-581`),
-/// with the item or items Ruby encoded.
+/// with the item or items Ruby encoded. A frozen `Parsed` raises Ruby's
+/// `FrozenError` first.
 fn parse_items(
     ruby: &Ruby,
-    parsed: &NParsed,
+    parsed: Obj<NParsed>,
     input: RString,
     items: Value,
 ) -> Result<Value, Error> {
+    parsed.check_frozen()?;
     let input = bytes(input);
     let items = Items::from_value(ruby, items)?
         .ok_or_else(|| Error::new(ruby.exception_type_error(), "no format items"))?;
@@ -284,13 +290,15 @@ fn parse_literal(ruby: &Ruby, input: RString, literal: RString) -> Result<Value,
 }
 
 /// `Parsed::parse_component` (`src/parsing/parsed.rs:593-616`), with the
-/// component Ruby encoded as an item.
+/// component Ruby encoded as an item. A frozen `Parsed` raises Ruby's
+/// `FrozenError` first.
 fn parse_component(
     ruby: &Ruby,
-    parsed: &NParsed,
+    parsed: Obj<NParsed>,
     input: RString,
     item: Value,
 ) -> Result<Value, Error> {
+    parsed.check_frozen()?;
     let Some(Items::One(time::format_description::OwnedFormatItem::Component(component))) =
         Items::from_value(ruby, item)?
     else {

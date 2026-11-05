@@ -29,7 +29,8 @@ class TestGem < Minitest::Test
     time = manifest[/^time = .*$/]
 
     assert_includes time, %(version = "=#{locked('time')}")
-    assert_includes time, %(features = ["std", "formatting", "parsing", "local-offset", "macros", "serde-human-readable"])
+    assert_includes time,
+      %(features = ["std", "formatting", "parsing", "local-offset", "macros", "serde-human-readable", "serde-well-known"])
     refute_includes time, "large-dates"
     refute_includes File.read(File.join(ROOT, "Cargo.lock")), %(name = "rand")
   end

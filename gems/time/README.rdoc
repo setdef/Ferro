@@ -42,7 +42,8 @@ macOS 27, where earlier toolchains strip the extension in a way the new
 loader rejects. The build runs <tt>cargo --locked</tt>, so it compiles
 exactly the dependency versions this gem was tested with. To build against
 newer ones anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will
-do); it replaces <tt>--locked</tt>. Building needs no system libraries.
+do); it replaces <tt>--locked</tt>. Building also needs libclang, which
+rb-sys loads through bindgen to read Ruby's headers.
 
 == Use
 
@@ -188,11 +189,12 @@ What differs from calling time from Rust:
   result against time's own formatter.
 
 Not bound yet: every impl with std's unsigned +Duration+ (Timestamp's
-included), whose Ruby value is a choice for all of Ferro's gems at once,
-and SignedDuration's +Display+ with a precision, which waits with the
-width and fill of every type's +Display+ for one translation of Rust's
-formatter. Each operation with std's +Duration+ has a SignedDuration twin
-that is bound. ferro-time's plan 010 says why for each. time's +serde+ and +macros+ features are built and add no Ruby API.
+included), whose Ruby value is a choice for all of Ferro's gems at once.
+Most operations that take std's +Duration+ have a SignedDuration twin
+that is bound; the conversions, the comparisons, and +unsigned_abs+ do
+not. ferro-time's plan 010 says why. SignedDuration#to_s takes Rust's
+precision, <tt>duration.to_s(3)</tt> for <tt>{:.3}</tt>, but not its width
+or fill. time's +serde+ and +macros+ features are built and add no Ruby API.
 
 time's +large-dates+ feature is off, as Tauri and its plugins build time,
 so years run from -9999 to 9999. The +rand+, +quickcheck+, and
@@ -203,10 +205,12 @@ OffsetDateTime.now_local) comes from the system's time-zone rules and is
 safe in a multi-threaded process, as time guarantees. Util.refresh_tz
 refreshes those rules only where time can prove the call sound: on macOS
 it runs, and on Linux, where a Ruby process is never single-threaded, it
-returns +nil+.
+returns +nil+. On Windows, where time has nothing to refresh, it returns
++true+ and does nothing.
 
 The extension is Ractor-safe, and every value the gem makes is frozen and
-shareable. On Windows, Ruby 4.0.9 can hang when a Ractor starts a garbage
+shareable, but for Parsing::Parsed and the iterators of Iter, which are
+mutable and stay in the Ractor that made them. On Windows, Ruby 4.0.9 can hang when a Ractor starts a garbage
 collection while the main Ractor has another thread asleep; the bug is
 Ruby's (ferro-arboard's README says more).
 

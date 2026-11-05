@@ -12,6 +12,12 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `SignedDuration#to_s(precision)`, time's concise `Display` with a precision (Rust's `{:.3}`); a precision from 65,536 up to `usize`'s maximum raises `RangeError` ("Formatting argument out of range"), as Rust's formatter panics, and one from `2**64` up raises Ruby's own `RangeError`.
+- The conversions between time's error types: `Error::ComponentRange.try_from`, `Error::TryFromParsed.try_from` and `.from`, `Error::ParseFromDescription.try_from`, `Error::Parse.from`, and `Error::Format.from`, raising `Error::DifferentVariant` for another variant.
+- `Error#source`, the error one holds, as time's `Error::source` answers it: a parse error's `Error::TryFromParsed` or `Error::ParseFromDescription` twin, and a nested `ComponentRange`'s `Error::ComponentRange`.
+
 ## [0.1.0.pre.4] - 2026-11-02
 
 ### Added

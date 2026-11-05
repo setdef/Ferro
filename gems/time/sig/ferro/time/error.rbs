@@ -5,11 +5,15 @@ module Ferro
   module Time
     class Error < StandardError
       def initialize: (?String? message) -> void
+      def source: () -> Error?
+      private def self.refuse_unless_enum: (singleton(Error) owner, Symbol name) -> void
 
       class ConversionRange < Error
       end
 
       class ComponentRange < Error
+        def self.try_from: (Error error) -> ComponentRange
+
         attr_reader name: String
         attr_reader is_conditional: bool
 
@@ -26,6 +30,8 @@ module Ferro
       end
 
       class Format < Error
+        def self.from: (Error::ComponentRange component_range) -> Format::ComponentRange
+
         class InsufficientTypeInformation < Format
         end
 
@@ -40,6 +46,7 @@ module Ferro
           attr_reader is_conditional: bool
 
           def initialize: (String name, bool is_conditional) -> void
+          def source: () -> Error::ComponentRange
         end
 
         class StdIo < Format
@@ -47,6 +54,8 @@ module Ferro
       end
 
       class ParseFromDescription < Error
+        def self.try_from: (Error error) -> ParseFromDescription
+
         class InvalidLiteral < ParseFromDescription
         end
 
@@ -61,6 +70,9 @@ module Ferro
       end
 
       class TryFromParsed < Error
+        def self.try_from: (Error error) -> TryFromParsed
+        def self.from: (Error::ComponentRange component_range) -> TryFromParsed::ComponentRange
+
         class InsufficientInformation < TryFromParsed
         end
 
@@ -69,11 +81,16 @@ module Ferro
           attr_reader is_conditional: bool
 
           def initialize: (String name, bool is_conditional) -> void
+          def source: () -> Error::ComponentRange
         end
       end
 
       class Parse < Error
+        def self.from: (Error::TryFromParsed | Error::ParseFromDescription error) -> Parse
+
         class TryFromParsed < Parse
+          def source: () -> Error::TryFromParsed
+
           class InsufficientInformation < TryFromParsed
           end
 
@@ -86,6 +103,8 @@ module Ferro
         end
 
         class ParseFromDescription < Parse
+          def source: () -> Error::ParseFromDescription
+
           class InvalidLiteral < ParseFromDescription
           end
 

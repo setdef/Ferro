@@ -71,7 +71,7 @@ module Ferro
       def eql?: (Object other) -> bool
       def hash: () -> Integer
       def <=>: (SignedDuration other) -> Integer | (Object other) -> Integer?
-      def to_s: () -> String
+      def to_s: (?Integer? precision) -> String
       def inspect: () -> String
       def dup: () -> self
       def clone: (?freeze: bool?) -> self

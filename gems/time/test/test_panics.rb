@@ -55,6 +55,20 @@ class TestPanics < Minitest::Test
     assert_raises(TypeError) { Duration::SECOND * "2" }
   end
 
+  # Rust's formatter keeps a precision in 16 bits and panics past it
+  # (core's fmt/rt.rs); magnus refuses an Integer no usize holds.
+  def test_a_display_precision_is_sixteen_bits
+    assert_equal "1.#{'0' * 65_535}s", Duration::SECOND.to_s(65_535)
+    assert_refused("Formatting argument out of range") { Duration::SECOND.to_s(65_536) }
+    assert_equal "1s", Duration::SECOND.to_s(0)
+    negative = assert_raises(RangeError) { Duration::SECOND.to_s(-1) }
+    assert_equal "can't convert negative integer to unsigned", negative.message
+    assert_refused("Formatting argument out of range") { Duration::SECOND.to_s((2 ** 63) - 1) }
+    wide = assert_raises(RangeError) { Duration::SECOND.to_s(2 ** 64) }
+    assert_equal "bignum too big to convert into 'unsigned long long'", wide.message
+    assert_raises(TypeError) { Duration::SECOND.to_s("3") }
+  end
+
   def test_date_arithmetic
     assert_refused("overflow adding duration to date") { T::Date::MAX + Duration::DAY }
     assert_refused("overflow subtracting duration from date") { T::Date::MIN - Duration::DAY }

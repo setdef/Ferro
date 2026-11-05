@@ -13,8 +13,10 @@ crate-type = ["cdylib"]
 
 [dependencies]
 # Every feature with a Ruby meaning is on; large-dates, rand, quickcheck,
-# and wasm-bindgen are off (plan 007, decision 2).
-time = { version = "=0.3.55", features = ["std", "formatting", "parsing", "local-offset", "macros", "serde-human-readable"] }
+# and wasm-bindgen are off (plan 007, decision 2). serde-well-known gates
+# no code of its own: it turns on serde, formatting, and parsing, which
+# serde-human-readable already does.
+time = { version = "=0.3.55", features = ["std", "formatting", "parsing", "local-offset", "macros", "serde-human-readable", "serde-well-known"] }
 magnus = { version = "0.9.3", features = ["bytes"] }
 rb-sys = "0.9.130"
 

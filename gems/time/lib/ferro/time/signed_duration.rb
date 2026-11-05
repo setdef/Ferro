@@ -806,17 +806,42 @@ module Ferro
         Native.duration_cmp(self, other) if other.is_a?(SignedDuration)
       end
 
-      # The value as time's +Display+ writes it: the exact, full-precision
-      # form. time's concise, rounded form takes a precision from Rust's
-      # formatter (<tt>{:.3}</tt>), which Ruby's +to_s+ has no counterpart
-      # for, and is not bound (plan 010, decision 17).
+      # The value as time's +Display+ writes it. Without a +precision+ it
+      # is the exact, full-precision form, Rust's <tt>{}</tt>. With one it
+      # is the concise form, Rust's <tt>{:.3}</tt>: the largest unit the
+      # duration has at least one of, rounded to +precision+ decimal
+      # places, where a day is exactly 24 hours and a minute exactly 60
+      # seconds. time warns that the form is not stable and must not be
+      # relied upon.
       #
-      # === Example
+      # Rust's formatter takes the precision with its width and fill;
+      # this binds the precision alone, since Ruby's padding of the whole
+      # String cannot reproduce how time pads each part (plan 010,
+      # decision 17).
+      #
+      # Mirrors time's <tt>Display for SignedDuration</tt>
+      # (<tt>src/signed_duration.rs:1331-1419</tt>).
+      #
+      # [precision] Integer from 0 to 65,535, or +nil+. Rust's formatter
+      #             keeps a precision in 16 bits and panics past it, so a
+      #             precision from 65,536 up to <tt>2**63 - 1</tt>
+      #             (+usize+'s maximum on a 64-bit platform) raises
+      #             +RangeError+ with that message, "Formatting argument
+      #             out of range". A larger one, or a negative one, is
+      #             no +usize+, and raises Ruby's own +RangeError+ ("bignum
+      #             too big to convert into 'unsigned long long'" from
+      #             <tt>2**64</tt> up).
+      #
+      # === Examples
       #
       #   duration = Ferro::Time::Duration.new(93_784, 5)
       #   duration.to_s # => "1d2h3m4s5ns"
-      def to_s
-        Native.duration_display(self)
+      #   duration.to_s(3) # => "1.085d"
+      #   Ferro::Time::Duration::ZERO.to_s(3) # => "0.000s"
+      def to_s(precision = nil)
+        return Native.duration_display(self) if precision.nil?
+
+        Native.duration_display_precision(self, precision)
       end
 
       # The value as time's +Debug+ writes it.

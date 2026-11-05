@@ -379,6 +379,40 @@ fn duration_scale_float(
     })
 }
 
+// SPDX-SnippetBegin
+// SPDX-SnippetCopyrightText: The Rust Project Developers
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-SnippetComment: the panic message of core::fmt::rt::Argument::from_usize
+//   (library/core/src/fmt/rt.rs:130-135 at rust-lang/rust d8ef4f3)
+
+/// What Rust's formatter panics with for a precision past 16 bits: core
+/// keeps a runtime precision as a `u16` (`library/core/src/fmt/rt.rs:130-135`
+/// at rust-lang/rust `d8ef4f3`). The tests pin it against the toolchain the
+/// gem builds with.
+pub const PRECISION_OUT_OF_RANGE: &str = "Formatting argument out of range";
+
+// SPDX-SnippetEnd
+
+/// `Display` with a precision, `format!("{:.*}", precision, value)`: the
+/// concise, rounded form (`:1331-1381`). A precision past `u16::MAX` is
+/// refused with the panic Rust's formatter raises for it.
+pub fn display_precision(value: SignedDuration, precision: usize) -> Result<String, Failure> {
+    if u16::try_from(precision).is_err() {
+        return Err(Failure::Range(PRECISION_OUT_OF_RANGE.to_owned()));
+    }
+    Ok(format!("{value:.precision$}"))
+}
+
+/// `Display` with a precision, for `to_s(precision)`.
+fn duration_display_precision(
+    ruby: &Ruby,
+    value: &NDuration,
+    precision: usize,
+) -> Result<String, Error> {
+    let value = value.0;
+    guarded(ruby, || display_precision(value, precision))
+}
+
 /// `Div<SignedDuration>` (`:1840-1851`), a Float.
 fn duration_ratio(ruby: &Ruby, value: &NDuration, other: &NDuration) -> Result<f64, Error> {
     let (value, other) = (value.0, other.0);
@@ -415,14 +449,18 @@ pub fn define(native: RModule) -> Result<(), Error> {
     native.define_singleton_method("duration_scale_int", function!(duration_scale_int, 3))?;
     native.define_singleton_method("duration_scale_float", function!(duration_scale_float, 3))?;
     native.define_singleton_method("duration_ratio", function!(duration_ratio, 2))?;
+    native.define_singleton_method(
+        "duration_display_precision",
+        function!(duration_display_precision, 2),
+    )?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        add, div_float, div_int, mul_float, mul_int, nanoseconds_i128, neg, new, seconds_f32,
-        seconds_f64, sub, unit,
+        add, display_precision, div_float, div_int, mul_float, mul_int, nanoseconds_i128, neg, new,
+        seconds_f32, seconds_f64, sub, unit, PRECISION_OUT_OF_RANGE,
     };
     use crate::{capture, Failure, Panic};
     use time::SignedDuration;
@@ -543,5 +581,25 @@ mod tests {
             Err(Failure::ZeroDivision)
         ));
         assert!(capture(|| SignedDuration::SECOND / std::hint::black_box(0_i32)).is_err());
+    }
+
+    #[test]
+    fn a_precision_past_sixteen_bits_is_refused_with_rusts_panic() {
+        let value = SignedDuration::new(93_784, 5);
+        let precision = std::hint::black_box(usize::from(u16::MAX) + 1);
+        assert_eq!(
+            capture(|| format!("{value:.precision$}")),
+            Err(Panic(PRECISION_OUT_OF_RANGE.to_owned()))
+        );
+        assert!(matches!(
+            display_precision(value, precision),
+            Err(Failure::Range(message)) if message == PRECISION_OUT_OF_RANGE
+        ));
+        let widest = usize::from(u16::MAX);
+        assert_eq!(
+            display_precision(value, widest).unwrap(),
+            format!("{value:.widest$}")
+        );
+        assert_eq!(display_precision(value, 3).unwrap(), "1.085d");
     }
 }
