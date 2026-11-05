@@ -22,14 +22,14 @@ class TestGem < Minitest::Test
     assert_equal locked("global-hotkey"), SPEC.metadata.fetch("global_hotkey_version")
   end
 
-  # Both of global-hotkey's features are built (plan 004, decision 2).
-  def test_the_manifest_pins_that_global_hotkey_with_every_feature
+  # Neither of global-hotkey's features, serde and tracing, is built (ADR 002;
+  # plan 004, decision 2).
+  def test_the_manifest_pins_that_global_hotkey_with_no_feature
     manifest = File.read(File.join(ROOT, "ext/ferro_global_hotkey/Cargo.toml"))
     global_hotkey = manifest[/^global-hotkey = .*$/]
 
-    assert_includes global_hotkey, %(version = "=#{locked('global-hotkey')}")
-    assert_includes global_hotkey, %(features = ["serde", "tracing"])
-    refute_includes global_hotkey, "default-features"
+    assert_equal %(global-hotkey = "=#{locked('global-hotkey')}"), global_hotkey
+    refute_includes global_hotkey, "features"
   end
 
   def test_the_readme_names_that_global_hotkey_and_keyboard_types

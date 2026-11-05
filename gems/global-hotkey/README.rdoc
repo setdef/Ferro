@@ -17,11 +17,18 @@ X11 key grabs on Linux.
 
 ferro-global-hotkey binds global-hotkey
 (https://github.com/tauri-apps/global-hotkey), Tauri's hotkey crate, one to
-one. It keeps global-hotkey's names and behavior and adds nothing of its
-own. Use it to give a tray app a summon key, toggle recording from
-anywhere, or read the shortcuts a user typed into your settings.
+one. It keeps global-hotkey's names and behavior. Where Rust has no Ruby
+meaning it translates, and it adds no class of its own. Use it to give a
+tray app a summon key, toggle recording from anywhere, or read the
+shortcuts a user typed into your settings.
+
+ferro-global-hotkey binds global-hotkey 0.9.0. The gem's version follows
+its own API; its +global_hotkey_version+ metadata names the global-hotkey
+release.
 
 == Install
+
+Add the gem to your Gemfile, with a version, or let Bundler write the line:
 
 --
 SPDX-SnippetBegin
@@ -29,22 +36,46 @@ SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
 SPDX-License-Identifier: MIT-0
 ++
 
-  bundle add ferro-global-hotkey
+  gem "ferro-global-hotkey", "~> 0.1"
+
+  # or, from the command line:
+  bundle add ferro-global-hotkey --version "~> 0.1"
 
 --
 SPDX-SnippetEnd
 ++
 
-The gem compiles a Rust extension when it installs, so the machine that
-installs it needs Rust and Cargo: Rust 1.80 or newer, and 1.99 or newer on
-macOS 27, where earlier toolchains strip the extension in a way the new
-loader rejects. The build runs <tt>cargo --locked</tt>, so it compiles
-exactly the dependency versions this gem was tested with. To build against
-newer ones anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will
-do); it replaces <tt>--locked</tt>.
+The gem needs Ruby 4.0 or newer. It compiles a Rust extension when it
+installs, so the machine that installs it needs:
 
-On Linux, global-hotkey talks to the X server through x11rb, pure Rust, so
-building needs no system libraries.
+* Rust and Cargo, 1.85 or newer (the highest +rust-version+ among the
+  locked dependencies). On Windows, use Rust's +x86_64-pc-windows-gnu+
+  toolchain, since RubyInstaller's Ruby is a MinGW build and rb-sys
+  refuses to build it with the MSVC target.
+* libclang, which rb-sys's bindgen reads Ruby's headers with
+  (<tt>libclang-dev</tt> on Debian and Ubuntu, +clang+ with the Xcode
+  command line tools on macOS, LLVM on Windows).
+
+The build runs <tt>cargo --locked</tt>, so it compiles exactly the
+dependency versions this gem was tested with. To build against newer ones
+anyway, set +RB_SYS_EXTRA_CARGO_ARGS+ (an empty string will do); it
+replaces <tt>--locked</tt>.
+
+At run time the platforms differ:
+
+[Linux] X11 only. global-hotkey talks to the X server through x11rb, pure
+        Rust, so no X library is linked at build time or run time. Under
+        Wayland, hotkeys work only through XWayland.
+[macOS] Carbon hot keys, which ask for no permission. A media key
+        (+MediaPlayPause+, +MediaTrackNext+, +MediaTrackPrevious+,
+        +MediaFastForward+, or +MediaRewind+) is different: registering
+        one installs an event tap, which needs the Accessibility
+        permission, and without it +register+ raises
+        Error::FailedToWatchMediaKeyEvent.
+[Windows] +RegisterHotKey+, which asks for no permission.
+
+On macOS and Windows, run an event loop too, as "The event loop" below
+explains.
 
 == Use
 
@@ -109,21 +140,63 @@ grabs stay and their keys stay swallowed; on macOS it aborts the process,
 and on Windows so does a panic on the press (a panic on the release ends
 only the thread that sends it).
 
-=== What your app must run
+On Windows and Linux, a key another program holds, or this manager already
+holds, raises Error::AlreadyRegistered, a subclass of
+Ferro::GlobalHotkey::Error. On macOS, Carbon does not refuse a key another
+program registered, so +register+ succeeds; a key this manager already
+holds raises Error::FailedToRegister, since Carbon reports no reason, and
+only a media key raises Error::AlreadyRegistered. A string that is not a
+hotkey raises one of Hotkey::HotKeyParseError's subclasses. +CmdOrCtrl+ in
+a hotkey string is Command on macOS and Control elsewhere.
 
-global-hotkey's platform notes hold here too. On Windows a win32 event
-loop must be running on the thread. It doesn't need to be the main thread,
-but you have to create the manager on the same thread as the event loop.
-On macOS an event loop must be running on the main thread, so you also
-need to create the manager on the main thread. A windowed app already runs
-one: Tokra's tao loop is one. A command-line script does not, and then
-registering works but no event ever arrives.
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+SPDX-License-Identifier: MIT-0
+++
+
+  begin
+    manager.register(summon)
+  rescue Ferro::GlobalHotkey::Error => e
+    case e
+    in Ferro::GlobalHotkey::Error::AlreadyRegistered[taken] then warn "#{taken} is taken"
+    in Ferro::GlobalHotkey::Error::FailedToRegister[reason] then warn reason
+    else raise
+    end
+  end
+
+--
+SPDX-SnippetEnd
+++
+
+=== The event loop
+
+global-hotkey's platform notes hold here too:
+
+--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2022-2022 Tauri Programme within The Commons Conservancy
+SPDX-License-Identifier: Apache-2.0 OR MIT
+SPDX-SnippetComment: Adapted from global-hotkey 0.9.0 src/lib.rs:15-18
+++
+
+On Windows a win32 event loop must be running on the thread. It doesn't
+need to be the main thread, but you have to create the manager on the same
+thread as the event loop. On macOS an event loop must be running on the
+main thread, so you also need to create the manager on the main thread.
+
+--
+SPDX-SnippetEnd
+++
+
+A windowed app already runs one: Tokra's tao loop is one. A command-line
+script does not, and then registering works but no event ever arrives.
 
 On Linux the manager starts an X11 thread of its own, so events arrive
 without a loop, but only from an X server. Under Wayland with no XWayland,
 that thread cannot connect and stops, and every call returns as if it had
-worked, as in Rust: global-hotkey logs the reason through +tracing+,
-which no Ruby program listens to.
+worked, as in Rust, where global-hotkey would log the reason through
++tracing+ (a feature the gem leaves out, as no Ruby program listens to it).
 
 On Linux, +unregister+ stops the manager reporting a hotkey at once, but
 the X server releases the keys only when that manager next sends a request
@@ -170,8 +243,9 @@ The API is global-hotkey's, translated where Rust has no Ruby meaning:
   Ruby's. A fieldless enum's <tt>as u32</tt> is +to_i+ (Code,
   HotKeyState).
 * keyboard-types' deprecated items are left out of the API docs, and
-  warn in Ruby's <tt>:deprecated</tt> category: <tt>Modifiers::HYPER</tt>, <tt>Modifiers::SUPER</tt>,
-  <tt>Code::Hyper</tt>, <tt>Code::Super</tt>, and <tt>Code::Turbo</tt>.
+  warn in Ruby's <tt>:deprecated</tt> category: <tt>Modifiers::HYPER</tt>,
+  <tt>Modifiers::SUPER</tt>, <tt>Code::Hyper</tt>, <tt>Code::Super</tt>,
+  and <tt>Code::Turbo</tt>.
 
 What differs from calling global-hotkey from Rust:
 
@@ -195,10 +269,10 @@ What differs from calling global-hotkey from Rust:
   bitflags' in-place methods, +Extend+, +FromIterator+, and formatters
   (use <tt>|</tt>, <tt>inject(:|)</tt>, and <tt>bits.to_s(16)</tt>).
 
-Both of global-hotkey's Cargo features are built. +serde+ adds no Ruby
-API: the text serde writes for a HotKey is HotKey#to_s, which
-HotKey.from_str reads. +tracing+ logs only why the Linux X11 thread
-stopped.
+The gem leaves out global-hotkey's two Cargo features, +serde+ and
++tracing+, which reach only Rust. The text serde writes for a HotKey is
+HotKey#to_s, which HotKey.from_str reads; +tracing+ would log only why
+the Linux X11 thread stopped.
 
 global-hotkey keeps state once per process: on macOS each copy installs a
 Carbon event handler that swallows every hotkey, so no other library in
@@ -210,12 +284,18 @@ receiver may cross Ractors; a manager stays in its own. On Windows, Ruby
 Ractor has another thread asleep; the bug is Ruby's (ferro-arboard's
 README says more).
 
-ferro-global-hotkey 0.1.0.pre.1 binds global-hotkey 0.9.0. The gem's
-version follows its own API; its +global_hotkey_version+ metadata names
-the global-hotkey release.
+== Links
+
+* Source: https://github.com/setdef/Ferro/tree/trunk/gems/global-hotkey
+* Changelog: https://github.com/setdef/Ferro/blob/trunk/gems/global-hotkey/CHANGELOG.md
+* The translation rules every Ferro gem follows (ADR 001):
+  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/adr/001.md
+* global-hotkey: https://github.com/tauri-apps/global-hotkey
 
 == License
 
 ferro-global-hotkey's code is Apache-2.0 OR MIT, as global-hotkey's is.
-This README is CC-BY-SA-4.0, and its code examples are MIT-0, so paste
-them freely. The lockfile is CC0-1.0. The license texts are in LICENSES/.
+This README is CC-BY-SA-4.0. Its paragraph of global-hotkey's platform
+notes comes from global-hotkey's rustdoc and is Apache-2.0 OR MIT, as
+global-hotkey's code is; its code examples are MIT-0, so paste them
+freely. The lockfile is CC0-1.0. The license texts are in LICENSES/.
