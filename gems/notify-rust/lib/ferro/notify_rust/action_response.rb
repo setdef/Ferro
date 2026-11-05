@@ -35,7 +35,7 @@ module Ferro
     #   Ferro::NotifyRust.handle_action(id) do |response|
     #     case response
     #     in Ferro::NotifyRust::ActionResponse::Custom(key:) then puts "chose #{key}"
-    #     in Ferro::NotifyRust::ActionResponse::Closed(reason:) then puts "closed: #{reason.inspect}"
+    #     in Ferro::NotifyRust::ActionResponse::Closed(reason:) then puts "closed: #{reason.debug}"
     #     end
     #   end
     module ActionResponse
@@ -51,6 +51,10 @@ module Ferro
         ##
         # :attr_reader: key
         # The action's identifier, a String.
+
+        private def to_native
+          [:Custom, key]
+        end
       end
 
       # The notification closed without any action being taken.
@@ -64,6 +68,10 @@ module Ferro
         ##
         # :attr_reader: reason
         # Why it closed, a CloseReason.
+
+        private def to_native
+          [:Closed, CloseReason.__send__(:tag_of, reason)]
+        end
       end
 
       # The response for the action key +key+: Custom. Mirrors
@@ -85,6 +93,17 @@ module Ferro
         (name == :Custom) ? Custom.new(String(value)) : Closed.new(CloseReason.__send__(:from_native, value))
       end
       private_class_method :from_native
+
+      # notify-rust's derived +Debug+ text for this response
+      # (<tt>src/response.rs:110</tt>), formatted by Rust. +inspect+ stays
+      # Ruby's.
+      #
+      # === Example
+      #
+      #   Ferro::NotifyRust::ActionResponse::Custom.new("ok").debug # => "Custom(\"ok\")"
+      def debug
+        Native.action_response_debug(__send__(:to_native))
+      end
     end
 
     #--

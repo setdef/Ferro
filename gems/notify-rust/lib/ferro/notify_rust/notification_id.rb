@@ -48,6 +48,10 @@ module Ferro
         ##
         # :attr_reader: value
         # The identifier, an Integer from 0 to <tt>2**32 - 1</tt>.
+
+        private def to_native
+          [:Xdg, value]
+        end
       end
 
       # A macOS +UNNotificationRequest+ string identifier.
@@ -61,6 +65,10 @@ module Ferro
         ##
         # :attr_reader: value
         # The identifier, a String.
+
+        private def to_native
+          [:Mac, value]
+        end
       end
 
       # Xdg for an Integer, Mac for a String. Mirrors the +From+ impls of
@@ -74,6 +82,17 @@ module Ferro
       def self.from(value)
         name, id = Native.notification_id_from(value)
         (name == :Xdg) ? Xdg.new(Integer(id)) : Mac.new(String(id))
+      end
+
+      # notify-rust's derived +Debug+ text for this identifier
+      # (<tt>src/notification_id.rs:19</tt>), formatted by Rust. +inspect+
+      # stays Ruby's.
+      #
+      # === Example
+      #
+      #   Ferro::NotifyRust::NotificationId::Xdg.new(42).debug # => "Xdg(42)"
+      def debug
+        Native.notification_id_debug(__send__(:to_native))
       end
     end
 

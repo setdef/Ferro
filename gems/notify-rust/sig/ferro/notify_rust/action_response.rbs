@@ -11,6 +11,10 @@ module Ferro
 
         def self.new: (String key) -> instance
                     | (key: String) -> instance
+
+        private
+
+        def to_native: () -> [:Custom, String]
       end
 
       class Closed < Data
@@ -20,10 +24,16 @@ module Ferro
 
         def self.new: (CloseReason reason) -> instance
                     | (reason: CloseReason) -> instance
+
+        private
+
+        def to_native: () -> [:Closed, close_reason_tag]
       end
 
       def self.from: (String key) -> ActionResponse
       private def self.from_native: (action_response_tag tag) -> ActionResponse
+
+      def debug: () -> String
     end
   end
 end

@@ -17,10 +17,75 @@ class TestValues < Minitest::Test
   NotifyRust = Ferro::NotifyRust
 
   def test_urgency_has_three_frozen_constants
-    assert_equal %w[Low Normal Critical].map { |name| "Ferro::NotifyRust::Urgency::#{name}" },
-      [urgency::Low, urgency::Normal, urgency::Critical].map(&:inspect)
+    assert_equal %w[Low Normal Critical], [urgency::Low, urgency::Normal, urgency::Critical].map(&:debug)
     assert [urgency::Low, urgency::Normal, urgency::Critical].all?(&:frozen?)
     assert_raises(NoMethodError) { urgency.new(:Low) }
+  end
+
+  # notify-rust derives Debug for each value (src/urgency.rs:27,
+  # src/timeout.rs:13, src/response.rs:21, :63, :110, src/hints.rs:39,
+  # src/notification_id.rs:19, src/lib.rs:236), and Rust formats the text
+  # from the value the Ruby one stands for, quotes and escapes included.
+  def test_values_debug_as_notify_rust_derives
+    response = NotifyRust::NotificationResponse
+    close = NotifyRust::CloseReason
+
+    assert_equal %w[Default Never Milliseconds(6000)],
+      [NotifyRust::Timeout::Default, NotifyRust::Timeout::Never, NotifyRust::Timeout::Milliseconds.new(6000)].map(&:debug)
+    assert_equal %w[Expired Dismissed CloseAction Other(7)],
+      [close::Expired, close::Dismissed, close::CloseAction, close::Other.new(7)].map(&:debug)
+    assert_equal ["Default", 'Action("ok")', 'Reply("On \\"my\\" way")', "Closed(Other(4))"],
+      [
+        response::Default,
+        response::Action.new("ok"),
+        response::Reply.new('On "my" way'),
+        response::Closed.new(close::Other.new(4)),
+].map(&:debug)
+    assert_equal ['Custom("clicked_a")', "Closed(Expired)"],
+      [NotifyRust::ActionResponse::Custom.new("clicked_a"), NotifyRust::ActionResponse::Closed.new(close::Expired)]
+        .map(&:debug)
+    assert_equal ["Xdg(42)", 'Mac("my-app.status")'],
+      [NotifyRust::NotificationId::Xdg.new(42), NotifyRust::NotificationId::Mac.new("my-app.status")].map(&:debug)
+    assert_equal 'ServerInformation { name: "dunst", vendor: "knopwob", version: "1.12", spec_version: "1.2" }',
+      NotifyRust::ServerInformation.new(name: "dunst", vendor: "knopwob", version: "1.12", spec_version: "1.2").debug
+  end
+
+  def test_hints_debug_as_notify_rust_derives
+    hint = NotifyRust::Hint
+
+    assert_equal [
+      "ActionIcons(true)",
+      'Category("email")',
+      "X(-12)",
+      "Urgency(Critical)",
+      'Custom("x-dunst-stack-tag", "volume")',
+      'CustomInt("value", 40)',
+      "Invalid",
+],
+      [
+        hint::ActionIcons.new(true),
+        hint::Category.new("email"),
+        hint::X.new(-12),
+        hint::Urgency.new(urgency::Critical),
+        hint::Custom.new("x-dunst-stack-tag", "volume"),
+        hint::CustomInt.new("value", 40),
+        hint::Invalid,
+].map(&:debug)
+  end
+
+  def test_a_value_notify_rust_could_not_hold_has_no_debug
+    assert_raises(TypeError) { NotifyRust::NotificationResponse::Action.new(:ok).debug }
+    assert_raises(TypeError) { NotifyRust::Hint::Category.new(nil).debug }
+    assert_raises(RangeError) { NotifyRust::CloseReason::Other.new(-1).debug }
+    assert_raises(RangeError) { NotifyRust::Timeout::Milliseconds.new(2 ** 32).debug }
+  end
+
+  def test_inspect_stays_rubys
+    assert_match(/\A#<Ferro::NotifyRust::Urgency:0x\h+ @name=:Low>\z/, urgency::Low.inspect)
+    assert_match(/\A#<Ferro::NotifyRust::CloseReason::Unit:0x\h+ @name=:Expired>\z/, NotifyRust::CloseReason::Expired.inspect)
+    assert_equal "#<data Ferro::NotifyRust::Timeout::Milliseconds value=6000>",
+      NotifyRust::Timeout::Milliseconds.new(6000).inspect
+    assert_equal '#<data Ferro::NotifyRust::Hint::Category value="email">', NotifyRust::Hint::Category.new("email").inspect
   end
 
   def test_urgency_from_int
@@ -67,6 +132,26 @@ class TestValues < Minitest::Test
     assert_equal NotifyRust::Timeout::Default, NotifyRust::Timeout.from(-234)
     assert_equal NotifyRust::Timeout::Never, NotifyRust::Timeout.from(0)
     assert_raises(RangeError) { NotifyRust::Timeout.from(2 ** 31) }
+    assert_raises(TypeError) { NotifyRust::Timeout.from("234") }
+  end
+
+  # From<Duration> for Timeout (src/timeout.rs:46-56), with the Duration as
+  # seconds (ADR 001, 2026-11-05). An Integer is From<i32>'s milliseconds,
+  # as an integer literal is in Rust, so a Duration is any other Numeric.
+  # Ports the doc tests at src/notification.rs:341-355.
+  def test_timeout_from_a_duration_in_seconds
+    timeout = NotifyRust::Timeout
+
+    assert_equal timeout::Milliseconds.new(2000), timeout.from(2.0)
+    assert_equal timeout::Milliseconds.new(1500), timeout.from(3r / 2)
+    assert_same timeout::Never, timeout.from(0.0)
+    assert_same timeout::Default, timeout.from(18_446_744_073_709_551.615)
+    assert_equal timeout::Milliseconds.new(1), timeout.from(0.0015), "as_millis truncates"
+    assert_equal timeout::Milliseconds.new(1500), NotifyRust::Notification.new.timeout(1.5).timeout
+    assert_equal "cannot convert float seconds to Duration: value is negative",
+      assert_raises(ArgumentError) { timeout.from(-1.0) }.message
+    assert_equal "cannot convert float seconds to Duration: value is either too big or NaN",
+      assert_raises(ArgumentError) { timeout.from(Float::NAN) }.message
   end
 
   def test_timeout_as_the_specification_sends_it
@@ -89,7 +174,6 @@ class TestValues < Minitest::Test
     assert_same NotifyRust::CloseReason::CloseAction, NotifyRust::CloseReason.from(3)
     assert_equal NotifyRust::CloseReason::Other.new(4), NotifyRust::CloseReason.from(4)
     assert_equal NotifyRust::CloseReason::Other.new(0), NotifyRust::CloseReason.from(0)
-    assert_equal "Ferro::NotifyRust::CloseReason::Expired", NotifyRust::CloseReason::Expired.inspect
   end
 
   def test_notification_response_from_a_key_is_an_action
@@ -156,7 +240,6 @@ class TestValues < Minitest::Test
     assert_equal NotifyRust::Hint::Category.new("email"), NotifyRust::Hint::Category.new("email")
     refute_equal NotifyRust::Hint::Category.new("email"), NotifyRust::Hint::DesktopEntry.new("email")
     assert_equal 1, [NotifyRust::Hint::Resident.new(true), NotifyRust::Hint::Resident.new(true)].uniq.size
-    assert_equal "Ferro::NotifyRust::Hint::Invalid", NotifyRust::Hint::Invalid.inspect
   end
 
   def test_server_information_holds_four_strings
@@ -199,5 +282,20 @@ class TestValues < Minitest::Test
     assert_nil version[1, 2] <=> "1.2"
     assert_raises(NoMethodError) { NotifyRust::Version.new(1, 2) }
     assert_raises(NoMethodError) { NotifyRust::Version[1, 2] }
+  end
+
+  # notify-rust derives Debug for its DbusStack and miniver's Version
+  # (src/xdg/mod.rs:402, src/miniver.rs:4). Without a server
+  # SPEC_VERSION, which a Version's text is built on, falls back to 1.1.
+  def test_linux_values_debug_as_notify_rust_derives
+    skip_unless_platform(:linux)
+    (debug,) = in_child(<<~RUBY, "DBUS_SESSION_BUS_ADDRESS" => "unix:path=/nonexistent/bus")
+      notify = Ferro::NotifyRust
+      [notify::DbusStack::Zbus.debug, notify::DbusStack::Dbus.debug, notify::Version.__send__(:new, 3, 14).debug,
+        notify::SPEC_VERSION.debug, notify::DbusStack::Zbus.inspect]
+    RUBY
+
+    assert_equal ["Zbus", "Dbus", "Version { major: 3, minor: 14 }", "Version { major: 1, minor: 1 }"], debug.first(4)
+    assert_match(/\A#<Ferro::NotifyRust::DbusStack:0x\h+ @name=:Zbus>\z/, debug.last)
   end
 end

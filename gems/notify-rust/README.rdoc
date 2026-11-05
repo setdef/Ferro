@@ -107,6 +107,12 @@ click, an action, and a close apart without keywords, and +on_close+ yields
 the CloseReason when the notification goes away. A handle can also +close+
 the notification, or change it and +update+ it in place.
 
+As in Rust, each wait, and +close+, takes the handle: afterwards any call
+on it raises +IOError+, as a closed IO does. So does a handle after the end
+of +show+'s block, which is its scope. On Linux, +wait_for_action_async+
+and +close_async+ borrow the handle instead, so one thread can wait while
+another closes.
+
 Every wait releases Ruby's global VM lock, so other threads keep running,
 and no call ever runs with the lock held. On Linux an interrupt (Ctrl-C,
 <tt>Thread#raise</tt>, +Timeout+) ends a wait; notify-rust offers no way
@@ -129,7 +135,8 @@ SPDX-SnippetCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
 SPDX-License-Identifier: MIT-0
 ++
 
-  # Without a block, the notification is sent at once.
+  # On macOS, without a block, the notification is sent at once, and the
+  # handle show returns is used up. On Linux and Windows it stays usable.
   Ferro::NotifyRust::Notification.new.summary("Done").show
 
   # With a block, it is sent when the block ends, unless a wait sent it.
@@ -160,51 +167,61 @@ icon, timeout, or app name; +hint+ and +urgency+ do not exist there.
 The API is notify-rust's, translated where Rust has no Ruby meaning:
 
 * Notification wraps notify-rust's builder. +dup+ and +finalize+ copy it,
-  as Rust's +Clone+ does; #inspect shows notify-rust's +Debug+ text; a
-  frozen one refuses its setters.
+  as Rust's +Clone+ does; a frozen one refuses its setters.
+* +Debug+ is +debug+, which answers notify-rust's text exactly, as Rust
+  formats it, on every value, handle, and error that has one; +inspect+
+  stays Ruby's.
 * Enums are constants (Urgency::Critical, Timeout::Never,
   CloseReason::Dismissed); variants with data are Data classes
   (Timeout::Milliseconds, Hint::Category, NotificationResponse::Action).
   +Default+ is <tt>.default</tt>. Conversions keep notify-rust's rules:
   <tt>From</tt> is +from+, <tt>TryFrom</tt> is +try_from+, <tt>FromStr</tt>
   is +from_str+, and <tt>i32::from(timeout)</tt> is Timeout#to_i.
+* A Rust +Duration+ is a Numeric number of seconds. Timeout.from and
+  Notification#timeout read an Integer as milliseconds
+  (<tt>From<i32></tt>) and any other Numeric as a +Duration+, so
+  <tt>timeout(2)</tt> is two milliseconds and <tt>timeout(2.0)</tt> two
+  seconds, as in Rust.
+* A value a Rust method consumes raises +IOError+ when used again, as a
+  closed IO does: a handle after a wait, +close+, or the end of +show+'s
+  block, and a Future after +value+.
 * Closures are blocks, called after the wait ends, with Ruby's lock held.
 * A Rust future is a Future (Linux), and <tt>.await</tt> is Future#value.
-  As a Rust future does, it starts its work when first awaited.
+  As a Rust future does, it starts its work when first awaited, and
+  answers once.
 * Each kind of error is a subclass of Ferro::NotifyRust::Error with
   notify-rust's message. A wrong argument type raises +TypeError+; an
   error that is not notify-rust's own, such as Timeout.from_str's parse
-  failure, raises +ArgumentError+ with Rust's message.
+  failure, raises +ArgumentError+ with Rust's message. A wait without the
+  block Rust requires raises +ArgumentError+ before it waits.
 * Methods a platform lacks are not defined there, so <tt>respond_to?</tt>
   answers. On Linux and Windows a NotificationHandle answers every
   Notification setter, as notify-rust's +Deref+ gives.
-* notify-rust's <tt>#[deprecated]</tt> items warn in Ruby's
-  <tt>:deprecated</tt> category: Notification#actions with an argument,
-  Notification.at_bus, and on macOS the Urgency constant.
+* notify-rust's hidden and deprecated items are not bound: the +actions+
+  setter (the field still reads and writes), Notification.at_bus, and
+  +show_debug+. On macOS the Urgency constant, whose export notify-rust
+  deprecates there, stays, since Hint::Urgency holds one; naming it warns
+  in Ruby's <tt>:deprecated</tt> category.
 
 What differs from calling notify-rust from Rust:
 
-* A handle's waits consume it in Rust. In Ruby, a Linux handle stays
-  usable, and a second wait waits for the next signal; on macOS and
-  Windows a wait takes the notification out, as notify-rust does, and a
-  second wait returns without calling its block.
 * Rust refuses at compile time to change a handle a wait borrows. In
-  Ruby, a setter or +update+ on a Linux handle while another thread waits
-  on it or closes it waits for that to end, as with a Mutex, and Ctrl-C,
-  <tt>Thread#raise</tt>, and +Timeout+ end that wait; on the waiting
-  thread itself, from a signal trap, it raises +ThreadError+
-  (<tt>already borrowed: ...</tt>). On Windows, a handle a wait consumed
-  raises from every setter and field.
+  Ruby, a setter or +update+ on a Linux handle while another thread's
+  +wait_for_action_async+ or +close_async+ runs waits for that to end, as
+  with a Mutex, and Ctrl-C, <tt>Thread#raise</tt>, and +Timeout+ end that
+  wait; on the waiting thread itself, from a signal trap, it raises
+  +ThreadError+ (<tt>already borrowed: ...</tt>). A wait or close already
+  under way on another thread when a handle is used up finishes, and keeps
+  the handle's D-Bus connection until it does; a setter or +update+ still
+  waiting for its turn then raises +IOError+.
+* On macOS, +show+ without a block uses its handle up at once, since that
+  is when notify-rust sends; wait inside +show+'s block there.
 * A panic inside notify-rust would end your Ruby process. It raises
   Ferro::NotifyRust::Error with <tt>notify-rust panicked: ...</tt>
-  instead, and Notification.at_bus raises Error::Msg for a sub-bus
-  notify-rust would panic on. Rust still prints its usual panic message to
-  stderr first.
+  instead. Rust still prints its usual panic message to stderr first.
 * notify-rust's Error keeps its kind private, so ferro reads it from
   notify-rust's +Debug+ text.
-* Not bound: <tt>From<Duration> for Timeout</tt> (pass Integer
-  milliseconds), +show_debug+ (deprecated, "never meant to be public
-  API"), macOS's <tt>NotificationHandle::new</tt> (+show+ makes the
+* Not bound: macOS's <tt>NotificationHandle::new</tt> (+show+ makes the
   same handle), and Image's conversions from the image crate's types (use
   Image.open).
 

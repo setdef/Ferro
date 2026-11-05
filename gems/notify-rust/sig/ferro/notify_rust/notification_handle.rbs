@@ -6,6 +6,7 @@ module Ferro
     class NotificationHandle
       private def self.new: () -> NotificationHandle
 
+      def debug: () -> String
       def wait_for_action: () { (String action) -> void } -> nil
       def wait_for_response: () { (NotificationResponse response) -> void } -> nil
       def on_close: () { (CloseReason reason) -> void } -> nil
@@ -13,6 +14,8 @@ module Ferro
       private
 
       def release: () -> self
+      def native_release: () -> nil
+      def native_debug: () -> String
       def native_wait_for_action: () -> String?
       def native_wait_for_response: () -> response_tag?
       def native_on_close: () -> close_reason_tag?

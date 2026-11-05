@@ -27,6 +27,21 @@ class TestWindows < Minitest::Test
     assert_equal "ferro-notify-rust test", handle.summary
     assert_same handle, handle.body("changed")
     assert_equal "changed", handle.body
+    assert_match(/\ANotificationHandle \{ notification: Notification \{ /, handle.debug)
+  rescue NotifyRust::Error::Msg => e
+    refute_empty e.message
+  end
+
+  # Rust drops the handle at the end of its scope, so the end of show's
+  # block takes notify-rust's handle out, and every later call raises
+  # IOError, as a closed IO does. No wait runs: one blocks for a person.
+  def test_the_end_of_shows_block_uses_the_handle_up
+    kept = NotifyRust::Notification.new.summary("ferro-notify-rust test").timeout(0).show { |handle| handle }
+    error = assert_raises(IOError) { kept.summary }
+
+    assert_equal "Ferro::NotifyRust::NotificationHandle consumed by Builder#show", error.message
+    assert_raises(IOError) { kept.debug }
+    assert_raises(IOError) { kept.wait_for_action { |action| action } }
   rescue NotifyRust::Error::Msg => e
     refute_empty e.message
   end

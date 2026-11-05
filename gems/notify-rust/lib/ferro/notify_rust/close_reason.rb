@@ -50,9 +50,8 @@ module Ferro
           freeze
         end
 
-        # The constant that holds this reason.
-        def inspect
-          "Ferro::NotifyRust::CloseReason::#{@name}"
+        private def to_native
+          @name
         end
       end
       private_constant :Unit
@@ -78,6 +77,10 @@ module Ferro
         ##
         # :attr_reader: raw_reason
         # The platform's code, an Integer.
+
+        private def to_native
+          raw_reason
+        end
       end
 
       # The reason the XDG specification's code +raw_reason+ means: 1
@@ -103,6 +106,26 @@ module Ferro
         end
       end
       private_class_method :from_native
+
+      # The native layer's tag for +reason+, a CloseReason; raises
+      # +TypeError+ for anything else, as Rust's types would refuse it.
+      def self.tag_of(reason) # :nodoc:
+        raise TypeError, "no implicit conversion of #{reason.class} into Ferro::NotifyRust::CloseReason" unless reason.is_a?(CloseReason)
+
+        (_ = reason).__send__(:to_native)
+      end
+      private_class_method :tag_of
+
+      # notify-rust's derived +Debug+ text for this reason
+      # (<tt>src/response.rs:21</tt>), formatted by Rust. +inspect+ stays
+      # Ruby's.
+      #
+      # === Example
+      #
+      #   Ferro::NotifyRust::CloseReason::Other.new(7).debug # => "Other(7)"
+      def debug
+        Native.close_reason_debug(__send__(:to_native))
+      end
     end
 
     #--

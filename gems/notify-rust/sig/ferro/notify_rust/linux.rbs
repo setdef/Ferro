@@ -21,6 +21,7 @@ module Ferro
       private def self.[]: (Integer major, Integer minor) -> instance
 
       def <=>: (Object other) -> Integer?
+      def debug: () -> String
     end
 
     module Native
@@ -29,6 +30,9 @@ module Ferro
       def self.handle_action: (Integer id) -> action_response_tag?
       def self.dbus_stack: () -> (:Dbus | :Zbus)
       def self.spec_version: () -> [Integer, Integer]
+      def self.version_debug: (Integer major, Integer minor) -> String
+      def self.dbus_stack_debug: (:Dbus | :Zbus name) -> String
+      def self.image_error_debug: (:TooBig | :WrongDataSize | :CantConvert name) -> String
     end
 
     class Error
@@ -40,16 +44,23 @@ module Ferro
     end
 
     class ImageError < StandardError
+      @debug: String?
+
+      def debug: () -> String?
+
       class TooBig < ImageError
+        def debug: () -> String?
       end
 
       class WrongDataSize < ImageError
+        def debug: () -> String?
       end
 
       class CantOpen < ImageError
       end
 
       class CantConvert < ImageError
+        def debug: () -> String?
       end
     end
 
@@ -66,13 +77,13 @@ module Ferro
       def ==: (Object other) -> bool
       def eql?: (Object other) -> bool
       def hash: () -> Integer
-      def inspect: () -> String
+      def debug: () -> String
 
       private
 
       def native_equal: (Object other) -> bool
       def native_hash: () -> Integer
-      def native_inspect: () -> String
+      def native_debug: () -> String
     end
 
     module Hint
@@ -95,12 +106,13 @@ module Ferro
       private def self.new: (:Dbus | :Zbus name) -> instance
 
       def initialize: (:Dbus | :Zbus name) -> void
-      def inspect: () -> String
+      def debug: () -> String
     end
 
     class Future[T]
       @work: ^() -> T
       @lock: Thread::Mutex
+      @consumed: bool
       @done: bool
       @value: T?
       @error: Error?
@@ -112,6 +124,7 @@ module Ferro
 
       private
 
+      def initialize_copy: (Future[T] original) -> bot
       def settle: () -> void
     end
 
@@ -125,11 +138,6 @@ module Ferro
       def show_async_at_bus: (String sub_bus) -> Future[NotificationHandle]
     end
 
-    class Notification
-      def self.at_bus: (String sub_bus) -> Notification
-      private def self.native_at_bus: (String sub_bus) -> Notification
-    end
-
     class NotificationHandle
       def id: () -> Integer
       def close: () -> nil
@@ -141,6 +149,8 @@ module Ferro
 
       def native_handle_id: () -> Integer
       def native_close: () -> nil
+      def native_close_async: () -> nil
+      def native_wait_for_action_async: () -> response_tag?
       def native_update: () -> nil
     end
   end

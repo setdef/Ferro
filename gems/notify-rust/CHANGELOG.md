@@ -16,11 +16,23 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 
 - `Notification.default`, notify-rust's `impl Default for Notification`.
 - On Linux, `SPEC_VERSION`, notify-rust's own lazily read specification version, loaded the first time it is named, as a `Version` with `major` and `minor` that compares as notify-rust's does.
+- `debug` on `Notification`, `NotificationHandle`, every value (`Urgency`, `Timeout`, `CloseReason`, `NotificationResponse`, `ActionResponse`, `Hint`, `NotificationId`, `ServerInformation`; on Linux `Image`, `DbusStack`, `Version`), and every error, answering notify-rust's `Debug` text as Rust formats it; an error notify-rust raised keeps the text of the value it returned.
+- `Timeout.from` and `Notification#timeout` take a Rust `Duration` as a non-Integer `Numeric` number of seconds, notify-rust's `From<Duration> for Timeout`; an Integer stays milliseconds.
 
 ### Changed
 
-- On Linux, a `NotificationHandle` setter or `update` while another thread waits on or closes the handle waits for that to end, which Ctrl-C, `Thread#raise`, and `Thread#kill` can cut short, instead of raising `Error` ("already borrowed"); any call while `update` runs waits for it instead of raising ("already mutably borrowed"). From a signal trap on the waiting thread itself it raises `ThreadError`. Breaking: code that rescued `Error` for "already borrowed" or "already mutably borrowed" now waits, or gets `ThreadError`.
+- On Linux, a `NotificationHandle` setter or `update` while another thread's `wait_for_action_async` or `close_async` runs waits for it to end, which Ctrl-C, `Thread#raise`, and `Thread#kill` can cut short, instead of raising `Error` ("already borrowed"); any call while `update` runs waits for it instead of raising ("already mutably borrowed"). From a signal trap on the waiting thread itself it raises `ThreadError`. Breaking: code that rescued `Error` for "already borrowed" or "already mutably borrowed" now waits, or gets `ThreadError`.
 - `Error::Conversion.new(reason)` builds notify-rust's message, `Conversion Error: ` and the reason, as `ErrorKind::Conversion` displays it; errors notify-rust raises keep the same message.
+- **Breaking:** a `NotificationHandle` works until a call that notify-rust's takes `self` for: `wait_for_action`, `wait_for_response`, `on_close`, and on Linux `close`, and the end of `show`'s block, where Rust drops it. Any later call on it raises `IOError`, instead of waiting again (Linux), returning without calling its block (macOS, Windows), or raising `Error` (Windows setters). On macOS, `show` without a block uses the handle up at once. On Linux, `wait_for_action_async` and `close_async` borrow the handle and leave it usable, and a used-up handle frees its D-Bus connection then, once any borrowing call ends, rather than when garbage-collected; a setter or `update` waiting for its turn then raises `IOError`.
+- **Breaking:** a Linux `Future` answers once, as `.await` takes a Rust future: the `value` that returns or raises its outcome uses it up, and a later `value` raises `IOError`; `dup` and `clone` raise `TypeError`.
+- **Breaking:** `inspect` is Ruby's own on every class; notify-rust's `Debug` text, which `Notification#inspect` and `Image#inspect` answered and the enum constants imitated, moved to `debug`.
+- **Breaking:** a wait without a block (`wait_for_action`, `wait_for_response`, `on_close`, and on Linux `handle_action`) raises `ArgumentError` before it waits, instead of waiting and then losing the answer.
+- **Breaking:** `Timeout.from` and `Notification#timeout` read a Float or Rational as seconds, notify-rust's `From<Duration>`, where `Timeout.from` read it as milliseconds and `timeout` raised `TypeError`.
+- **Breaking:** an allocated but uninitialized `Notification` raises Ruby's `TypeError` instead of `Error`.
+
+### Removed
+
+- **Breaking:** `Notification.at_bus` (Linux), which notify-rust hides and deprecates as "a test only feature", and the deprecated `actions(list)` setter; the `actions` field still reads and writes through `actions` and `actions=`.
 
 ### Fixed
 

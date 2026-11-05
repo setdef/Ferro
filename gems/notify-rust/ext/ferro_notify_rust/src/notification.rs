@@ -25,8 +25,9 @@ use crate::{capture, settle, values, Panic};
 /// for its turn (`lock.rs`), so it must not touch Ruby: callers convert
 /// their arguments first and build Ruby values from what it returns.
 pub trait Holds {
-    /// Runs `operation` on the notification. Raises when there is none, as
-    /// on a Windows handle a wait has consumed (plan 003, decision 5).
+    /// Runs `operation` on the notification. Raises when there is none:
+    /// `TypeError` for a notification only allocated, `IOError` for a
+    /// handle a consuming call used up (plan 003, decision 5).
     fn with<R>(
         &self,
         ruby: &Ruby,
@@ -83,9 +84,16 @@ impl Default for Notification {
     }
 }
 
-/// What a notification not yet initialized raises, as one from
-/// `Notification.allocate` would.
+/// What a notification not yet initialized, one from
+/// `Notification.allocate`, raises: Ruby's own `TypeError` in Ruby's words,
+/// as `Time.allocate.year` raises "uninitialized Time" (ADR 001,
+/// 2026-11-05: a breach of Ruby's rules raises Ruby's class).
 const UNINITIALIZED: &str = "uninitialized Ferro::NotifyRust::Notification";
+
+/// The `TypeError` an uninitialized notification raises.
+fn uninitialized(ruby: &Ruby) -> Error {
+    Error::new(ruby.exception_type_error(), UNINITIALIZED)
+}
 
 /// Fills `slot` with what `make` builds, catching a panic, which leaves
 /// `slot` empty.
@@ -129,8 +137,8 @@ impl Notification {
         Ok(())
     }
 
-    /// `#inspect`: notify-rust's `Debug` text (`src/notification.rs:49`).
-    fn inspect(ruby: &Ruby, rb_self: &Self) -> Result<String, Error> {
+    /// `#debug`: notify-rust's `Debug` text (`src/notification.rs:49`).
+    fn debug(ruby: &Ruby, rb_self: &Self) -> Result<String, Error> {
         rb_self.with_ref(ruby, |notification| format!("{notification:?}"))
     }
 }
@@ -151,7 +159,7 @@ impl Holds for Notification {
             .unwrap_or_else(PoisonError::into_inner)
             .as_mut()
             .map(operation);
-        outcome.ok_or_else(|| crate::error::base(ruby, UNINITIALIZED))
+        outcome.ok_or_else(|| uninitialized(ruby))
     }
 
     fn with_ref<R>(
@@ -165,7 +173,7 @@ impl Holds for Notification {
             .unwrap_or_else(PoisonError::into_inner)
             .as_ref()
             .map(operation);
-        outcome.ok_or_else(|| crate::error::base(ruby, UNINITIALIZED))
+        outcome.ok_or_else(|| uninitialized(ruby))
     }
 }
 
@@ -257,17 +265,6 @@ pub fn timeout<T: Holds + TypedData>(
     let timeout = values::timeout_from_ruby(ruby, tag)?;
     set(ruby, rb_self, |notification| {
         notification.timeout(timeout);
-    })
-}
-
-#[allow(deprecated)]
-pub fn actions<T: Holds + TypedData>(
-    ruby: &Ruby,
-    rb_self: Obj<T>,
-    actions: Vec<String>,
-) -> Result<(), Error> {
-    set(ruby, rb_self, |notification| {
-        notification.actions(actions);
     })
 }
 
@@ -441,10 +438,6 @@ macro_rules! define_builder {
             magnus::method!($crate::notification::timeout::<$holder>, 1),
         )?;
         class.define_private_method(
-            "native_actions",
-            magnus::method!($crate::notification::actions::<$holder>, 1),
-        )?;
-        class.define_private_method(
             "native_action",
             magnus::method!($crate::notification::action::<$holder>, 2),
         )?;
@@ -480,10 +473,10 @@ pub fn define(ruby: &Ruby, notify_rust: magnus::RModule) -> Result<(), Error> {
     let _ = <Notification as TypedData>::class(ruby);
     class.define_private_method("initialize", method!(Notification::initialize, 0))?;
     class.define_private_method("initialize_copy", method!(Notification::initialize_copy, 1))?;
-    class.define_private_method("native_inspect", method!(Notification::inspect, 0))?;
+    class.define_private_method("native_debug", method!(Notification::debug, 0))?;
     define_builder!(class, Notification);
-    // Windows' Notification has nothing of its own beside the builder.
-    #[cfg(not(windows))]
+    // Only macOS's Notification has methods of its own beside the builder.
+    #[cfg(target_os = "macos")]
     crate::platform::define_notification(ruby, class)?;
     Ok(())
 }

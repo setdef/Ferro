@@ -41,12 +41,12 @@ class TestRactor < Minitest::Test
   def test_another_ractor_builds_notifications_and_converts_values
     built = run_script(<<~RUBY)
       Ractor.new do
-        [Ferro::NotifyRust::Notification.new.summary("built").timeout(0).timeout.inspect,
+        [Ferro::NotifyRust::Notification.new.summary("built").timeout(0).timeout.debug,
           Ferro::NotifyRust::Timeout.from_str("42").value]
       end.value
     RUBY
 
-    assert_equal ["Ferro::NotifyRust::Timeout::Never", 42], built
+    assert_equal ["Never", 42], built
   end
 
   # A shared notification is frozen, so no Ractor can reset it by running

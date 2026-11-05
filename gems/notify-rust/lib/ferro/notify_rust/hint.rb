@@ -261,11 +261,6 @@ module Ferro
           freeze
         end
 
-        # The constant that holds this hint.
-        def inspect
-          "Ferro::NotifyRust::Hint::#{@name}"
-        end
-
         private def to_native
           [@name]
         end
@@ -340,6 +335,18 @@ module Ferro
       #   Ferro::NotifyRust::Hint::SoundName.new("bell").as_str # => "bell"
       def as_str
         Native.hint_as_str(to_native)
+      end
+
+      # notify-rust's derived +Debug+ text for this hint
+      # (<tt>src/hints.rs:39</tt>), formatted by Rust. +inspect+ stays
+      # Ruby's.
+      #
+      # === Example
+      #
+      #   Ferro::NotifyRust::Hint::Custom.new("x-dunst-stack-tag", "volume").debug
+      #   # => "Custom(\"x-dunst-stack-tag\", \"volume\")"
+      def debug
+        Native.hint_debug(to_native)
       end
 
       # The tag the native layer takes: the variant's name, then its

@@ -17,7 +17,7 @@ module Ferro
       def self.from: (Integer? value) -> Urgency
 
       def initialize: (urgency_tag name) -> void
-      def inspect: () -> String
+      def debug: () -> String
 
       private
 

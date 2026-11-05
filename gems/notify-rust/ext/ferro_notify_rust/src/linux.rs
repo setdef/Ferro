@@ -16,16 +16,18 @@
 use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::pin::pin;
+use std::sync::{Mutex, PoisonError};
 
 use magnus::rb_sys::{AsRawValue, FromRawValue};
 use magnus::{
-    function, method, prelude::*, typed_data::Obj, Error, RArray, RClass, RModule, RString, Ruby,
+    function, method, prelude::*, typed_data::Obj, Error, RArray, RModule, RString, Ruby, Symbol,
     TypedData, Value,
 };
 use notify_rust::{CloseReason, ImageError, NotificationResponse};
 
-use crate::lock::{Lock, Owner, ReadGuard};
-use crate::notification::{plain_set, try_set, Holds, Notification};
+use crate::lock::{Lock, Owner, ReadGuard, Retired};
+use crate::notification::{plain_set, try_set, Holds};
+use crate::slot::Slot;
 use crate::{capture, error, gvl, panic_of, path_from_ruby, settle, values};
 
 /// The platform's name, as `Ferro::NotifyRust::PLATFORM` reports it.
@@ -63,14 +65,14 @@ impl Image {
         i64::from_ne_bytes(hasher.finish().to_ne_bytes())
     }
 
-    /// `#inspect`: notify-rust's derived `Debug`.
-    fn inspect(&self) -> String {
+    /// `#debug`: notify-rust's derived `Debug` (`src/image.rs:20`).
+    fn debug(&self) -> String {
         format!("{:?}", self.0)
     }
 }
 
 /// The `ImageError` subclass for `failure`, with notify-rust's text
-/// (`src/image.rs:126-165`).
+/// (`src/image.rs:126-165`), keeping its `Debug` text.
 fn image_error(ruby: &Ruby, failure: &ImageError) -> Error {
     let leaf = match failure {
         ImageError::TooBig => "TooBig",
@@ -78,7 +80,31 @@ fn image_error(ruby: &Ruby, failure: &ImageError) -> Error {
         ImageError::CantOpen(_) => "CantOpen",
         ImageError::CantConvert => "CantConvert",
     };
-    error::raise(ruby, &["ImageError", leaf], &[failure.to_string()])
+    error::raise(
+        ruby,
+        &["ImageError", leaf],
+        &[failure.to_string()],
+        Some(format!("{failure:?}")),
+    )
+}
+
+/// `Native.image_error_debug`: notify-rust's derived `Debug` text
+/// (`src/image.rs:127`) for the variant `name` of an `ImageError` Ruby
+/// code made. Only the variants that hold nothing can be built; `CantOpen`
+/// holds the image crate's error, a value no Ruby value is.
+fn image_error_debug(ruby: &Ruby, name: Symbol) -> Result<String, Error> {
+    let failure = match name.name()?.as_ref() {
+        "TooBig" => ImageError::TooBig,
+        "WrongDataSize" => ImageError::WrongDataSize,
+        "CantConvert" => ImageError::CantConvert,
+        other => {
+            return Err(Error::new(
+                ruby.exception_type_error(),
+                format!("{other} is not an ImageError that holds nothing"),
+            ))
+        }
+    };
+    Ok(format!("{failure:?}"))
 }
 
 /// An `Image` for Ruby, or `ImageError`.
@@ -123,9 +149,10 @@ fn open(ruby: &Ruby, path: Value) -> Result<Obj<Image>, Error> {
 ///
 /// It takes the turns Rust's borrow checker hands out, at run time, as a
 /// reader-writer lock does (`lock.rs`, plan 003, decision 5). A wait,
-/// `close`, `id`, and the field readers take a shared turn, as
-/// notify-rust's `&self` methods borrow the handle, so a wait and a
-/// `close` run together, as notify-rust's own `close_async` example does
+/// `close`, their async forms, `id`, and the field readers take a shared
+/// turn, as notify-rust's `&self` methods borrow the handle, so
+/// `wait_for_action_async` and `close_async` run together, as
+/// notify-rust's own `close_async` example does
 /// (`src/xdg/mod.rs:155-178`). A setter or `update` takes the exclusive
 /// turn, as `&mut self` does, and waits for the shared ones to end, with
 /// the GVL released, as Ruby's `Mutex` makes a second thread wait; while
@@ -134,12 +161,38 @@ fn open(ruby: &Ruby, path: Value) -> Result<Obj<Image>, Error> {
 /// exclusive turn while its own wait holds a shared one (from a signal
 /// trap that runs during the wait) would wait for itself forever, so it
 /// raises `ThreadError` instead, as Ruby's `Mutex#lock` does.
+///
+/// notify-rust's `wait_for_action`, `wait_for_response`, `on_close`, and
+/// `close` take `self` (`src/xdg/mod.rs:101`, `:134`, `:214`, `:269`), and
+/// Rust drops the handle at the end of its scope, so each of those, and
+/// the end of `show`'s block, uses the handle up (`spent`): every later
+/// call raises `IOError` (ADR 001, 2026-11-05). `wait_for_action_async`
+/// and `close_async` borrow it (`:183`, `:229`), so they do not. A call
+/// already under way on another thread when the handle is used up
+/// finishes.
+///
+/// A consuming call frees notify-rust's handle, and the D-Bus connection
+/// it keeps (a socket, and zbus's executor thread, `src/xdg/zbus_rs.rs:61`;
+/// zbus 5.19.0 `src/connection/builder.rs:785-797`), when it returns, as
+/// Rust drops a moved handle at the end of the call, and the end of
+/// `show`'s block frees it there: each retires the lock (`lock.rs`). A
+/// borrowing call already under way on another thread keeps it until that
+/// call ends, as no Rust borrow outlives a move, and a setter or `update`
+/// waiting for its turn raises `IOError`. The drop runs where the last
+/// turn ends, with the GVL held when that is a Ruby method's end. It never
+/// waits: zbus's `ConnectionInner` drop only notifies its listeners
+/// (`src/connection/mod.rs:86-93`), and the socket and the reader task
+/// close without blocking; the executor thread ends on its own once its
+/// tasks are gone (`builder.rs:792-797`).
 #[magnus::wrap(
     class = "Ferro::NotifyRust::NotificationHandle",
     free_immediately,
     size
 )]
-pub struct Handle(Lock<notify_rust::NotificationHandle>);
+pub struct Handle {
+    lock: Lock<notify_rust::NotificationHandle>,
+    spent: Mutex<Slot<()>>,
+}
 
 /// What a setter or `update` raises on the thread whose own wait or close
 /// holds the handle.
@@ -167,19 +220,64 @@ fn owner(ruby: &Ruby) -> Result<Owner, Error> {
 
 impl Handle {
     fn new(handle: notify_rust::NotificationHandle) -> Self {
-        Self(Lock::new(handle))
+        Self {
+            lock: Lock::new(handle),
+            spent: Mutex::new(Slot::Live(())),
+        }
     }
 
-    /// A shared turn: at once if no setter or `update` has the handle,
-    /// else waited for with the GVL released.
+    fn slot(&self) -> std::sync::MutexGuard<'_, Slot<()>> {
+        self.spent.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Raises `IOError` once a consuming call has used the handle up.
+    fn live(&self, ruby: &Ruby) -> Result<(), Error> {
+        let spent = self.slot().get_mut().err();
+        spent.map_or(Ok(()), |by| Err(error::consumed(ruby, by)))
+    }
+
+    /// Uses the handle up for the consuming call `by`, or raises `IOError`
+    /// if one already did.
+    fn consume(&self, ruby: &Ruby, by: &'static str) -> Result<(), Error> {
+        let taken = self.slot().take(by);
+        taken.map_err(|earlier| error::consumed(ruby, earlier))
+    }
+
+    /// A shared turn, for a call that borrows the handle: at once if no
+    /// setter or `update` has the handle, else waited for with the GVL
+    /// released. Raises `IOError` for a handle used up.
     fn shared(&self, ruby: &Ruby) -> Result<ReadGuard<'_, notify_rust::NotificationHandle>, Error> {
+        self.live(ruby)?;
+        self.turn(ruby)
+    }
+
+    /// A shared turn, for a consuming call that has already used the
+    /// handle up, or a borrowing one that checked it is live. Raises
+    /// `IOError` once a consuming call has retired the lock.
+    fn turn(&self, ruby: &Ruby) -> Result<ReadGuard<'_, notify_rust::NotificationHandle>, Error> {
         let owner = owner(ruby)?;
-        if let Some(turn) = self.0.try_read(owner) {
-            return Ok(turn);
+        if let Some(turn) = self.lock.try_read(owner) {
+            return turn.map_err(|Retired(by)| error::consumed(ruby, by));
         }
-        let waiter = self.0.waiter(owner);
+        let waiter = self.lock.waiter(owner);
         gvl::wait_until(ruby, &waiter, || waiter.read(), |turn| turn)?
-            .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))
+            .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))?
+            .map_err(|Retired(by)| error::consumed(ruby, by))
+    }
+
+    /// The shared turn of the consuming call `by`: uses the handle up, as
+    /// Rust moves it into the call, takes a turn, and retires the lock, so
+    /// notify-rust's handle drops when the turn ends, as Rust drops it when
+    /// the call returns. An interrupted wait for the turn retires it too.
+    fn consuming_turn(
+        &self,
+        ruby: &Ruby,
+        by: &'static str,
+    ) -> Result<ReadGuard<'_, notify_rust::NotificationHandle>, Error> {
+        self.consume(ruby, by)?;
+        let turn = self.turn(ruby);
+        self.lock.retire(by);
+        turn
     }
 
     /// Waits for the exclusive turn with the GVL released and runs
@@ -192,32 +290,40 @@ impl Handle {
         short: bool,
         operation: impl FnOnce(&mut notify_rust::NotificationHandle) -> R,
     ) -> Result<R, Error> {
+        self.live(ruby)?;
         if short {
-            if let Some(mut turn) = self.0.try_write() {
+            if let Some(turn) = self.lock.try_write() {
+                let mut turn = turn.map_err(|Retired(by)| error::consumed(ruby, by))?;
                 return Ok(operation(&mut turn));
             }
         }
         let owner = owner(ruby)?;
-        if self.0.holds(owner) {
+        if self.lock.holds(owner) {
             return Err(Error::new(ruby.exception_thread_error(), BORROWED));
         }
-        let waiter = self.0.waiter(owner);
+        let waiter = self.lock.waiter(owner);
         gvl::wait_until(
             ruby,
             &waiter,
             || waiter.write(),
-            |mut turn| operation(&mut turn),
+            |turn| turn.map(|mut turn| operation(&mut turn)),
         )?
-        .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))
+        .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))?
+        .map_err(|Retired(by)| error::consumed(ruby, by))
     }
 
     /// Waits for the server's answer through `wait_for_action_async`
     /// (`src/xdg/mod.rs:146-195`), and returns the response it passed the
     /// closure, if any: the wait also ends when the connection does. An
     /// interrupt that raises just as the response arrives discards it
-    /// (`gvl.rs`).
-    fn response(&self, ruby: &Ruby) -> Result<Option<NotificationResponse>, Error> {
-        let handle = self.shared(ruby)?;
+    /// (`gvl.rs`). `by` names the consuming wait that uses the handle up,
+    /// or is `None` for `wait_for_action_async`, which borrows it.
+    fn response(
+        &self,
+        ruby: &Ruby,
+        by: Option<&'static str>,
+    ) -> Result<Option<NotificationResponse>, Error> {
+        let handle = by.map_or_else(|| self.shared(ruby), |by| self.consuming_turn(ruby, by))?;
         let mut seen = None;
         let outcome = {
             let mut future = pin!(sendable(handle.wait_for_action_async(
@@ -232,33 +338,79 @@ impl Handle {
     }
 
     /// `#native_wait_for_action`: the string `wait_for_action` passes its
-    /// closure, or `nil` when it calls none.
+    /// closure, or `nil` when it calls none. It uses the handle up.
     fn wait_for_action(ruby: &Ruby, rb_self: &Self) -> Result<Option<String>, Error> {
-        Ok(rb_self.response(ruby)?.as_ref().and_then(action_of))
+        Ok(rb_self
+            .response(ruby, Some("NotificationHandle#wait_for_action"))?
+            .as_ref()
+            .and_then(action_of))
     }
 
-    /// `#native_wait_for_response`: the response, as its tag, or `nil`.
+    /// `#native_wait_for_response`: the response, as its tag, or `nil`. It
+    /// uses the handle up.
     fn wait_for_response(ruby: &Ruby, rb_self: &Self) -> Result<Option<RArray>, Error> {
         Ok(rb_self
-            .response(ruby)?
+            .response(ruby, Some("NotificationHandle#wait_for_response"))?
+            .map(|response| values::response_to_ruby(ruby, &response)))
+    }
+
+    /// `#native_wait_for_action_async`: the response, as its tag, or `nil`,
+    /// waited for through a borrow of the handle, as
+    /// `wait_for_action_async` borrows it (`src/xdg/mod.rs:183`).
+    fn wait_for_action_async(ruby: &Ruby, rb_self: &Self) -> Result<Option<RArray>, Error> {
+        Ok(rb_self
+            .response(ruby, None)?
             .map(|response| values::response_to_ruby(ruby, &response)))
     }
 
     /// `#native_on_close`: the reason `on_close` passes its handler, or
-    /// `nil` when the wait ended otherwise (`src/xdg/mod.rs:269-288`).
+    /// `nil` when the wait ended otherwise (`src/xdg/mod.rs:269-288`). It
+    /// uses the handle up.
     fn on_close(ruby: &Ruby, rb_self: &Self) -> Result<Option<Value>, Error> {
-        Ok(match rb_self.response(ruby)? {
-            Some(NotificationResponse::Closed(reason)) => {
-                Some(values::close_reason_to_ruby(ruby, reason))
-            }
-            _ => None,
-        })
+        Ok(
+            match rb_self.response(ruby, Some("NotificationHandle#on_close"))? {
+                Some(NotificationResponse::Closed(reason)) => {
+                    Some(values::close_reason_to_ruby(ruby, reason))
+                }
+                _ => None,
+            },
+        )
     }
 
-    /// `#native_close`: `close_async` (`src/xdg/mod.rs:223-238`), which
-    /// `close` blocks on, ignoring its error as `close` does.
+    /// `#native_close`: `close` (`src/xdg/mod.rs:214-221`), which uses the
+    /// handle up and blocks on `close_async`.
     fn close(ruby: &Ruby, rb_self: &Self) -> Result<(), Error> {
+        let handle = rb_self.consuming_turn(ruby, "NotificationHandle#close")?;
+        Self::closed(ruby, &handle)
+    }
+
+    /// `#native_close_async`: `close_async` (`src/xdg/mod.rs:223-238`),
+    /// which borrows the handle.
+    fn close_async(ruby: &Ruby, rb_self: &Self) -> Result<(), Error> {
         let handle = rb_self.shared(ruby)?;
+        Self::closed(ruby, &handle)
+    }
+
+    /// `#native_release`: the end of `show`'s block, where Rust drops a
+    /// handle no consuming call has moved away, uses it up and retires the
+    /// lock, so notify-rust's handle drops now, or when a borrowing call
+    /// on another thread ends.
+    fn release(rb_self: &Self) {
+        let released = rb_self.slot().release("Builder#show");
+        if released.is_some() {
+            rb_self.lock.retire("Builder#show");
+        }
+    }
+
+    /// `#native_debug`: notify-rust's derived `Debug` (`src/xdg/mod.rs:70`),
+    /// which shows the zbus connection the handle keeps.
+    fn debug(ruby: &Ruby, rb_self: &Self) -> Result<String, Error> {
+        Ok(format!("{:?}", *rb_self.shared(ruby)?))
+    }
+
+    /// Polls `close_async` on `handle`, which a shared turn holds, until
+    /// the server has the call, ignoring its error as `close` does.
+    fn closed(ruby: &Ruby, handle: &notify_rust::NotificationHandle) -> Result<(), Error> {
         let outcome = {
             let mut future = pin!(sendable(handle.close_async()));
             gvl::wait(ruby, |context| future.as_mut().poll(context))?
@@ -431,28 +583,6 @@ macro_rules! define_builder {
 }
 pub(crate) use define_builder;
 
-/// `Notification.native_at_bus` (`src/notification.rs:127-139`).
-/// notify-rust unwraps an invalid sub-bus into a panic; that panic raises
-/// the error `show_async_at_bus` returns for the same input, `invalid
-/// subpath` (`:531`), as plan 003, decision 15 says.
-#[allow(deprecated)]
-fn at_bus(ruby: &Ruby, sub_bus: String) -> Result<Obj<Notification>, Error> {
-    match capture(move || notify_rust::Notification::at_bus(&sub_bus)) {
-        Ok(notification) => Ok(ruby.obj_wrap(Notification::new(notification))),
-        Err(panic) if panic.0.contains("invalid subpath") => Err(error::notify_error(
-            ruby,
-            &notify_rust::error::Error::from("invalid subpath"),
-        )),
-        Err(panic) => Err(error::panicked(ruby, &panic)),
-    }
-}
-
-/// The class methods only `Notification` has here.
-pub fn define_notification(_ruby: &Ruby, class: RClass) -> Result<(), Error> {
-    class.define_singleton_method("native_at_bus", function!(at_bus, 1))?;
-    Ok(())
-}
-
 /// Runs a call notify-rust cannot cancel with the GVL released.
 fn blocking<T>(
     ruby: &Ruby,
@@ -527,6 +657,39 @@ fn dbus_stack(ruby: &Ruby) -> Option<Value> {
     notify_rust::dbus_stack().map(|stack| ruby.to_symbol(format!("{stack:?}")).as_value())
 }
 
+/// `Native.dbus_stack_debug`: notify-rust's derived `Debug` for the
+/// variant `name` (`src/xdg/mod.rs:402-408`), whose `Dbus` variant exists
+/// without the `d` feature.
+fn dbus_stack_debug(ruby: &Ruby, name: Symbol) -> Result<String, Error> {
+    let stack = match name.name()?.as_ref() {
+        "Dbus" => notify_rust::DbusStack::Dbus,
+        "Zbus" => notify_rust::DbusStack::Zbus,
+        other => {
+            return Err(Error::new(
+                ruby.exception_type_error(),
+                format!("{other} is not a DbusStack"),
+            ))
+        }
+    };
+    Ok(format!("{stack:?}"))
+}
+
+/// `Native.version_debug`: the derived `Debug` of `miniver::Version`
+/// (`src/miniver.rs:4`) with `major` and `minor`. The type sits in a
+/// private module, so the only way to one is a copy of `SPEC_VERSION`
+/// (`src/lib.rs:226-233`), whose public fields the copy then takes. A
+/// `Version` exists in Ruby only once `SPEC_VERSION` is read, but reading
+/// it the first time asks the server, so it runs with the GVL released.
+fn version_debug(ruby: &Ruby, major: u64, minor: u64) -> Result<String, Error> {
+    gvl::without_gvl(ruby, move || {
+        let mut version = *notify_rust::SPEC_VERSION;
+        version.major = major;
+        version.minor = minor;
+        format!("{version:?}")
+    })?
+    .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))
+}
+
 /// Defines the Linux classes and functions.
 pub fn define(ruby: &Ruby, notify_rust: RModule, native: RModule) -> Result<(), Error> {
     let image = notify_rust.define_class("Image", ruby.class_object())?;
@@ -537,7 +700,7 @@ pub fn define(ruby: &Ruby, notify_rust: RModule, native: RModule) -> Result<(), 
     image.define_singleton_method("native_open", function!(open, 1))?;
     image.define_private_method("native_equal", method!(Image::equal, 1))?;
     image.define_private_method("native_hash", method!(Image::hash, 0))?;
-    image.define_private_method("native_inspect", method!(Image::inspect, 0))?;
+    image.define_private_method("native_debug", method!(Image::debug, 0))?;
 
     let handle = notify_rust.define_class("NotificationHandle", ruby.class_object())?;
     handle.undef_default_alloc_func();
@@ -552,7 +715,14 @@ pub fn define(ruby: &Ruby, notify_rust: RModule, native: RModule) -> Result<(), 
         method!(Handle::wait_for_response, 0),
     )?;
     handle.define_private_method("native_on_close", method!(Handle::on_close, 0))?;
+    handle.define_private_method(
+        "native_wait_for_action_async",
+        method!(Handle::wait_for_action_async, 0),
+    )?;
     handle.define_private_method("native_close", method!(Handle::close, 0))?;
+    handle.define_private_method("native_close_async", method!(Handle::close_async, 0))?;
+    handle.define_private_method("native_release", method!(Handle::release, 0))?;
+    handle.define_private_method("native_debug", method!(Handle::debug, 0))?;
     handle.define_private_method("native_update", method!(Handle::update, 0))?;
     handle.define_private_method("native_handle_id", method!(Handle::id, 0))?;
 
@@ -564,6 +734,9 @@ pub fn define(ruby: &Ruby, notify_rust: RModule, native: RModule) -> Result<(), 
     native.define_singleton_method("handle_action", function!(handle_action, 1))?;
     native.define_singleton_method("dbus_stack", function!(dbus_stack, 0))?;
     native.define_singleton_method("spec_version", function!(spec_version, 0))?;
+    native.define_singleton_method("version_debug", function!(version_debug, 2))?;
+    native.define_singleton_method("dbus_stack_debug", function!(dbus_stack_debug, 1))?;
+    native.define_singleton_method("image_error_debug", function!(image_error_debug, 1))?;
     Ok(())
 }
 

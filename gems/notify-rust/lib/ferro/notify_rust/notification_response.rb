@@ -42,7 +42,7 @@ module Ferro
     #     in Ferro::NotifyRust::NotificationResponse::Default then puts "body clicked"
     #     in Ferro::NotifyRust::NotificationResponse::Action(key:) then puts "button '#{key}' clicked"
     #     in Ferro::NotifyRust::NotificationResponse::Reply(text:) then puts "user replied: #{text}"
-    #     in Ferro::NotifyRust::NotificationResponse::Closed(reason:) then puts "closed: #{reason.inspect}"
+    #     in Ferro::NotifyRust::NotificationResponse::Closed(reason:) then puts "closed: #{reason.debug}"
     #     end
     #   end
     module NotificationResponse
@@ -56,9 +56,8 @@ module Ferro
           freeze
         end
 
-        # The constant that holds this response.
-        def inspect
-          "Ferro::NotifyRust::NotificationResponse::#{@name}"
+        private def to_native
+          [@name]
         end
       end
       private_constant :Unit
@@ -82,6 +81,10 @@ module Ferro
         # :attr_reader: key
         # The action's identifier, a String: what you passed
         # Notification#action first.
+
+        private def to_native
+          [:Action, key]
+        end
       end
 
       # The user submitted an inline text reply. Only notify-rust's macOS
@@ -96,6 +99,10 @@ module Ferro
         ##
         # :attr_reader: text
         # What the user typed, a String.
+
+        private def to_native
+          [:Reply, text]
+        end
       end
 
       # The notification closed without any action being taken.
@@ -109,6 +116,10 @@ module Ferro
         ##
         # :attr_reader: reason
         # Why it closed, a CloseReason.
+
+        private def to_native
+          [:Closed, CloseReason.__send__(:tag_of, reason)]
+        end
       end
 
       # The response for the action key +key+: Action. Mirrors
@@ -145,6 +156,17 @@ module Ferro
       #   Ferro::NotifyRust::NotificationResponse::Default.is_default_action # => true
       def is_default_action
         equal?(Default)
+      end
+
+      # notify-rust's derived +Debug+ text for this response
+      # (<tt>src/response.rs:63</tt>), formatted by Rust. +inspect+ stays
+      # Ruby's.
+      #
+      # === Example
+      #
+      #   Ferro::NotifyRust::NotificationResponse::Action.new("ok").debug # => "Action(\"ok\")"
+      def debug
+        Native.notification_response_debug(__send__(:to_native))
       end
     end
 

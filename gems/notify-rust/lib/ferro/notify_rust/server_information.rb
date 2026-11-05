@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 #++
 
+require_relative "ferro_notify_rust"
+
 module Ferro
   module NotifyRust
     #--
@@ -12,7 +14,7 @@ module Ferro
     # SPDX-License-Identifier: MIT OR Apache-2.0
     # SPDX-SnippetCopyrightText: 2017 Hendrik Sollich
     # SPDX-SnippetComment: ServerInformation and its field docs from
-    #   notify-rust 4.18.2 src/lib.rs:235-246
+    #   notify-rust 4.18.2 src/lib.rs:235-246, src/xdg/mod.rs:549-562
     #++
 
     # Who is showing your notifications: the server's name, vendor,
@@ -25,7 +27,9 @@ module Ferro
     # NotifyRust.get_server_information (Linux) returns one. notify-rust
     # defines the type on every platform.
     #
-    # Mirrors notify-rust's +ServerInformation+ (<tt>src/lib.rs:235-246</tt>).
+    # Mirrors notify-rust's +ServerInformation+ (<tt>src/lib.rs:235-246</tt>),
+    # and on Linux the private copy get_server_information returns
+    # (<tt>src/xdg/mod.rs:549-562</tt>), which has the same fields.
     #
     # === Example
     #
@@ -47,6 +51,18 @@ module Ferro
       ##
       # :attr_reader: spec_version
       # The specification version the server is compliant with, a String.
+
+      # notify-rust's derived +Debug+ text (<tt>src/lib.rs:236</tt>),
+      # formatted by Rust from the four fields. +inspect+ stays Data's.
+      # Raises +TypeError+ for a field that is no String.
+      #
+      # === Example
+      #
+      #   Ferro::NotifyRust::ServerInformation.new(name: "dunst", vendor: "knopwob", version: "1.12", spec_version: "1.2").debug
+      #   # => "ServerInformation { name: \"dunst\", vendor: \"knopwob\", version: \"1.12\", spec_version: \"1.2\" }"
+      def debug
+        Native.server_information_debug(name, vendor, version, spec_version)
+      end
     end
 
     #--

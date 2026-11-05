@@ -10,7 +10,10 @@ module Ferro
         @name: :Expired | :Dismissed | :CloseAction
 
         def initialize: (:Expired | :Dismissed | :CloseAction name) -> void
-        def inspect: () -> String
+
+        private
+
+        def to_native: () -> (:Expired | :Dismissed | :CloseAction)
       end
 
       Expired: Unit
@@ -24,10 +27,17 @@ module Ferro
 
         def self.new: (Integer raw_reason) -> instance
                     | (raw_reason: Integer) -> instance
+
+        private
+
+        def to_native: () -> Integer
       end
 
       def self.from: (Integer raw_reason) -> (Unit | Other)
       private def self.from_native: (close_reason_tag tag) -> (Unit | Other)
+      private def self.tag_of: (Object reason) -> close_reason_tag
+
+      def debug: () -> String
     end
   end
 end

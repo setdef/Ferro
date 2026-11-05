@@ -9,12 +9,12 @@ module Ferro
       def self.default: () -> Notification
 
       def initialize: () -> void
-      def inspect: () -> String
+      def debug: () -> String
 
       private
 
       def initialize_copy: (Notification other) -> void
-      def native_inspect: () -> String
+      def native_debug: () -> String
     end
   end
 end

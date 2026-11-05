@@ -31,6 +31,15 @@
 //! one run without the GVL, so no thread ever needs to ask whether it holds
 //! one.
 //!
+//! A consuming call retires the lock ([`Lock::retire`]), as Rust moves a
+//! value out of the place that held it: the lock lets go of its own
+//! reference, so the value drops as soon as the last shared turn out ends,
+//! or at once when none is, and an exclusive turn out drops it instead of
+//! putting it back. Rust lets no borrow outlive a move, so a turn already
+//! out finishes first, as the borrow checker would have made it; every
+//! turn asked for afterwards, and every waiter, gets [`Retired`] instead,
+//! with the name of the call that retired the lock.
+//!
 //! This module is ferro-arboard's `lock.rs` (plan 001, Follow-up: the GVL
 //! is never held), grown from one turn to a reader-writer lock. Its
 //! author, Kerrick Long, licenses this copy as MIT OR Apache-2.0 with the
@@ -53,7 +62,8 @@ pub struct Lock<T> {
 
 /// The turns out, under the lock's mutex.
 ///
-/// `value` is `None` while an exclusive turn has it. Each shared turn
+/// `value` is `None` while an exclusive turn has it, and for good once
+/// `retired` names the consuming call that retired the lock. Each shared turn
 /// holds a clone of the `Arc` and drops it before its turn ends, so once
 /// `readers` is empty the slot's `Arc` is the only one. The mutex is held
 /// only for a moment, never across a wait, and nothing panics under it; a
@@ -61,7 +71,16 @@ pub struct Lock<T> {
 struct State<T> {
     value: Option<Arc<T>>,
     readers: Vec<Owner>,
+    retired: Option<&'static str>,
 }
+
+/// No turn will come: the consuming call named here retired the lock.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Retired(pub &'static str);
+
+/// A turn, or why none will come. `None` from a `try_` or a waiter means
+/// no turn now: another turn is out, or Ruby asked the waiter to stop.
+pub type Turn<G> = Option<Result<G, Retired>>;
 
 /// One shared turn with the value, ended when dropped.
 pub struct ReadGuard<'a, T> {
@@ -94,6 +113,7 @@ impl<T> Lock<T> {
             state: Mutex::new(State {
                 value: Some(Arc::new(value)),
                 readers: Vec::new(),
+                retired: None,
             }),
             freed: Condvar::new(),
         }
@@ -104,13 +124,30 @@ impl<T> Lock<T> {
     }
 
     /// A shared turn for `owner`, if no exclusive turn is out.
-    pub fn try_read(&self, owner: Owner) -> Option<ReadGuard<'_, T>> {
+    pub fn try_read(&self, owner: Owner) -> Turn<ReadGuard<'_, T>> {
         self.read_from(&mut self.state(), owner)
     }
 
     /// The exclusive turn, if no other turn is out.
-    pub fn try_write(&self) -> Option<WriteGuard<'_, T>> {
+    pub fn try_write(&self) -> Turn<WriteGuard<'_, T>> {
         self.write_from(&mut self.state())
+    }
+
+    /// Retires the lock for the consuming call `by`, and wakes every
+    /// waiter, which gets [`Retired`]. The lock's own reference drops here,
+    /// outside the mutex, so the value drops now if no turn is out, and
+    /// otherwise when the last one ends. Retiring a retired lock does
+    /// nothing, and keeps the first name.
+    pub fn retire(&self, by: &'static str) {
+        let mut state = self.state();
+        if state.retired.is_some() {
+            return;
+        }
+        state.retired = Some(by);
+        let own = state.value.take();
+        drop(state);
+        self.freed.notify_all();
+        drop(own);
     }
 
     /// Whether `owner` holds a shared turn, so that waiting for the
@@ -129,17 +166,23 @@ impl<T> Lock<T> {
         }
     }
 
-    fn read_from(&self, state: &mut State<T>, owner: Owner) -> Option<ReadGuard<'_, T>> {
+    fn read_from(&self, state: &mut State<T>, owner: Owner) -> Turn<ReadGuard<'_, T>> {
+        if let Some(by) = state.retired {
+            return Some(Err(Retired(by)));
+        }
         let value = Arc::clone(state.value.as_ref()?);
         state.readers.push(owner);
-        Some(ReadGuard {
+        Some(Ok(ReadGuard {
             value: Some(value),
             lock: self,
             owner,
-        })
+        }))
     }
 
-    fn write_from(&self, state: &mut State<T>) -> Option<WriteGuard<'_, T>> {
+    fn write_from(&self, state: &mut State<T>) -> Turn<WriteGuard<'_, T>> {
+        if let Some(by) = state.retired {
+            return Some(Err(Retired(by)));
+        }
         if !state.readers.is_empty() {
             return None;
         }
@@ -147,10 +190,10 @@ impl<T> Lock<T> {
         // the unwrap finds this one alone; were it ever not, the writer
         // would wait as for a shared turn.
         match Arc::try_unwrap(state.value.take()?) {
-            Ok(value) => Some(WriteGuard {
+            Ok(value) => Some(Ok(WriteGuard {
                 value: Some(value),
                 lock: self,
-            }),
+            })),
             Err(shared) => {
                 state.value = Some(shared);
                 None
@@ -169,7 +212,9 @@ impl<T> std::ops::Deref for ReadGuard<'_, T> {
 }
 
 impl<T> Drop for ReadGuard<'_, T> {
-    /// Drops the clone, then ends the turn and wakes every waiter.
+    /// Drops the clone, which drops the value if the lock is retired and
+    /// this was the last turn out, then ends the turn and wakes every
+    /// waiter.
     fn drop(&mut self) {
         drop(self.value.take());
         let mut state = self.lock.state();
@@ -197,10 +242,17 @@ impl<T> std::ops::DerefMut for WriteGuard<'_, T> {
 }
 
 impl<T> Drop for WriteGuard<'_, T> {
-    /// Puts the value back, then wakes every waiter.
+    /// Puts the value back, or drops it, outside the mutex, if the lock
+    /// was retired meanwhile, then wakes every waiter.
     fn drop(&mut self) {
         if let Some(value) = self.value.take() {
-            self.lock.state().value = Some(Arc::new(value));
+            let mut state = self.lock.state();
+            if state.retired.is_none() {
+                state.value = Some(Arc::new(value));
+            } else {
+                drop(state);
+                drop(value);
+            }
         }
         self.lock.freed.notify_all();
     }
@@ -212,18 +264,19 @@ impl<'a, T> Waiter<'a, T> {
     /// `None`: Ruby then handles the interrupt and, unless it raises,
     /// waits again. An interrupt wins over a free turn, so an interrupted
     /// call does not start its work, as the (a) case of the passage at
-    /// `thread.c:1694-1699` (Ruby v4.0.9) describes.
-    pub fn read(&self) -> Option<ReadGuard<'a, T>> {
+    /// `thread.c:1694-1699` (Ruby v4.0.9) describes. Returns [`Retired`]
+    /// once the lock is retired.
+    pub fn read(&self) -> Turn<ReadGuard<'a, T>> {
         self.wait(|lock, state| lock.read_from(state, self.owner))
     }
 
     /// Waits for the exclusive turn, as [`Waiter::read`] waits for a
     /// shared one.
-    pub fn write(&self) -> Option<WriteGuard<'a, T>> {
+    pub fn write(&self) -> Turn<WriteGuard<'a, T>> {
         self.wait(Lock::write_from)
     }
 
-    fn wait<G>(&self, mut take: impl FnMut(&'a Lock<T>, &mut State<T>) -> Option<G>) -> Option<G> {
+    fn wait<G>(&self, mut take: impl FnMut(&'a Lock<T>, &mut State<T>) -> Turn<G>) -> Turn<G> {
         let mut state = self.lock.state();
         loop {
             if self.unblocked.swap(false, Ordering::Relaxed) {
@@ -250,11 +303,32 @@ impl<T: Send + Sync> Unblock for Waiter<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use super::Lock;
+    use super::{Lock, Retired, Turn};
     use crate::gvl::Unblock;
-    use std::sync::mpsc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{mpsc, Arc};
     use std::thread;
     use std::time::Duration;
+
+    /// The turn, which these tests never find retired, or `None`.
+    fn live<G>(turn: Turn<G>) -> Option<G> {
+        turn.transpose()
+            .unwrap_or_else(|Retired(by)| panic!("retired by {by}"))
+    }
+
+    /// A value that counts its drops.
+    struct Counted(Arc<AtomicUsize>);
+
+    impl Drop for Counted {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    fn counted() -> (Lock<Counted>, Arc<AtomicUsize>) {
+        let drops = Arc::new(AtomicUsize::new(0));
+        (Lock::new(Counted(Arc::clone(&drops))), drops)
+    }
 
     // The timeouts below only turn a lost wake into a failure rather than
     // a hang: no run passes by them.
@@ -263,27 +337,27 @@ mod tests {
     #[test]
     fn shared_turns_go_together_and_shut_out_the_exclusive_one() {
         let lock = Lock::new(5);
-        let first = lock.try_read(1).expect("free");
-        let second = lock.try_read(2).expect("readers share");
+        let first = live(lock.try_read(1)).expect("free");
+        let second = live(lock.try_read(2)).expect("readers share");
         assert_eq!(*first + *second, 10);
-        assert!(lock.try_write().is_none());
+        assert!(live(lock.try_write()).is_none());
         drop(first);
-        assert!(lock.try_write().is_none());
+        assert!(live(lock.try_write()).is_none());
         drop(second);
-        let mut write = lock.try_write().expect("free again");
+        let mut write = live(lock.try_write()).expect("free again");
         *write += 1;
-        assert!(lock.try_read(1).is_none());
-        assert!(lock.try_write().is_none());
+        assert!(live(lock.try_read(1)).is_none());
+        assert!(live(lock.try_write()).is_none());
         drop(write);
-        assert_eq!(lock.try_read(1).map(|read| *read), Some(6));
+        assert_eq!(live(lock.try_read(1)).map(|read| *read), Some(6));
     }
 
     #[test]
     fn a_thread_holding_a_shared_turn_is_known_by_its_owner() {
         let lock = Lock::new(5);
-        let first = lock.try_read(1).expect("free");
-        let again = lock.try_read(1).expect("readers share");
-        let other = lock.try_read(2).expect("readers share");
+        let first = live(lock.try_read(1)).expect("free");
+        let again = live(lock.try_read(1)).expect("readers share");
+        let other = live(lock.try_read(2)).expect("readers share");
         assert!(lock.holds(1));
         assert!(lock.holds(2));
         assert!(!lock.holds(3));
@@ -298,13 +372,13 @@ mod tests {
     #[test]
     fn a_writer_waits_for_every_reader_and_then_changes_the_value() {
         let lock = Lock::new(Vec::new());
-        let reading = lock.try_read(1).expect("free");
+        let reading = live(lock.try_read(1)).expect("free");
         let (waiting, waits) = mpsc::channel();
         thread::scope(|scope| {
             let writer = scope.spawn(|| {
                 let waiter = lock.waiter(2);
                 waiting.send(()).expect("the test listens");
-                let mut turn = waiter.write().expect("not unblocked");
+                let mut turn = live(waiter.write()).expect("not unblocked");
                 turn.push("writer");
             });
             waits.recv().expect("the writer starts");
@@ -312,19 +386,19 @@ mod tests {
             drop(reading);
             writer.join().expect("no panic");
         });
-        assert_eq!(*lock.try_read(1).expect("free"), ["writer"]);
+        assert_eq!(*live(lock.try_read(1)).expect("free"), ["writer"]);
     }
 
     #[test]
     fn a_reader_waits_for_the_writer() {
         let lock = Lock::new(5);
-        let mut exclusive = lock.try_write().expect("free");
+        let mut exclusive = live(lock.try_write()).expect("free");
         let (waiting, waits) = mpsc::channel();
         thread::scope(|scope| {
             let reader = scope.spawn(|| {
                 let waiter = lock.waiter(1);
                 waiting.send(()).expect("the test listens");
-                waiter.read().map(|turn| *turn)
+                live(waiter.read()).map(|turn| *turn)
             });
             waits.recv().expect("the reader starts");
             *exclusive = 6;
@@ -338,7 +412,7 @@ mod tests {
     #[test]
     fn a_waiting_writer_does_not_keep_out_another_reader() {
         let lock = Lock::new(5);
-        let reading = lock.try_read(1).expect("free");
+        let reading = live(lock.try_read(1)).expect("free");
         let waiter = lock.waiter(2);
         let (waiting, waits) = mpsc::channel();
         let (ended, ends) = mpsc::channel();
@@ -346,11 +420,11 @@ mod tests {
             scope.spawn(|| {
                 waiting.send(()).expect("the test listens");
                 ended
-                    .send(waiter.write().map(|turn| *turn))
+                    .send(live(waiter.write()).map(|turn| *turn))
                     .expect("the test listens");
             });
             waits.recv().expect("the writer starts");
-            assert_eq!(lock.try_read(3).map(|turn| *turn), Some(5));
+            assert_eq!(live(lock.try_read(3)).map(|turn| *turn), Some(5));
             drop(reading);
             assert_eq!(ends.recv_timeout(LOST), Ok(Some(5)));
         });
@@ -359,7 +433,7 @@ mod tests {
     #[test]
     fn unblocking_ends_a_wait_without_a_turn() {
         let lock = Lock::new(5);
-        let reading = lock.try_read(1).expect("free");
+        let reading = live(lock.try_read(1)).expect("free");
         let waiter = lock.waiter(2);
         let (waiting, waits) = mpsc::channel();
         let (ended, ends) = mpsc::channel();
@@ -367,7 +441,7 @@ mod tests {
             scope.spawn(|| {
                 waiting.send(()).expect("the test listens");
                 ended
-                    .send(waiter.write().is_none())
+                    .send(live(waiter.write()).is_none())
                     .expect("the test listens");
             });
             waits.recv().expect("the waiter starts");
@@ -379,7 +453,7 @@ mod tests {
             assert_eq!(outcome, Ok(true), "the unblock woke the waiter");
             assert!(kept, "the reader keeps its turn");
         });
-        assert!(lock.try_write().is_some());
+        assert!(live(lock.try_write()).is_some());
     }
 
     #[test]
@@ -387,11 +461,11 @@ mod tests {
         let lock = Lock::new(5);
         let waiter = lock.waiter(1);
         waiter.unblock();
-        assert!(waiter.read().is_none());
-        assert_eq!(waiter.read().map(|turn| *turn), Some(5));
+        assert!(live(waiter.read()).is_none());
+        assert_eq!(live(waiter.read()).map(|turn| *turn), Some(5));
         waiter.unblock();
-        assert!(waiter.write().is_none());
-        assert_eq!(waiter.write().map(|turn| *turn), Some(5));
+        assert!(live(waiter.write()).is_none());
+        assert_eq!(live(waiter.write()).map(|turn| *turn), Some(5));
     }
 
     #[test]
@@ -401,8 +475,91 @@ mod tests {
             let _state = lock.state();
             panic!("poison it");
         });
-        assert_eq!(lock.try_read(1).map(|turn| *turn), Some(5));
-        assert_eq!(lock.try_write().map(|turn| *turn), Some(5));
-        assert_eq!(lock.waiter(1).read().map(|turn| *turn), Some(5));
+        assert_eq!(live(lock.try_read(1)).map(|turn| *turn), Some(5));
+        assert_eq!(live(lock.try_write()).map(|turn| *turn), Some(5));
+        assert_eq!(live(lock.waiter(1).read()).map(|turn| *turn), Some(5));
+    }
+
+    #[test]
+    fn retiring_a_free_lock_drops_the_value_and_refuses_every_turn() {
+        let (lock, drops) = counted();
+        lock.retire("close");
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            lock.try_read(1).map(Result::err),
+            Some(Some(Retired("close")))
+        );
+        assert_eq!(
+            lock.try_write().map(Result::err),
+            Some(Some(Retired("close")))
+        );
+        assert_eq!(
+            lock.waiter(1).read().map(Result::err),
+            Some(Some(Retired("close")))
+        );
+        lock.retire("again");
+        assert_eq!(
+            lock.try_read(1).map(Result::err),
+            Some(Some(Retired("close")))
+        );
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+    }
+
+    /// Rust frees a moved value once the borrows before the move end.
+    #[test]
+    fn a_retired_value_drops_when_the_last_shared_turn_ends() {
+        let (lock, drops) = counted();
+        let first = live(lock.try_read(1)).expect("free");
+        let second = live(lock.try_read(2)).expect("readers share");
+        lock.retire("wait_for_action");
+        assert_eq!(drops.load(Ordering::SeqCst), 0, "turns out keep it");
+        drop(first);
+        assert_eq!(drops.load(Ordering::SeqCst), 0);
+        drop(second);
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+        assert!(!lock.holds(2));
+    }
+
+    #[test]
+    fn an_exclusive_turn_out_when_the_lock_retires_drops_the_value() {
+        let (lock, drops) = counted();
+        let exclusive = live(lock.try_write()).expect("free");
+        lock.retire("Builder#show");
+        assert_eq!(drops.load(Ordering::SeqCst), 0);
+        drop(exclusive);
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            lock.try_write().map(Result::err),
+            Some(Some(Retired("Builder#show")))
+        );
+    }
+
+    /// A waiting setter would otherwise wait forever for a value that will
+    /// never come back.
+    #[test]
+    fn retiring_wakes_a_waiter_with_the_name() {
+        let (lock, drops) = counted();
+        let reading = live(lock.try_read(1)).expect("free");
+        let waiter = lock.waiter(2);
+        let (waiting, waits) = mpsc::channel();
+        let (ended, ends) = mpsc::channel();
+        thread::scope(|scope| {
+            scope.spawn(|| {
+                waiting.send(()).expect("the test listens");
+                ended
+                    .send(waiter.write().map(Result::err))
+                    .expect("the test listens");
+            });
+            waits.recv().expect("the writer starts");
+            lock.retire("close");
+            let outcome = ends.recv_timeout(LOST);
+            // Frees a waiter the retirement did not wake, so the scope can
+            // end.
+            waiter.unblock();
+            assert_eq!(outcome, Ok(Some(Some(Retired("close")))));
+        });
+        assert_eq!(drops.load(Ordering::SeqCst), 0, "the reader keeps it");
+        drop(reading);
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
     }
 }

@@ -26,8 +26,11 @@ module Ferro
     #   src/notification.rs:489-505, src/lib.rs:218-222
     #++
 
-    # notify-rust deprecates Urgency on macOS: "Urgency is not supported
-    # on macOS (NSUserNotificationCenter path)".
+    # notify-rust deprecates Urgency's export on macOS: "Urgency is not
+    # supported on macOS (NSUserNotificationCenter path)". The type stays
+    # bound, since Hint::Urgency, which notify-rust does not deprecate,
+    # holds one there (src/hints.rs:84-85); naming the constant warns as
+    # the export does.
     deprecate_constant :Urgency
 
     #--
@@ -231,8 +234,9 @@ module Ferro
 
     class Notification
       # Schedules a copy of the notification for +time+, a Ruby ::Time, read to
-      # the second, and returns a NotificationHandle whose waits return at
-      # once, as notify-rust's does. Raises
+      # the second, and returns a NotificationHandle holding no
+      # notification, as notify-rust's does, whose first wait returns at
+      # once without calling its block and uses it up. Raises
       # Error::MacNotificationSys::Notification::ScheduleInThePast for a
       # time in the past. Defined only on macOS. Mirrors
       # <tt>Notification::schedule</tt> (<tt>src/notification.rs:489-496</tt>),
@@ -261,20 +265,6 @@ module Ferro
       #   Ferro::NotifyRust::Notification.new.summary("Stand up").schedule_raw(::Time.now.to_f + 3600)
       def schedule_raw(timestamp)
         native_schedule_raw(timestamp)
-      end
-    end
-
-    class NotificationHandle
-      # Replaced below: on macOS the handle's drop sends the notification.
-      remove_method :release
-
-      # Drops notify-rust's handle, which sends the notification unless a
-      # wait already did (<tt>src/macos/nsusernotifications.rs:142-162</tt>).
-      # The send waits up to about two seconds for the notification
-      # center to confirm delivery, with Ruby's global VM lock released.
-      private def release
-        native_drop
-        self
       end
     end
 

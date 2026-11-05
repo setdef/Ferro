@@ -29,7 +29,6 @@ class TestPlatform < Minitest::Test
       assert_equal linux, NotifyRust.const_defined?(name, false), name
     end
     assert_equal linux, NotifyRust::Hint.const_defined?(:ImageData, false)
-    assert_equal linux, NotifyRust::Notification.respond_to?(:at_bus)
     %i[close close_async update wait_for_action_async].each do |name|
       assert_equal linux, NotifyRust::NotificationHandle.method_defined?(name), name
     end
@@ -60,6 +59,13 @@ class TestPlatform < Minitest::Test
     end
   end
 
+  # notify-rust hides and deprecates at_bus, "a test only feature"
+  # (src/notification.rs:129-130), and Tauri needs none of it, so it is
+  # not bound anywhere (ADR 001, 2026-11-05).
+  def test_hidden_and_deprecated_items_are_not_bound
+    refute_respond_to NotifyRust::Notification, :at_bus
+  end
+
   def test_windows_items_exist_only_on_windows
     assert_equal PLATFORM == :windows, NotifyRust::Notification.method_defined?(:app_id)
   end
@@ -87,7 +93,7 @@ class TestPlatform < Minitest::Test
       finalize
       show
 ].each { |name| assert NotifyRust::Notification.method_defined?(name), name }
-    %i[wait_for_action wait_for_response on_close].each do |name|
+    %i[wait_for_action wait_for_response on_close debug].each do |name|
       assert NotifyRust::NotificationHandle.method_defined?(name), name
     end
     assert_includes %i[linux macos windows], PLATFORM

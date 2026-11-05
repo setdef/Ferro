@@ -8,8 +8,14 @@
 //! read from the derived `Debug` text, `Error { kind: Zbus(...) }`. The
 //! tests below build every variant through the public `From<ErrorKind>`
 //! and pin both that text and the `Display` text the Ruby classes copy.
+//!
+//! Each exception raised for a value notify-rust returned keeps that
+//! value's `Debug` text, formatted here, as `@debug`, which its Ruby
+//! `debug` answers (ADR 001, 2026-11-05).
 
-use magnus::{prelude::*, Error, ExceptionClass, RClass, RModule, Ruby, TryConvert, Value};
+use magnus::{
+    prelude::*, Error, ExceptionClass, RClass, RModule, RObject, Ruby, Symbol, TryConvert, Value,
+};
 
 use crate::Panic;
 
@@ -27,8 +33,9 @@ pub fn class_at(ruby: &Ruby, path: &[&str]) -> Result<RClass, Error> {
 }
 
 /// An instance of the exception class at `path`, made with `arguments`,
-/// or the error looking it up raised.
-pub fn raise(ruby: &Ruby, path: &[&str], arguments: &[String]) -> Error {
+/// keeping `debug`, the `Debug` text of the Rust value it stands for, if
+/// there is one; or the error looking it up raised.
+pub fn raise(ruby: &Ruby, path: &[&str], arguments: &[String], debug: Option<String>) -> Error {
     let made = class_at(ruby, path).and_then(|class| {
         let class = ExceptionClass::from_value(class.as_value()).ok_or_else(|| {
             Error::new(
@@ -45,15 +52,33 @@ pub fn raise(ruby: &Ruby, path: &[&str], arguments: &[String]) -> Error {
             )),
         }
     });
-    match made {
+    let kept = made.and_then(|exception| {
+        if let Some(text) = debug {
+            // An exception is a plain object, which holds instance
+            // variables as any object does.
+            RObject::try_convert(exception.as_value())?.ivar_set("@debug", text)?;
+        }
+        Ok(exception)
+    });
+    match kept {
         Ok(exception) => Error::from(exception),
         Err(error) => error,
     }
 }
 
-/// `Ferro::NotifyRust::Error` with `message`.
+/// `Ferro::NotifyRust::Error` with `message`, for a panic, which is no
+/// value of notify-rust's, so it keeps no `Debug` text.
 pub fn base(ruby: &Ruby, message: impl Into<String>) -> Error {
-    raise(ruby, &["Error"], &[message.into()])
+    raise(ruby, &["Error"], &[message.into()], None)
+}
+
+/// The `IOError` a handle that a consuming call used up raises, as a
+/// closed IO does (ADR 001, 2026-11-05); `by` names that call.
+pub fn consumed(ruby: &Ruby, by: &str) -> Error {
+    Error::new(
+        ruby.exception_io_error(),
+        format!("Ferro::NotifyRust::NotificationHandle consumed by {by}"),
+    )
 }
 
 /// The base `Error` for a panic inside notify-rust.
@@ -189,10 +214,37 @@ fn quoted_name(display: &str) -> String {
         .unwrap_or_default()
 }
 
-/// The Ruby exception for one of notify-rust's errors.
+/// The Ruby exception for one of notify-rust's errors, keeping its
+/// `Debug` text.
 pub fn notify_error(ruby: &Ruby, error: &notify_rust::error::Error) -> Error {
-    let target = classify(&format!("{error:?}"), &error.to_string());
-    raise(ruby, &target.path, &target.arguments)
+    let debug = format!("{error:?}");
+    let target = classify(&debug, &error.to_string());
+    raise(ruby, &target.path, &target.arguments, Some(debug))
+}
+
+/// The notify-rust error that an exception Ruby code made stands for,
+/// where its variant holds nothing but text (`src/error.rs:22-50`): `Msg`,
+/// `SpecVersion`, and `Conversion` with `text`, and
+/// `ImplementationMissing`. Every other variant holds another crate's
+/// value, which no Ruby value is, so there is none to build.
+fn rebuilt(kind: &str, text: Option<String>) -> Option<notify_rust::error::Error> {
+    use notify_rust::error::ErrorKind;
+
+    Some(notify_rust::error::Error::from(match (kind, text) {
+        ("Msg", Some(text)) => ErrorKind::Msg(text),
+        ("SpecVersion", Some(text)) => ErrorKind::SpecVersion(text),
+        ("Conversion", Some(text)) => ErrorKind::Conversion(text),
+        ("ImplementationMissing", _) => ErrorKind::ImplementationMissing,
+        _ => return None,
+    }))
+}
+
+/// `Native.error_debug`: notify-rust's `Debug` text (`src/error.rs:16`,
+/// `:22`) for the error of variant `kind` holding `text`, which an
+/// exception Ruby code made stands for, or `nil` for a variant that holds
+/// another crate's value.
+pub fn error_debug(kind: Symbol, text: Option<String>) -> Result<Option<String>, Error> {
+    Ok(rebuilt(&kind.name()?, text).map(|error| format!("{error:?}")))
 }
 
 // SPDX-SnippetBegin
@@ -205,7 +257,7 @@ pub fn notify_error(ruby: &Ruby, error: &notify_rust::error::Error) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{classify, mac_leaf, variant_after, Raise};
+    use super::{classify, mac_leaf, rebuilt, variant_after, Raise};
     use notify_rust::error::{Error, ErrorKind};
 
     fn target(error: &Error) -> Raise {
@@ -358,6 +410,32 @@ mod tests {
                 arguments: vec!["it's".into()],
             }
         );
+    }
+
+    #[test]
+    fn a_variant_of_text_alone_is_rebuilt_as_notify_rust_debugs_it() {
+        let debug = |kind: &str, text: Option<&str>| {
+            rebuilt(kind, text.map(str::to_owned)).map(|error| format!("{error:?}"))
+        };
+        assert_eq!(
+            debug("Msg", Some("invalid subpath")).as_deref(),
+            Some(r#"Error { kind: Msg("invalid subpath") }"#)
+        );
+        assert_eq!(
+            debug("SpecVersion", Some("1")).as_deref(),
+            Some(r#"Error { kind: SpecVersion("1") }"#)
+        );
+        assert_eq!(
+            debug("Conversion", Some("x")).as_deref(),
+            Some(r#"Error { kind: Conversion("x") }"#)
+        );
+        assert_eq!(
+            debug("ImplementationMissing", None).as_deref(),
+            Some("Error { kind: ImplementationMissing }")
+        );
+        assert_eq!(debug("Parse", Some("x")), None);
+        assert_eq!(debug("Zbus", Some("x")), None);
+        assert_eq!(debug("Msg", None), None);
     }
 
     #[test]

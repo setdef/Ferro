@@ -61,13 +61,15 @@ module Ferro
         freeze
       end
 
-      # The constant that holds this urgency.
+      # notify-rust's derived +Debug+ text for this urgency
+      # (<tt>src/urgency.rs:27</tt>), formatted by Rust: the variant's name.
+      # +inspect+ stays Ruby's.
       #
       # === Example
       #
-      #   Ferro::NotifyRust::Urgency::Low.inspect # => "Ferro::NotifyRust::Urgency::Low"
-      def inspect
-        "Ferro::NotifyRust::Urgency::#{@name}"
+      #   Ferro::NotifyRust::Urgency::Low.debug # => "Low"
+      def debug
+        Native.urgency_debug(@name)
       end
 
       # The behavior for +Low+ urgency depends on the notification server.

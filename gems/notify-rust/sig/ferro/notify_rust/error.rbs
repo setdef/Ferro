@@ -4,21 +4,31 @@
 module Ferro
   module NotifyRust
     class Error < StandardError
+      @debug: String?
+
+      def debug: () -> String?
+
       class Msg < Error
+        def debug: () -> String?
       end
 
       class Parse < Error
       end
 
       class SpecVersion < Error
+        def debug: () -> String?
       end
 
       class Conversion < Error
+        @conversion: String
+
         def initialize: (?String conversion) -> void
+        def debug: () -> String?
       end
 
       class ImplementationMissing < Error
         def initialize: (?String? message) -> void
+        def debug: () -> String?
       end
     end
   end

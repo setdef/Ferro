@@ -38,15 +38,20 @@ class TestNotification < Minitest::Test
     default = NotifyRust::Notification.default
 
     assert_instance_of NotifyRust::Notification, default
-    assert_equal notification.inspect, default.inspect
+    assert_equal notification.debug, default.debug
   end
 
   # Ruby's allocator makes the notification empty; notify-rust builds it in
-  # initialize, where a panic can raise instead of aborting the process.
-  def test_an_allocated_but_uninitialized_notification_raises_instead_of_crashing
-    error = assert_raises(NotifyRust::Error) { NotifyRust::Notification.allocate.summary }
+  # initialize, where a panic can raise instead of aborting the process. An
+  # object only allocated breaks Ruby's rules, not notify-rust's, so it
+  # raises Ruby's TypeError in Ruby's words, as Time.allocate.year does.
+  def test_an_allocated_but_uninitialized_notification_raises_rubys_type_error
+    allocated = NotifyRust::Notification.allocate
+    error = assert_raises(TypeError) { allocated.summary }
 
     assert_equal "uninitialized Ferro::NotifyRust::Notification", error.message
+    assert_raises(TypeError) { allocated.summary("x") }
+    assert_raises(TypeError) { allocated.debug }
   end
 
   def test_setters_reach_notify_rusts_fields_and_return_the_notification
@@ -71,11 +76,24 @@ class TestNotification < Minitest::Test
     assert_same NotifyRust::Timeout::Never, notification.timeout(0).timeout
     assert_same NotifyRust::Timeout::Default, notification.timeout(-1).timeout
     assert_same NotifyRust::Timeout::Never, notification.timeout(NotifyRust::Timeout::Never).timeout
+    assert_equal NotifyRust::Timeout::Milliseconds.new(2500), notification.timeout(2.5).timeout,
+      "a Numeric other than an Integer is a Duration in seconds"
     assert_raises(TypeError) { notification.timeout("never") }
   end
 
+  # The timeout field holds a Timeout (src/notification.rs:101), so
+  # assigning it takes nothing else, while the setter takes anything
+  # Into<Timeout> (:361), as in Rust.
+  def test_the_timeout_field_takes_only_a_timeout
+    built = notification
+
+    assert_raises(TypeError) { built.timeout = 5 }
+    assert_raises(TypeError) { built.timeout = 5.0 }
+    assert_same NotifyRust::Timeout::Default, built.timeout
+  end
+
   def test_id_reaches_notify_rust
-    assert_includes notification.id(42).inspect, "id: Some(42)"
+    assert_includes notification.id(42).debug, "id: Some(42)"
     assert_raises(RangeError) { notification.id(-1) }
   end
 
@@ -146,27 +164,24 @@ class TestNotification < Minitest::Test
     assert_equal "", thawed.summary, "an unfrozen notification may still be initialized again"
   end
 
-  def test_inspect_is_notify_rusts_debug_text
-    assert_match(/\ANotification \{ appname: ".*", summary: "Hi", subtitle: None,/, notification.summary("Hi").inspect)
+  def test_debug_is_notify_rusts_debug_text_and_inspect_stays_rubys
+    built = notification.summary("Hi")
+
+    assert_match(/\ANotification \{ appname: ".*", summary: "Hi", subtitle: None,/, built.debug)
+    assert_match(/\A#<Ferro::NotifyRust::Notification:0x\h+>\z/, built.inspect)
   end
 
-  def test_setting_actions_is_deprecated
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = true
-    built = nil
-    _, warnings = capture_io { built = notification.actions(%w[a A]) }
+  # notify-rust deprecates the actions setter, "please use .action() only"
+  # (src/notification.rs:442), so it is not bound (ADR 001, 2026-11-05).
+  # The field it sets is public and not deprecated, so it reads and
+  # writes.
+  def test_the_deprecated_actions_setter_is_not_bound
+    built = notification.action("a", "A")
 
-    assert_includes warnings, "Ferro::NotifyRust::Notification#actions is deprecated: please use .action() only"
-    assert_equal %w[a A], built.actions
-    Warning[:deprecated] = false
-    experimental = Warning[:experimental]
-    Warning[:experimental] = true
-    _, quiet = capture_io { notification.actions(%w[b B]) }
+    assert_raises(ArgumentError) { built.actions(%w[b B]) }
+    built.actions = %w[b B]
 
-    assert_empty quiet, "the warning is in the :deprecated category alone"
-  ensure
-    Warning[:deprecated] = deprecated
-    Warning[:experimental] = experimental unless experimental.nil?
+    assert_equal %w[b B], built.actions
   end
 
   def test_image_path_and_sound_name_reach_the_platforms_field
@@ -176,8 +191,8 @@ class TestNotification < Minitest::Test
       assert_includes built.hints, NotifyRust::Hint::ImagePath.new("/tmp/chart.png")
       assert_includes built.hints, NotifyRust::Hint::SoundName.new("Ping")
     else
-      assert_includes built.inspect, 'path_to_image: Some("/tmp/chart.png")'
-      assert_includes built.inspect, 'sound_name: Some("Ping")'
+      assert_includes built.debug, 'path_to_image: Some("/tmp/chart.png")'
+      assert_includes built.debug, 'sound_name: Some("Ping")'
     end
   end
 
@@ -188,8 +203,8 @@ class TestNotification < Minitest::Test
       .hint(hint::Custom.new("foo", "bar1")).hint(hint::Custom.new("foo", "bar2")).urgency(urgency::Critical)
 
     assert_equal Set[hint::Resident.new(true), hint::Urgency.new(urgency::Critical)], built.hints
-    assert_includes built.inspect, %(("foo", String): Custom("foo", "bar2"))
-    refute_includes built.inspect, "bar1"
+    assert_includes built.debug, %(("foo", String): Custom("foo", "bar2"))
+    refute_includes built.debug, "bar1"
     assert_raises(TypeError) { built.hint("resident") }
   end
 
@@ -221,32 +236,47 @@ class TestNotification < Minitest::Test
       assert_equal image.hash, NotifyRust::Image.from_rgb(1, 1, "\xFF\x00\x00".b).hash
       assert_predicate image, :frozen?
       assert_equal "Image { width: 1, height: 1, rowstride: 3, alpha: false, bits_per_sample: 8, channels: 3, " \
-        "data: [255, 0, 0] }", image.inspect
+        "data: [255, 0, 0] }", image.debug
+      assert_match(/\A#<Ferro::NotifyRust::Image:0x\h+>\z/, image.inspect)
       hinted = notification.image(path).hints.first
 
       assert_equal NotifyRust::Hint::ImageData.new(image), hinted
       assert_predicate hinted.value, :frozen?
+      assert_equal "ImageData(#{image.debug})", hinted.debug
       assert_includes notification.image_data(image).hints, NotifyRust::Hint::ImageData.new(image)
     end
   end
 
+  # Each ImageError keeps the Debug text of the error notify-rust returned
+  # (src/image.rs:127); one Ruby code made is rebuilt where the variant
+  # holds nothing, and CantOpen, which holds the image crate's error, has
+  # none.
   def test_linux_image_errors_are_notify_rusts
     skip_unless_platform(:linux)
     image = NotifyRust::Image
+    wrong = assert_raises(NotifyRust::ImageError::WrongDataSize) { image.from_rgba(1, 1, "\0\0\0") }
 
-    assert_equal "The given bytes don't match the width, height and channel count\n",
-      assert_raises(NotifyRust::ImageError::WrongDataSize) { image.from_rgba(1, 1, "\0\0\0") }.message
+    assert_equal "The given bytes don't match the width, height and channel count\n", wrong.message
+    assert_equal "WrongDataSize", wrong.debug
     assert_equal "The given image is too big. DBus only has 32 bits for width / height\n",
       assert_raises(NotifyRust::ImageError::TooBig) { image.from_rgb(0x1000_0000, 1, "") }.message
-    assert_match(/\ACan't open given path /, assert_raises(NotifyRust::ImageError::CantOpen) { image.open("/no/such.png") }.message)
-    assert_match(/\ACan't open given path /, assert_raises(NotifyRust::Error::Image) { notification.image("/no/such.png") }.message)
+    cant_open = assert_raises(NotifyRust::ImageError::CantOpen) { image.open("/no/such.png") }
+
+    assert_match(/\ACan't open given path /, cant_open.message)
+    assert_match(/\ACantOpen\(IoError\(/, cant_open.debug)
+    from_image = assert_raises(NotifyRust::Error::Image) { notification.image("/no/such.png") }
+
+    assert_match(/\ACan't open given path /, from_image.message)
+    assert_match(/\AError \{ kind: Image\(CantOpen\(IoError\(/, from_image.debug)
+    assert_equal %w[TooBig CantConvert], [NotifyRust::ImageError::TooBig.new.debug, NotifyRust::ImageError::CantConvert.new.debug]
+    assert_nil NotifyRust::ImageError::CantOpen.new("x").debug
   end
 
   def test_windows_app_id_and_urgency_reach_notify_rust
     skip_unless_platform(:windows)
     built = notification.app_id("Example.App").urgency(urgency::Critical)
 
-    assert_includes built.inspect, 'app_id: Some("Example.App")'
-    assert_includes built.inspect, "urgency: Some(Critical)"
+    assert_includes built.debug, 'app_id: Some("Example.App")'
+    assert_includes built.debug, "urgency: Some(Critical)"
   end
 end

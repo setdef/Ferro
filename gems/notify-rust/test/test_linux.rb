@@ -63,6 +63,8 @@ class TestLinux < Minitest::Test
     assert_equal "1.2", info.spec_version
     assert_includes NotifyRust.get_capabilities, "actions"
     assert_same NotifyRust::DbusStack::Zbus, NotifyRust.dbus_stack
+    assert_equal 'ServerInformation { name: "dunst", vendor: "knopwob", version: "' \
+      "#{info.version}\", spec_version: \"1.2\" }", info.debug
   end
 
   # SPEC_VERSION is notify-rust's own static, read from the server once
@@ -74,6 +76,7 @@ class TestLinux < Minitest::Test
     assert_operator version, :>=, NotifyRust::Version.__send__(:new, 1, 1)
     assert Ractor.shareable?(version)
     assert_same version, NotifyRust::SPEC_VERSION
+    assert_equal "Version { major: 1, minor: 2 }", version.debug
   end
 
   def test_show_sends_the_notification_and_answers_its_id
@@ -84,12 +87,86 @@ class TestLinux < Minitest::Test
     assert_operator handle.id, :>, 0
     assert_equal 1, displayed
     assert_equal "burst", handle.summary
+    # notify-rust derives Debug for the handle (src/xdg/mod.rs:58, :70,
+    # src/xdg/zbus_rs/handle.rs:12), connection and all.
+    assert_match(/\ANotificationHandle \{ inner: Zbus\(ZbusNotificationHandle \{ id: #{handle.id}, connection: /,
+      handle.debug)
+    assert_match(/\A#<Ferro::NotifyRust::NotificationHandle:0x\h+>\z/, handle.inspect)
   end
 
+  # Rust drops the handle at the end of its scope, so the end of show's
+  # block uses it up, and a later call raises IOError, as a closed IO does.
   def test_show_with_a_block_yields_the_handle_and_returns_the_blocks_value
-    id = notification.show(&:id)
+    kept = nil
+    id = notification.show do |handle|
+      kept = handle
+      handle.id
+    end
 
     assert_operator id, :>, 0
+    error = assert_raises(IOError) { kept.id }
+    assert_equal "Ferro::NotifyRust::NotificationHandle consumed by Builder#show", error.message
+    assert_raises(IOError) { kept.summary }
+    assert_raises(IOError) { kept.close }
+  end
+
+  # Each handle keeps a D-Bus connection of its own (src/xdg/zbus_rs.rs:61).
+  # Rust frees a handle, socket and all, when a call that takes it returns,
+  # or at the end of its scope; here too, not when the garbage collector
+  # frees the Ruby object, which the test keeps. A consuming call is
+  # checked inside show's block, before its end could free the handle. The
+  # socket closes on zbus's executor thread, so each check waits for it,
+  # with a generous bound.
+  def test_a_call_that_takes_the_handle_frees_its_connection
+    {
+      "close" => lambda(&:close),
+      "on_close" => lambda { |handle|
+        closer = once_listening { Server.run("dunstctl", "close") }
+        handle.on_close { |reason| reason }
+        closer.join
+      },
+    }.each do |call, consume|
+      before = sockets
+      notification(call).show do |handle|
+        opened = sockets - before
+        consume.call(handle)
+
+        refute_empty opened, "show opened no socket"
+        assert closed?(opened), "#{call} left the handle's socket open past 30 s"
+      end
+    end
+    before = sockets
+    opened = nil
+    kept = notification("scope").show do |handle|
+      opened = sockets - before
+      handle
+    end
+
+    refute_empty opened, "show opened no socket"
+    assert closed?(opened), "the end of show's block left the handle's socket open past 30 s"
+    assert_raises(IOError) { kept.id }
+  end
+
+  # The sockets this process holds, as /proc names them by inode. A test
+  # compares sockets, not counts, so another handle the garbage collector
+  # frees meanwhile cannot pass it.
+  private def sockets
+    Dir.children("/proc/self/fd").filter_map do |fd|
+      target = File.readlink("/proc/self/fd/#{fd}")
+      target if target.start_with?("socket:")
+    rescue SystemCallError
+      nil
+    end
+  end
+
+  # Whether every one of +opened+ closes within 30 s.
+  private def closed?(opened)
+    600.times.any? do
+      next true if (sockets & opened).empty?
+
+      sleep 0.05
+      false
+    end
   end
 
   def test_every_kind_of_hint_reaches_the_server
@@ -106,7 +183,7 @@ class TestLinux < Minitest::Test
       hint::Custom.new("x-dunst-stack-tag", "volume"),
       hint::ImageData.new(NotifyRust::Image.from_rgb(64, 64, "\x80".b * (64 * 64 * 3))),
 ].each do |each|
-      notification("hint #{each.inspect}").hint(each).show
+      notification("hint #{each.class.name}").hint(each).show
     end
 
     assert_operator displayed, :>=, 1
@@ -122,17 +199,37 @@ class TestLinux < Minitest::Test
     assert_equal ["default"], actions
   end
 
+  # wait_for_action takes the handle (src/xdg/mod.rs:101), so a second
+  # wait on it raises IOError before it reaches the server; the second
+  # notification is another handle.
   def test_wait_for_action_passes_a_named_action_and_closed
     handle = notification("click me").action("clicked_a", "button a").show
     sender = once_listening { Server.signal("ActionInvoked", "uint32:#{handle.id}", "string:clicked_a") }
     actions = []
     handle.wait_for_action { |action| actions << action }
     sender.join
+    error = assert_raises(IOError) { handle.wait_for_action { |action| actions << action } }
+
+    assert_equal "Ferro::NotifyRust::NotificationHandle consumed by NotificationHandle#wait_for_action", error.message
+    Server.run("dunstctl", "close-all")
+    closing = notification("close me").action("clicked_a", "button a").show
     closer = once_listening { Server.run("dunstctl", "close") }
-    handle.wait_for_action { |action| actions << action }
+    closing.wait_for_action { |action| actions << action }
     closer.join
 
     assert_equal %w[clicked_a __closed], actions
+  end
+
+  # Rust requires each wait's closure, so a wait without a block raises
+  # ArgumentError before it takes the handle, which stays usable.
+  def test_a_wait_without_a_block_raises_before_it_waits
+    handle = notification.show
+
+    %i[wait_for_action wait_for_response on_close wait_for_action_async].each do |name|
+      assert_raises(ArgumentError, name) { handle.public_send(name) }
+    end
+    assert_raises(ArgumentError) { NotifyRust.handle_action(handle.id) }
+    assert_operator handle.id, :>, 0
   end
 
   def test_wait_for_response_tells_a_click_from_an_action
@@ -151,7 +248,9 @@ class TestLinux < Minitest::Test
     expiry = once_listening { closed(expiring, 1) }
     expiring.on_close { |reason| reasons << reason }
     expiry.join
-    expiring.close
+    # The test sent the signal, so dunst still shows the notification;
+    # on_close took the handle, so dunstctl closes it.
+    Server.run("dunstctl", "close-all")
     dismissed = notification("dismiss me").show
     closer = once_listening { Server.run("dunstctl", "close") }
     dismissed.on_close { |reason| reasons << reason }
@@ -170,10 +269,11 @@ class TestLinux < Minitest::Test
     assert closed
   end
 
-  # A setter needs the handle mutably, which a wait borrows. The setter
-  # waits for the wait, with the lock released, as Ruby's Mutex makes a
-  # second thread wait, and a close from a third thread still ends the
-  # wait, since readers go first (lock.rs). The setter's thread sleeps
+  # A setter needs the handle mutably, which wait_for_action_async borrows
+  # (src/xdg/mod.rs:183). The setter waits for the wait, with the lock
+  # released, as Ruby's Mutex makes a second thread wait, and a
+  # close_async, which borrows too (:229), from a third thread still ends
+  # the wait, since readers go first (lock.rs). The setter's thread sleeps
   # while the waiter is still waiting, which shows both blocking with the
   # lock released while this thread runs.
   def test_a_setter_during_a_wait_waits_for_it_and_close_still_ends_the_wait
@@ -185,10 +285,10 @@ class TestLinux < Minitest::Test
       setter.report_on_exception = false
       Thread.pass until setter.status != "run"
       waiting = [setter.status, waiter.status, handle.summary]
-      handle.close
+      handle.close_async.value
       waiting
     end
-    waiter = Thread.new { handle.wait_for_response { |response| responses << response } }
+    waiter = Thread.new { handle.wait_for_action_async { |response| responses << response }.value }
 
     assert_equal ["sleep", "sleep", "borrowed"], closer.value, "the setter waits for the wait"
     waiter.join
@@ -197,10 +297,28 @@ class TestLinux < Minitest::Test
     assert_equal "changed", handle.summary
   end
 
-  # A setter waiting for another thread's wait has an unblocking function,
-  # so Thread#raise and Thread#kill end its wait (thread.c:2969-2982,
-  # :3007-3027 at v4.0.9) while the wait it waited for goes on. The joins'
-  # bounds only turn a lost wake into a failure rather than a hang.
+  # A wait that takes the handle uses it up when it starts, as Rust moves
+  # the handle into the call: a setter on another thread meanwhile raises
+  # IOError at once rather than waiting.
+  def test_a_setter_during_a_wait_that_takes_the_handle_raises_io_error
+    handle = notification("taken").timeout(NotifyRust::Timeout::Never).show
+    waiter = nil
+    setter = once_listening do
+      error = assert_raises(IOError) { handle.summary("changed") }
+      Server.run("dunstctl", "close")
+      [error.message, waiter.status]
+    end
+    waiter = Thread.new { handle.on_close { |reason| reason } }
+
+    assert_equal ["Ferro::NotifyRust::NotificationHandle consumed by NotificationHandle#on_close", "sleep"], setter.value
+    waiter.join
+  end
+
+  # A setter waiting for another thread's borrowing wait has an unblocking
+  # function, so Thread#raise and Thread#kill end its wait
+  # (thread.c:2969-2982, :3007-3027 at v4.0.9) while the wait it waited
+  # for goes on. The joins' bounds only turn a lost wake into a failure
+  # rather than a hang.
   def test_thread_raise_and_kill_end_a_setter_waiting_for_a_wait
     handle = notification("borrowed").timeout(NotifyRust::Timeout::Never).show
     responses = []
@@ -224,11 +342,11 @@ class TestLinux < Minitest::Test
       killed.join(30) || flunk("Thread#kill did not end the setter's wait")
       [waited, error, killed.status, waiter.status]
     end
-    waiter = Thread.new { handle.wait_for_response { |response| responses << response } }
+    waiter = Thread.new { handle.wait_for_action_async { |response| responses << response }.value }
     outcome = setters.value
 
     assert_equal [%w[sleep sleep], "raised", false, "sleep"], outcome, "each setter waited and ended while the wait went on"
-    handle.close
+    handle.close_async.value
     waiter.join
     assert_equal [NotifyRust::NotificationResponse::Closed.new(NotifyRust::CloseReason::CloseAction)], responses
     assert_equal "borrowed", handle.summary
@@ -265,12 +383,13 @@ class TestLinux < Minitest::Test
     assert_equal "Ferro::NotifyRust::Error::Image", outcome
   end
 
-  # A setter called on the thread whose own wait holds the handle, from a
-  # signal trap that runs during that wait, would wait for itself forever,
-  # so it raises ThreadError, as Ruby's Mutex#lock does for a thread that
-  # holds it. The wait goes on after the trap, and a close ends it. The
-  # signal waits, as once_listening does, for the wait's match rules, so
-  # the trap runs inside the wait and the close's signal reaches it.
+  # A setter called on the thread whose own borrowing wait holds the
+  # handle, from a signal trap that runs during that wait, would wait for
+  # itself forever, so it raises ThreadError, as Ruby's Mutex#lock does for
+  # a thread that holds it. The wait goes on after the trap, and a close
+  # ends it. The signal waits, as once_listening does, for the wait's match
+  # rules, so the trap runs inside the wait and the close's signal reaches
+  # it.
   def test_a_setter_in_a_trap_during_its_own_threads_wait_raises_thread_error
     outcome, = in_child(<<~RUBY)
       rules = lambda do
@@ -289,33 +408,34 @@ class TestLinux < Minitest::Test
         rescue ThreadError => e
           [e.class.name, e.message]
         end
-        closer = Thread.new { handle.close }
+        closer = Thread.new { handle.close_async.value }
       end
       Thread.new do
         sleep 0.05 until rules.call > before
         Process.kill(:USR1, Process.pid)
       end
       responses = []
-      handle.wait_for_response { |response| responses << response.inspect }
+      handle.wait_for_action_async { |response| responses << response.debug }.value
       closer.join
       [error, responses, handle.summary]
     RUBY
 
     assert_equal [
       ["ThreadError", "already borrowed: this thread's own wait or close is using this NotificationHandle"],
-      ["#<data Ferro::NotifyRust::NotificationResponse::Closed reason=Ferro::NotifyRust::CloseReason::CloseAction>"],
+      ["Closed(CloseAction)"],
       "trapped",
 ], outcome
   end
 
   # notify-rust's close_async example (src/xdg/mod.rs:155-178) closes while
-  # it waits; the handle's wait and close borrow it together.
+  # it waits; wait_for_action_async and close_async borrow the handle
+  # together.
   def test_close_while_waiting_closes_with_close_action
     handle = notification("I'll be here till you close me!").hint(NotifyRust::Hint::Resident.new(true))
       .timeout(NotifyRust::Timeout::Never).show
-    closer = once_listening { handle.close }
+    closer = once_listening { handle.close_async.value }
     responses = []
-    handle.wait_for_response { |response| responses << response }
+    handle.wait_for_action_async { |response| responses << response }.value
     closer.join
 
     assert_equal [NotifyRust::NotificationResponse::Closed.new(NotifyRust::CloseReason::CloseAction)], responses
@@ -365,12 +485,47 @@ class TestLinux < Minitest::Test
 
     assert_raises(Interrupt) { waiter.join(5) || flunk("the interrupt did not end the wait") }
     assert_equal 20, ticks
-    closer = once_listening { Server.run("dunstctl", "close") }
-    reasons = []
-    handle.on_close { |reason| reasons << reason }
-    closer.join
+    assert_raises(IOError, "the wait took the handle, as Rust moves it, though it was interrupted") do
+      handle.on_close { |reason| reason }
+    end
+  end
 
-    assert_equal [NotifyRust::CloseReason::Dismissed], reasons, "the handle still works after an interrupted wait"
+  # An interrupt that ends a Future's wait drops the work, as dropping a
+  # Rust future does, and leaves both the borrowed handle and the Future
+  # usable: the next value waits again.
+  def test_an_interrupted_future_waits_again_on_the_next_value
+    handle = notification("never answered").timeout(NotifyRust::Timeout::Never).show
+    responses = []
+    future = handle.wait_for_action_async { |response| responses << response }
+    before = Server.match_rules("NotificationClosed")
+    waiter = Thread.new do
+      Thread.current.report_on_exception = false
+      future.value
+    end
+    200.times { Server.listening_since?("NotificationClosed", before) ? break : sleep(0.05) }
+    waiter.raise(Interrupt)
+
+    assert_raises(Interrupt) { waiter.join(5) || flunk("the interrupt did not end the wait") }
+    # The dropped wait's match rule may linger a moment; the next wait
+    # counts from what is left. The bounds are generous, so only a rule
+    # that never goes, or a value that never returns, fails them.
+    gone = 600.times.any? do
+      next true unless Server.listening_since?("NotificationClosed", before)
+
+      sleep 0.05
+      false
+    end
+
+    assert gone, "the interrupted wait's match rule stayed past 30 s"
+    closer = once_listening { Server.run("dunstctl", "close") }
+    again = Thread.new { future.value }
+    again.report_on_exception = false
+
+    assert again.join(60), "the next value did not return once the notification closed"
+    assert_nil again.value
+    closer.join
+    assert_equal [NotifyRust::NotificationResponse::Closed.new(NotifyRust::CloseReason::Dismissed)], responses
+    assert_operator handle.id, :>, 0
   end
 
   def test_handle_action_yields_an_action_response
@@ -388,7 +543,10 @@ class TestLinux < Minitest::Test
 
     assert_equal 0, displayed, "nothing is sent until value runs"
     handle = future.value
-    assert_same handle, future.value
+    error = assert_raises(IOError, ".await takes the future") { future.value }
+
+    assert_equal "Ferro::NotifyRust::Future consumed by Future#value", error.message
+    assert_raises(TypeError) { future.dup }
     assert_equal 1, displayed
 
     responses = []
@@ -399,32 +557,21 @@ class TestLinux < Minitest::Test
     assert_nil waiting.value
     closer.join
     assert_equal [NotifyRust::NotificationResponse::Closed.new(NotifyRust::CloseReason::CloseAction)], responses
+    assert_operator handle.id, :>, 0, "the async methods borrow the handle"
   end
 
-  def test_wait_for_action_async_needs_a_block
-    handle = notification.show
-
-    assert_raises(ArgumentError) { handle.wait_for_action_async }
-  end
-
+  # An error is the future's outcome too, so the first value raises it and
+  # uses the future up.
   def test_a_bus_nobody_serves_raises_zbus_errors
     future = notification.show_async_at_bus("nobody_listens")
     error = assert_raises(NotifyRust::Error::Zbus) { future.value }
 
     assert_includes error.message, "org.freedesktop.DBus.Error.ServiceUnknown"
-    assert_same error, assert_raises(NotifyRust::Error::Zbus) { future.value }
-    assert_raises(NotifyRust::Error::Msg) { notification.show_async_at_bus("9").value }
-  end
+    assert_match(/\AError \{ kind: Zbus\(/, error.debug)
+    assert_raises(IOError) { future.value }
+    invalid = assert_raises(NotifyRust::Error::Msg) { notification.show_async_at_bus("9").value }
 
-  def test_at_bus_refuses_an_invalid_sub_bus_with_notify_rusts_message
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = false
-    error = assert_raises(NotifyRust::Error::Msg) { NotifyRust::Notification.at_bus("9") }
-
-    assert_equal "invalid subpath", error.message
-    assert_raises(NotifyRust::Error::Zbus) { NotifyRust::Notification.at_bus("nobody_listens").summary("x").show }
-  ensure
-    Warning[:deprecated] = deprecated
+    assert_equal 'Error { kind: Msg("invalid subpath") }', invalid.debug
   end
 
   def test_without_a_session_bus_show_raises_zbus_and_handle_action_a_caught_panic

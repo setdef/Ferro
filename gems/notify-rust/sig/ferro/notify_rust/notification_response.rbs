@@ -10,7 +10,10 @@ module Ferro
         @name: :Default
 
         def initialize: (:Default name) -> void
-        def inspect: () -> String
+
+        private
+
+        def to_native: () -> [:Default]
       end
 
       Default: Unit
@@ -22,6 +25,10 @@ module Ferro
 
         def self.new: (String key) -> instance
                     | (key: String) -> instance
+
+        private
+
+        def to_native: () -> [:Action, String]
       end
 
       class Reply < Data
@@ -31,6 +38,10 @@ module Ferro
 
         def self.new: (String text) -> instance
                     | (text: String) -> instance
+
+        private
+
+        def to_native: () -> [:Reply, String]
       end
 
       class Closed < Data
@@ -40,12 +51,17 @@ module Ferro
 
         def self.new: (CloseReason reason) -> instance
                     | (reason: CloseReason) -> instance
+
+        private
+
+        def to_native: () -> [:Closed, close_reason_tag]
       end
 
       def self.from: (String key) -> NotificationResponse
       private def self.from_native: (response_tag tag) -> NotificationResponse
 
       def is_default_action: () -> bool
+      def debug: () -> String
     end
   end
 end

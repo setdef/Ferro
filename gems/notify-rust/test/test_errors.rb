@@ -50,6 +50,32 @@ class TestErrors < Minitest::Test
     assert_equal 'Conversion Error: invalid input ""', error.message
   end
 
+  # An exception raised for an error notify-rust returned keeps that
+  # error's Debug text, which Rust formatted (src/error.rs:15-16, :21-22);
+  # inspect stays Ruby's.
+  def test_an_error_from_notify_rust_keeps_its_debug_text
+    error = assert_raises(NotifyRust::Error::Conversion) { urgency.try_from("urgent") }
+
+    assert_equal 'Error { kind: Conversion("invalid input \"urgent\"") }', error.debug
+    assert_equal '#<Ferro::NotifyRust::Error::Conversion: Conversion Error: invalid input "urgent">', error.inspect
+  end
+
+  # One Ruby code makes stands for the error notify-rust would build from
+  # the same text, where the variant holds nothing else; a variant that
+  # holds another crate's value, and a panic, have no Rust value to show.
+  def test_an_error_ruby_makes_debugs_as_notify_rust_would_where_it_can
+    error = NotifyRust::Error
+
+    assert_equal 'Error { kind: Msg("invalid subpath") }', error::Msg.new("invalid subpath").debug
+    assert_equal 'Error { kind: SpecVersion("0.9") }', error::SpecVersion.new("0.9").debug
+    assert_equal 'Error { kind: Conversion("x") }', error::Conversion.new("x").debug
+    assert_equal 'Error { kind: Conversion("42") }', error::Conversion.new(42).debug, "the reason as message reads it"
+    assert_equal "Error { kind: ImplementationMissing }", error::ImplementationMissing.new.debug
+    assert_nil error::Parse.new("Parsing Error: x").debug
+    assert_nil error.new("notify-rust panicked: boom").debug
+    assert_nil error::Zbus.new("no bus").debug if PLATFORM == :linux
+  end
+
   def test_mac_notification_sys_errors_nest_under_their_kind
     skip_unless_platform(:macos)
     mac = NotifyRust::Error::MacNotificationSys
@@ -60,5 +86,16 @@ class TestErrors < Minitest::Test
     assert_equal "a.b", mac::Application::CouldNotSet.new("a.b").name
     assert_equal "Could not schedule notification", mac::Notification::UnableToSchedule.new.message
     assert_equal "Could not deliver notification", mac::Notification::UnableToDeliver.new.message
+  end
+
+  # Raised by schedule_raw, the error is notify-rust's, wrapping
+  # mac-notification-sys's, and keeps that Debug text.
+  def test_a_mac_notification_sys_error_keeps_its_debug_text
+    skip_unless_platform(:macos)
+    error = assert_raises(NotifyRust::Error::MacNotificationSys::Notification::ScheduleInThePast) do
+      NotifyRust::Notification.new.summary("too late").schedule_raw(0.0)
+    end
+
+    assert_equal "Error { kind: MacNotificationSys(Notification(ScheduleInThePast)) }", error.debug
   end
 end

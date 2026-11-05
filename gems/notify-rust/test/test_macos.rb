@@ -77,16 +77,19 @@ class TestMacOS < Minitest::Test
       second = begin
         Ferro::NotifyRust.set_application("com.apple.finder")
       rescue Ferro::NotifyRust::Error::MacNotificationSys::Application::AlreadySet => e
-        [e.class.name, e.message, e.name]
+        [e.class.name, e.message, e.name, e.debug]
       end
       [first, second]
     RUBY
 
     assert_nil outcome.first
+    # set_application returns mac-notification-sys's own error, and the
+    # exception keeps its Debug text.
     assert_equal [
       "Ferro::NotifyRust::Error::MacNotificationSys::Application::AlreadySet",
       "Application 'com.apple.finder' can only be set once.",
       "com.apple.finder",
+      'Application(AlreadySet("com.apple.finder"))',
 ], outcome.last
   end
 
@@ -138,42 +141,63 @@ class TestMacOS < Minitest::Test
     Warning[:deprecated] = deprecated
   end
 
-  # show without a block drops the handle, which sends at once; its waits
-  # then return without calling the block, as notify-rust's do for a
-  # handle with no notification.
+  # show without a block drops the handle, which sends at once, as Rust
+  # drops a handle it never binds; the handle is then used up, and every
+  # call on it raises IOError, as a closed IO does, before it waits. A wait
+  # without a block raises ArgumentError before it takes the handle.
   def test_show_without_a_block_sends_and_leaves_a_spent_handle
     outcome, = in_child(<<~RUBY)
       handle = Ferro::NotifyRust::Notification.new.summary(#{TITLE.dump}).show
-      yielded = []
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      handle.wait_for_action { |action| yielded << action }
-      handle.wait_for_response { |response| yielded << response }
-      handle.on_close { |reason| yielded << reason }
-      [handle.class.name, yielded, Process.clock_gettime(Process::CLOCK_MONOTONIC) - started]
+      raised = [
+        -> { handle.wait_for_action { |action| action } },
+        -> { handle.wait_for_response { |response| response } },
+        -> { handle.on_close { |reason| reason } },
+        -> { handle.debug },
+        -> { handle.wait_for_action },
+      ].map do |call|
+        call.call
+        nil
+      rescue IOError, ArgumentError => e
+        [e.class.name, e.message]
+      end
+      [handle.class.name, raised, Process.clock_gettime(Process::CLOCK_MONOTONIC) - started]
     RUBY
 
     assert_equal "Ferro::NotifyRust::NotificationHandle", outcome[0]
-    assert_empty outcome[1]
+    spent = ["IOError", "Ferro::NotifyRust::NotificationHandle consumed by Builder#show"]
+
+    assert_equal [spent, spent, spent, spent], outcome[1].first(4)
+    assert_equal "ArgumentError", outcome[1].last.first
     assert_operator outcome[2], :<, 0.5
   end
 
   # A wait on the main thread runs the main run loop itself, with Ruby's
-  # lock released, so another Ruby thread counts on meanwhile.
+  # lock released, so another Ruby thread counts on meanwhile. The wait
+  # takes the handle, as notify-rust's takes self, so a second raises
+  # IOError, and the end of the block does not send again.
   def test_waits_on_the_main_thread_release_the_gvl_and_spend_the_handle
     outcome, = in_child(<<~RUBY)
       #{SWEEPER}
       Ferro::NotifyRust::Notification.new.summary(#{TITLE.dump}).action("ok", "OK").show do |handle|
+        debug = handle.debug
         before = $ticks
         actions = []
         handle.wait_for_action { |action| actions << action }
         ticked = $ticks - before
-        handle.wait_for_action { |action| actions << action }
-        [actions, ticked]
+        second = begin
+          handle.wait_for_action { |action| actions << action }
+        rescue IOError => e
+          e.message
+        end
+        [actions, ticked, second, debug]
       end
     RUBY
 
-    assert_equal ["__closed"], outcome.first, "a second wait finds the handle spent"
-    assert_operator outcome.last, :>=, 10, "the other thread ran while the wait blocked"
+    assert_equal ["__closed"], outcome[0]
+    assert_operator outcome[1], :>=, 10, "the other thread ran while the wait blocked"
+    assert_equal "Ferro::NotifyRust::NotificationHandle consumed by NotificationHandle#wait_for_action", outcome[2]
+    assert_match(/\ANotificationHandle \{ notification: Some\(Notification \{ appname: /, outcome[3])
   end
 
   def test_wait_for_response_and_on_close_report_an_unanswered_notification
@@ -183,12 +207,11 @@ class TestMacOS < Minitest::Test
       responses = []
       notification.show { |handle| handle.wait_for_response { |response| responses << response } }
       notification.show { |handle| handle.on_close { |reason| responses << reason } }
-      responses.map(&:inspect)
+      responses.map(&:debug)
     RUBY
 
     assert_equal 2, outcome.size
-    assert_match(/\A#<data Ferro::NotifyRust::NotificationResponse::Closed reason=Ferro::NotifyRust::CloseReason::(Expired|Dismissed)>\z/,
-      outcome.first)
-    assert_match(/\AFerro::NotifyRust::CloseReason::(Expired|Dismissed)\z/, outcome.last)
+    assert_match(/\AClosed\((Expired|Dismissed)\)\z/, outcome.first)
+    assert_match(/\A(Expired|Dismissed)\z/, outcome.last)
   end
 end

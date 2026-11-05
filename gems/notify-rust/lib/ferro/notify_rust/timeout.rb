@@ -47,11 +47,6 @@ module Ferro
           freeze
         end
 
-        # The constant that holds this timeout.
-        def inspect
-          "Ferro::NotifyRust::Timeout::#{@name}"
-        end
-
         private def to_native
           @name
         end
@@ -92,19 +87,37 @@ module Ferro
         Default
       end
 
-      # The timeout +milliseconds+ means, as the notification
-      # specification reads it: a positive number expires after that many
-      # milliseconds, 0 never expires, and a negative number leaves it to
-      # the server. Mirrors <tt>From<i32> for Timeout</tt>
-      # (<tt>src/timeout.rs:35-44</tt>).
+      # The timeout +value+ means. notify-rust converts two kinds of value,
+      # and the class of +value+ picks one, as the type does in Rust:
       #
-      # [milliseconds] Integer within a 32-bit signed range.
+      # - An Integer is milliseconds, as the notification specification
+      #   reads them: a positive number expires after that many, 0 never
+      #   expires, and a negative number leaves it to the server. Mirrors
+      #   <tt>From<i32> for Timeout</tt> (<tt>src/timeout.rs:35-44</tt>).
+      #   Raises +RangeError+ outside a 32-bit signed range.
+      # - Any other Numeric is a Rust +Duration+, in seconds: zero never
+      #   expires, more milliseconds than 32 bits hold leaves it to the
+      #   server, and anything else expires after its whole milliseconds.
+      #   Mirrors <tt>From<Duration> for Timeout</tt>
+      #   (<tt>src/timeout.rs:46-56</tt>). A negative, NaN, or infinite
+      #   count, or one past a +Duration+'s range, raises +ArgumentError+
+      #   with Rust's reason, where Rust would panic making the +Duration+.
+      #
+      # So <tt>from(2)</tt> is two milliseconds and <tt>from(2.0)</tt> two
+      # seconds, as <tt>Timeout::from(2)</tt> and
+      # <tt>Timeout::from(Duration::from_secs(2))</tt> are in Rust, where an
+      # integer literal is an +i32+.
+      #
+      # [value] Integer milliseconds, or Numeric seconds.
       #
       # === Example
       #
       #   Ferro::NotifyRust::Timeout.from(-234) # => Ferro::NotifyRust::Timeout::Default
-      def self.from(milliseconds)
-        from_native(Native.timeout_from_i32(milliseconds))
+      #   Ferro::NotifyRust::Timeout.from(1.5)  # => #<data Ferro::NotifyRust::Timeout::Milliseconds value=1500>
+      def self.from(value)
+        return from_native(Native.timeout_from_duration(_ = Float(value))) if value.is_a?(Numeric) && !value.is_a?(Integer)
+
+        from_native(Native.timeout_from_i32(value))
       end
 
       # The timeout +string+ names: <tt>"default"</tt>, <tt>"never"</tt>,
@@ -143,6 +156,17 @@ module Ferro
       #   Ferro::NotifyRust::Timeout::Never.to_i # => 0
       def to_i
         Native.timeout_to_i32(__send__(:to_native))
+      end
+
+      # notify-rust's derived +Debug+ text for this timeout
+      # (<tt>src/timeout.rs:13</tt>), formatted by Rust. +inspect+ stays
+      # Ruby's.
+      #
+      # === Example
+      #
+      #   Ferro::NotifyRust::Timeout::Milliseconds.new(6000).debug # => "Milliseconds(6000)"
+      def debug
+        Native.timeout_debug(__send__(:to_native))
       end
     end
 

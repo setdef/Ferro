@@ -229,26 +229,34 @@ module Ferro
 
       # Without +timeout+, the field, a Timeout. With it, sets how long the
       # notification lasts, often not respected by the server: a Timeout,
-      # or an Integer of milliseconds read as Timeout.from reads it, where
-      # -1 leaves it to the server and 0 means never expire. macOS ignores
-      # it. Mirrors <tt>Notification::timeout</tt>
-      # (<tt>src/notification.rs:325-364</tt>).
+      # or anything Timeout.from reads, as notify-rust takes anything
+      # <tt>Into<Timeout></tt>. An Integer is milliseconds, where -1
+      # leaves it to the server and 0 means never expire; any other
+      # Numeric is a Rust +Duration+ in seconds, so <tt>timeout(2)</tt> is
+      # two milliseconds and <tt>timeout(2.0)</tt> two seconds, as
+      # <tt>timeout(2)</tt> and <tt>timeout(Duration::from_secs(2))</tt>
+      # are in Rust. macOS ignores it. Mirrors
+      # <tt>Notification::timeout</tt> (<tt>src/notification.rs:325-364</tt>).
       #
-      # [timeout] Timeout, or Integer milliseconds.
+      # [timeout] Timeout, Integer milliseconds, or Numeric seconds.
       #
       # === Example
       #
       #   Ferro::NotifyRust::Notification.new.timeout(6000).timeout
       #   # => #<data Ferro::NotifyRust::Timeout::Milliseconds value=6000>
+      #   Ferro::NotifyRust::Notification.new.timeout(1.5).timeout
+      #   # => #<data Ferro::NotifyRust::Timeout::Milliseconds value=1500>
       def timeout(timeout = NONE)
         return Timeout.__send__(:from_native, __send__(:native_field, :timeout)) if NONE.equal?(timeout)
 
-        timeout = Timeout.from(timeout) if timeout.is_a?(Integer)
+        timeout = Timeout.from(timeout) if timeout.is_a?(Numeric)
         __send__(:native_timeout, timeout_tag(timeout))
         self
       end
 
-      # Assigns the +timeout+ field, a Timeout.
+      # Assigns the +timeout+ field, a Timeout, as Rust code may. The field
+      # holds a Timeout (<tt>src/notification.rs:101</tt>), so it takes no
+      # Integer or seconds; use #timeout for those.
       #
       # === Example
       #
@@ -257,25 +265,20 @@ module Ferro
         __send__(:native_set_field, :timeout, timeout_tag(timeout))
       end
 
-      # Without +actions+, the field: the actions as a flat Array of
-      # identifier, label, identifier, label. With it, replaces them all.
+      # The +actions+ field: the actions as a flat Array of identifier,
+      # label, identifier, label. Add one with #action.
       #
-      # Deprecated in notify-rust: "please use .action() only". Setting
-      # them warns when <tt>Warning[:deprecated]</tt> is on. Mirrors
-      # <tt>Notification::actions</tt> (<tt>src/notification.rs:432-446</tt>).
-      #
-      # [actions] Array of String.
+      # notify-rust's setter of the same name, which replaces them all, is
+      # deprecated ("please use .action() only",
+      # <tt>src/notification.rs:442</tt>), so it is not bound; assign the
+      # field with #actions= instead. Mirrors the field
+      # (<tt>src/notification.rs:80</tt>).
       #
       # === Example
       #
       #   Ferro::NotifyRust::Notification.new.action("ok", "OK").actions # => ["ok", "OK"]
-      def actions(actions = NONE)
-        return __send__(:native_field, :actions) if NONE.equal?(actions)
-
-        warn("Ferro::NotifyRust::Notification#actions is deprecated: please use .action() only",
-          category: :deprecated, uplevel: 1)
-        __send__(:native_actions, actions)
-        self
+      def actions
+        __send__(:native_field, :actions)
       end
 
       # Assigns the +actions+ field, a flat Array of identifier, label,
@@ -342,6 +345,15 @@ module Ferro
       # +show+ sends at once, and with one it sends when the block ends,
       # unless a wait inside it already did.
       #
+      # The block is the handle's scope, as a File.open block is the file's:
+      # Rust drops the handle at the end of its scope, so when the block
+      # ends, by an exception too, the handle is used up, and any later call
+      # on it raises +IOError+. On Linux and Windows the handle a +show+
+      # without a block returns stays usable until a call that takes it,
+      # as notify-rust's does. On macOS a +show+ without a block uses the
+      # handle up at once, since that is when it sends, so the handle it
+      # returns raises +IOError+ too; wait inside a block there.
+      #
       # Showing releases Ruby's global VM lock. On Linux an interrupt
       # (Ctrl-C, <tt>Thread#raise</tt>, +Timeout+) ends the wait for the
       # server; elsewhere it takes effect once the call returns. Raises
@@ -358,7 +370,14 @@ module Ferro
       #   end
       def show
         handle = __send__(:native_show)
-        return handle.__send__(:release) unless block_given?
+        unless block_given?
+          # Only notify-rust's macOS handle sends when it drops
+          # (src/macos/nsusernotifications.rs:142-162); the Linux and
+          # Windows shows have sent already and return a live handle
+          # (src/xdg/mod.rs:414-416, src/windows.rs:14-48).
+          handle.__send__(:release) if NotifyRust.const_get(:PLATFORM) == :macos
+          return handle
+        end
 
         begin
           yield handle

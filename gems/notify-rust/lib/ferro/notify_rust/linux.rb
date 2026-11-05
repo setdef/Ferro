@@ -27,7 +27,7 @@ module Ferro
     # SPDX-SnippetCopyrightText: 2017 Hendrik Sollich
     # SPDX-SnippetComment: the XDG API and its documentation from
     #   notify-rust 4.18.2 src/xdg/mod.rs, src/image.rs, src/hints.rs:53-55,
-    #   src/notification.rs:127-139, 166-171, 202-211, 275-318, 386-390,
+    #   src/notification.rs:166-171, 202-211, 275-318, 386-390,
     #   515-533, src/lib.rs:226-233, and src/miniver.rs:4-45
     #++
 
@@ -62,7 +62,8 @@ module Ferro
     # Image's constructors return this error type rather than Error, as
     # notify-rust's do, so each case is a subclass with notify-rust's
     # message. Each message ends with a newline, as notify-rust writes it.
-    # Defined only on Linux.
+    # #debug answers notify-rust's +Debug+ text for the error. Defined only
+    # on Linux.
     #
     # Mirrors notify-rust's +ImageError+ (<tt>src/image.rs:126-165</tt>).
     #
@@ -74,6 +75,23 @@ module Ferro
     #     warn e.message
     #   end
     class ImageError < StandardError
+      # notify-rust's derived +Debug+ text (<tt>src/image.rs:127</tt>) for
+      # the error this exception was raised for, formatted by Rust. +nil+
+      # for one Ruby code made, except for the subclasses whose variant
+      # holds nothing, which Rust formats; CantOpen holds the image
+      # crate's error, a value no Ruby value is. +inspect+ stays Ruby's.
+      #
+      # === Example
+      #
+      #   begin
+      #     Ferro::NotifyRust::Image.from_rgba(1, 1, "\0\0\0")
+      #   rescue Ferro::NotifyRust::ImageError => e
+      #     e.debug # => "WrongDataSize"
+      #   end
+      def debug
+        @debug
+      end
+
       # The image is too big: D-Bus has only 32 bits for its width and
       # height.
       #
@@ -82,6 +100,14 @@ module Ferro
       #   Ferro::NotifyRust::Image.from_rgb(0x1000_0000, 1, "")
       #   # raises Ferro::NotifyRust::ImageError::TooBig
       class TooBig < ImageError
+        # notify-rust's +Debug+ text for the variant, <tt>TooBig</tt>.
+        #
+        # === Example
+        #
+        #   Ferro::NotifyRust::ImageError::TooBig.new.debug # => "TooBig"
+        def debug
+          @debug || Native.image_error_debug(:TooBig)
+        end
       end
 
       # The bytes do not match the width, height, and channel count.
@@ -91,6 +117,14 @@ module Ferro
       #   Ferro::NotifyRust::Image.from_rgba(1, 1, "\0\0\0")
       #   # raises Ferro::NotifyRust::ImageError::WrongDataSize
       class WrongDataSize < ImageError
+        # notify-rust's +Debug+ text for the variant, <tt>WrongDataSize</tt>.
+        #
+        # === Example
+        #
+        #   Ferro::NotifyRust::ImageError::WrongDataSize.new.debug # => "WrongDataSize"
+        def debug
+          @debug || Native.image_error_debug(:WrongDataSize)
+        end
       end
 
       # The file could not be opened or decoded; the message names the
@@ -110,6 +144,14 @@ module Ferro
       #   Ferro::NotifyRust::Image.open("grayscale.png")
       #   # raises Ferro::NotifyRust::ImageError::CantConvert
       class CantConvert < ImageError
+        # notify-rust's +Debug+ text for the variant, <tt>CantConvert</tt>.
+        #
+        # === Example
+        #
+        #   Ferro::NotifyRust::ImageError::CantConvert.new.debug # => "CantConvert"
+        def debug
+          @debug || Native.image_error_debug(:CantConvert)
+        end
       end
     end
 
@@ -210,14 +252,16 @@ module Ferro
         native_hash
       end
 
-      # notify-rust's +Debug+ text: the size, format, and every byte.
+      # notify-rust's derived +Debug+ text (<tt>src/image.rs:20</tt>),
+      # formatted by Rust: the size, format, and every byte. +inspect+
+      # stays Ruby's.
       #
       # === Example
       #
-      #   Ferro::NotifyRust::Image.from_rgb(1, 1, "abc").inspect
+      #   Ferro::NotifyRust::Image.from_rgb(1, 1, "abc").debug
       #   # => "Image { width: 1, height: 1, rowstride: 3, alpha: false, bits_per_sample: 8, channels: 3, data: [97, 98, 99] }"
-      def inspect
-        native_inspect
+      def debug
+        native_debug
       end
     end
 
@@ -261,13 +305,15 @@ module Ferro
         freeze
       end
 
-      # The constant that holds this stack.
+      # notify-rust's derived +Debug+ text for this stack
+      # (<tt>src/xdg/mod.rs:402</tt>), formatted by Rust: the variant's
+      # name. +inspect+ stays Ruby's.
       #
       # === Example
       #
-      #   Ferro::NotifyRust::DbusStack::Zbus.inspect # => "Ferro::NotifyRust::DbusStack::Zbus"
-      def inspect
-        "Ferro::NotifyRust::DbusStack::#{@name}"
+      #   Ferro::NotifyRust::DbusStack::Zbus.debug # => "Zbus"
+      def debug
+        Native.dbus_stack_debug(@name)
       end
 
       # dbus-rs (https://docs.rs/dbus), which ferro-notify-rust does not
@@ -291,11 +337,16 @@ module Ferro
     # Builder#show_async_at_bus, NotificationHandle#close_async, and
     # NotificationHandle#wait_for_action_async. Defined only on Linux.
     #
-    # Like <tt>Thread#value</tt>, #value returns the same value, or raises
-    # the same Error, every time, and one thread waits at a time. Waiting
-    # releases Ruby's global VM lock, and an interrupt (Ctrl-C,
-    # <tt>Thread#raise</tt>, +Timeout+) ends the wait and drops the work,
-    # as dropping a Rust future does; call #value again to start it again.
+    # <tt>.await</tt> takes a Rust future, so a Future works once: the
+    # #value that returns its result, or raises the Error it finished
+    # with, uses it up, and any later #value raises +IOError+, as a closed
+    # IO does (ADR 001, 2026-11-05). One thread waits at a time; another
+    # waiting on the same Future gets that +IOError+ once the first has the
+    # result. Waiting releases Ruby's global VM lock, and an interrupt
+    # (Ctrl-C, <tt>Thread#raise</tt>, +Timeout+) ends the wait and drops
+    # the work, as dropping a Rust future does, without using the Future
+    # up: call #value again to start the work again. A Rust future is not
+    # +Clone+, so neither is this.
     #
     # Mirrors the <tt>impl Future</tt> notify-rust's async methods return
     # (<tt>src/notification.rs:515-533</tt>, <tt>src/xdg/mod.rs:146-238</tt>).
@@ -313,20 +364,34 @@ module Ferro
       def initialize(&work)
         @work = work
         @lock = Thread::Mutex.new
+        @consumed = false
         @done = false
         @value = nil
         @error = nil
       end
 
-      # Runs the work, if it has not finished, and returns what it returned:
-      # a NotificationHandle from Builder#show_async, +nil+ from the
-      # handle's async methods. Raises the Error it raised.
+      # Raises +TypeError+: a Rust future is not +Clone+, so a copy that
+      # shared the work would answer a second time. Ruby words it as it
+      # does for +Thread+, which has no allocator either.
+      def initialize_copy(_original)
+        raise TypeError, "allocator undefined for #{self.class}"
+      end
+
+      # Runs the work and returns what it returned: a NotificationHandle
+      # from Builder#show_async, +nil+ from the handle's async methods.
+      # Raises the Error it raised. Either uses the Future up: a later call
+      # raises +IOError+.
       #
       # === Example
       #
       #   handle = Ferro::NotifyRust::Notification.new.summary("Hi").show_async.value
       def value
-        @lock.synchronize { settle unless @done }
+        @lock.synchronize do
+          raise IOError, "#{self.class} consumed by Future#value" if @consumed
+
+          settle unless @done
+          @consumed = true
+        end
         error = @error
         raise error if error
 
@@ -456,32 +521,6 @@ module Ferro
       end
     end
 
-    class Notification
-      private_class_method :native_at_bus
-
-      # A new notification that #show sends to the server owning the bus
-      # name <tt>de.hoodie.Notification.</tt> followed by +sub_bus+ (see
-      # Builder#show_async_at_bus). Raises Error::Msg
-      # (<tt>invalid subpath</tt>) for a name D-Bus would refuse, where
-      # notify-rust would panic.
-      #
-      # notify-rust hides and deprecates it: "this is a test only feature".
-      # It warns when <tt>Warning[:deprecated]</tt> is on. Defined only on
-      # Linux. Mirrors <tt>Notification::at_bus</tt>
-      # (<tt>src/notification.rs:127-139</tt>).
-      #
-      # [sub_bus] String.
-      #
-      # === Example
-      #
-      #   Ferro::NotifyRust::Notification.at_bus("my_test_server").summary("test").show
-      def self.at_bus(sub_bus)
-        warn("Ferro::NotifyRust::Notification.at_bus is deprecated: this is a test only feature",
-          category: :deprecated, uplevel: 1)
-        native_at_bus(NotifyRust.__send__(:string, sub_bus))
-      end
-    end
-
     class NotificationHandle
       # The id the server gave the notification. Defined only on Linux.
       # Mirrors <tt>NotificationHandle::id</tt>
@@ -496,7 +535,9 @@ module Ferro
       end
 
       # Closes the notification on the server. notify-rust ignores the
-      # server's error, so this does too. Defined only on Linux. Mirrors
+      # server's error, so this does too. It takes the handle, as
+      # notify-rust's takes +self+, so it uses the handle up; #close_async
+      # borrows it instead. Defined only on Linux. Mirrors
       # <tt>NotificationHandle::close</tt> (<tt>src/xdg/mod.rs:197-221</tt>).
       #
       # === Example
@@ -516,7 +557,11 @@ module Ferro
       end
 
       # A Future that closes the notification, as #close does, when its
-      # +value+ runs. Defined only on Linux. Mirrors
+      # +value+ runs. It borrows the handle, as notify-rust's does, so the
+      # handle stays usable, and a wait on another thread through
+      # #wait_for_action_async ends with CloseReason::CloseAction. The
+      # Future raises +IOError+ if the handle is used up before +value+
+      # runs. Defined only on Linux. Mirrors
       # <tt>NotificationHandle::close_async</tt>
       # (<tt>src/xdg/mod.rs:223-238</tt>).
       #
@@ -524,24 +569,33 @@ module Ferro
       #
       #   handle.close_async.value
       def close_async
-        Future.__send__(:new) { close }
+        Future.__send__(:new) do
+          native_close_async
+          nil
+        end
       end
 
       # A Future that waits, when its +value+ runs, for the user to act on
       # the notification and yields the NotificationResponse to the block,
-      # as #wait_for_response does. Raises +ArgumentError+ without a block,
-      # since Rust requires the closure. Defined only on Linux. Mirrors
+      # as #wait_for_response does. It borrows the handle, as notify-rust's
+      # does, so the handle stays usable: another thread may #close_async
+      # it meanwhile. Raises +ArgumentError+ without a block, since Rust
+      # requires the closure. Defined only on Linux. Mirrors
       # <tt>NotificationHandle::wait_for_action_async</tt>
       # (<tt>src/xdg/mod.rs:146-195</tt>).
       #
       # === Example
       #
-      #   future = handle.wait_for_action_async { |response| puts response.inspect }
+      #   future = handle.wait_for_action_async { |response| puts response.debug }
       #   Thread.new { future.value }
       def wait_for_action_async(&block)
         raise ArgumentError, "no block given; wait_for_action_async calls it with the response" unless block
 
-        Future.__send__(:new) { wait_for_response(&block) }
+        Future.__send__(:new) do
+          tag = native_wait_for_action_async
+          block.call(NotificationResponse.__send__(:from_native, tag)) unless tag.nil?
+          nil
+        end
       end
 
       # Sends the notification again with the same id, so the server
@@ -612,6 +666,19 @@ module Ferro
 
         [major, minor] <=> [other.major, other.minor]
       end
+
+      # miniver's derived +Debug+ text (<tt>src/miniver.rs:4</tt>),
+      # formatted by Rust from a copy of SPEC_VERSION, the one way to the
+      # type, given these fields. Reading SPEC_VERSION the first time asks
+      # the server, with Ruby's global VM lock released. +inspect+ stays
+      # Data's.
+      #
+      # === Example
+      #
+      #   Ferro::NotifyRust::SPEC_VERSION.debug # => "Version { major: 1, minor: 2 }"
+      def debug
+        Native.version_debug(major, minor)
+      end
     end
 
     # SPEC_VERSION asks the server the first time it is named, so it
@@ -645,7 +712,8 @@ module Ferro
 
     # Waits for the server's signal about the notification with id +id+,
     # then yields an ActionResponse: Custom with the action's key, or
-    # Closed with the reason. Returns +nil+.
+    # Closed with the reason. Returns +nil+. Raises +ArgumentError+
+    # without a block, before it waits, since Rust requires the closure.
     #
     # Prefer NotificationHandle#wait_for_action. This opens a connection of
     # its own and waits until the signal comes, with Ruby's global VM lock
@@ -659,8 +727,10 @@ module Ferro
     # === Example
     #
     #   id = Ferro::NotifyRust::Notification.new.summary("click me").action("ok", "OK").show.id
-    #   Ferro::NotifyRust.handle_action(id) { |response| puts response.inspect }
+    #   Ferro::NotifyRust.handle_action(id) { |response| puts response.debug }
     def self.handle_action(id)
+      raise ArgumentError, "no block given; handle_action calls it with the response" unless block_given?
+
       tag = Native.handle_action(id)
       yield ActionResponse.__send__(:from_native, tag) unless tag.nil?
       nil

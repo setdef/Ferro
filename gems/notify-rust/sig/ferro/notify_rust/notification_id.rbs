@@ -11,6 +11,10 @@ module Ferro
 
         def self.new: (Integer value) -> instance
                     | (value: Integer) -> instance
+
+        private
+
+        def to_native: () -> [:Xdg, Integer]
       end
 
       class Mac < Data
@@ -20,9 +24,14 @@ module Ferro
 
         def self.new: (String value) -> instance
                     | (value: String) -> instance
+
+        private
+
+        def to_native: () -> [:Mac, String]
       end
 
       def self.from: (Integer | String value) -> (Xdg | Mac)
+      def debug: () -> String
     end
   end
 end

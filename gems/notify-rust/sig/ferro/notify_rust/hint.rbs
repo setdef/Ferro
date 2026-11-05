@@ -138,7 +138,6 @@ module Ferro
         @name: :Invalid
 
         def initialize: (:Invalid name) -> void
-        def inspect: () -> String
 
         private
 
@@ -153,6 +152,7 @@ module Ferro
       def as_bool: () -> bool?
       def as_i32: () -> Integer?
       def as_str: () -> String?
+      def debug: () -> String
 
       private
 

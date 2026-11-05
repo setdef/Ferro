@@ -50,11 +50,5 @@ module Ferro
       def native_schedule: (Integer seconds) -> NotificationHandle
       def native_schedule_raw: (Float | Integer timestamp) -> NotificationHandle
     end
-
-    class NotificationHandle
-      private
-
-      def native_drop: () -> nil
-    end
   end
 end

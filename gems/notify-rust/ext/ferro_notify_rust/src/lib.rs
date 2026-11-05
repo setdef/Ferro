@@ -24,6 +24,7 @@ mod gvl;
 #[cfg(any(test, all(unix, not(target_os = "macos"))))]
 mod lock;
 mod notification;
+mod slot;
 mod values;
 
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -130,6 +131,10 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     native.define_singleton_method("urgency_try_from", function!(values::urgency_try_from, 1))?;
     native.define_singleton_method("urgency_from", function!(values::urgency_from, 1))?;
     native.define_singleton_method("timeout_from_i32", function!(values::timeout_from_i32, 1))?;
+    native.define_singleton_method(
+        "timeout_from_duration",
+        function!(values::timeout_from_duration, 1),
+    )?;
     native.define_singleton_method("timeout_from_str", function!(values::timeout_from_str, 1))?;
     native.define_singleton_method("timeout_to_i32", function!(values::timeout_to_i32, 1))?;
     native.define_singleton_method("close_reason_from", function!(values::close_reason_from, 1))?;
@@ -149,6 +154,30 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     native.define_singleton_method("hint_as_bool", function!(values::hint_as_bool, 1))?;
     native.define_singleton_method("hint_as_i32", function!(values::hint_as_i32, 1))?;
     native.define_singleton_method("hint_as_str", function!(values::hint_as_str, 1))?;
+    native.define_singleton_method("urgency_debug", function!(values::urgency_debug, 1))?;
+    native.define_singleton_method("timeout_debug", function!(values::timeout_debug, 1))?;
+    native.define_singleton_method(
+        "close_reason_debug",
+        function!(values::close_reason_debug, 1),
+    )?;
+    native.define_singleton_method(
+        "notification_response_debug",
+        function!(values::notification_response_debug, 1),
+    )?;
+    native.define_singleton_method(
+        "action_response_debug",
+        function!(values::action_response_debug, 1),
+    )?;
+    native.define_singleton_method("hint_debug", function!(values::hint_debug, 1))?;
+    native.define_singleton_method(
+        "notification_id_debug",
+        function!(values::notification_id_debug, 1),
+    )?;
+    native.define_singleton_method(
+        "server_information_debug",
+        function!(values::server_information_debug, 4),
+    )?;
+    native.define_singleton_method("error_debug", function!(error::error_debug, 2))?;
     native.define_singleton_method("gvl_releases", function!(gvl_releases, 0))?;
 
     notification::define(ruby, notify_rust)?;

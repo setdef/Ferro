@@ -32,8 +32,8 @@ module Ferro
     #
     # +dup+ and +clone+ copy the notification, as Rust's +Clone+ does, and
     # Builder#finalize returns a copy too. A frozen notification refuses
-    # its setters, and can be shared between Ractors. #inspect shows
-    # notify-rust's own +Debug+ text.
+    # its setters, and can be shared between Ractors. #debug shows
+    # notify-rust's own +Debug+ text; +inspect+ stays Ruby's.
     #
     # Mirrors notify-rust's +Notification+ (<tt>src/notification.rs:35-125</tt>).
     #
@@ -76,13 +76,16 @@ module Ferro
         new
       end
 
-      # notify-rust's +Debug+ text for the notification.
+      # notify-rust's +Debug+ text for the notification, formatted by Rust:
+      # every field, private ones included. +inspect+ stays Ruby's. Mirrors
+      # notify-rust's <tt>#[derive(Debug)]</tt> on +Notification+
+      # (<tt>src/notification.rs:49</tt>).
       #
       # === Example
       #
-      #   Ferro::NotifyRust::Notification.new.summary("Hi").inspect # => "Notification { appname: \"ruby\", summary: \"Hi\", ... }"
-      def inspect
-        native_inspect
+      #   Ferro::NotifyRust::Notification.new.summary("Hi").debug # => "Notification { appname: \"ruby\", summary: \"Hi\", ... }"
+      def debug
+        native_debug
       end
     end
 

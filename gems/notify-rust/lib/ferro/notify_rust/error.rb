@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 #++
 
+require_relative "ferro_notify_rust"
+
 module Ferro
   module NotifyRust
     #--
@@ -36,6 +38,9 @@ module Ferro
     # <tt>notify-rust panicked: ...</tt>, which would otherwise end the
     # Ruby process.
     #
+    # #debug answers the +Debug+ text of the error notify-rust returned,
+    # which Rust formatted when it raised; +inspect+ stays Ruby's.
+    #
     # Mirrors notify-rust's <tt>error::Error</tt> and +ErrorKind+
     # (<tt>src/error.rs:15-78</tt>).
     #
@@ -53,6 +58,26 @@ module Ferro
     #     e.message # => "Conversion Error: invalid input \"urgent\""
     #   end
     class Error < StandardError
+      # The +Debug+ text of the Rust error this exception was raised for,
+      # formatted by Rust: notify-rust's <tt>Error { kind: ... }</tt>, or,
+      # from NotifyRust.set_application, mac-notification-sys's own error.
+      # +nil+ when there is no such value: for a panic, and for most
+      # exceptions Ruby code makes, though a subclass whose variant holds
+      # only text builds the value notify-rust would. Mirrors
+      # notify-rust's <tt>#[derive(Debug)]</tt> on +Error+ and +ErrorKind+
+      # (<tt>src/error.rs:15-16</tt>, <tt>:21-22</tt>).
+      #
+      # === Example
+      #
+      #   begin
+      #     Ferro::NotifyRust::Urgency.try_from("urgent")
+      #   rescue Ferro::NotifyRust::Error => e
+      #     e.debug # => "Error { kind: Conversion(\"invalid input \\\"urgent\\\"\") }"
+      #   end
+      def debug
+        @debug
+      end
+
       # A message notify-rust passes along as text, such as
       # <tt>invalid subpath</tt> for a bad sub-bus, or, on Windows, why a
       # toast could not show. notify-rust keeps it "only for backwards
@@ -63,6 +88,16 @@ module Ferro
       #   Ferro::NotifyRust::Notification.new.show_async_at_bus("1").value
       #   # raises Ferro::NotifyRust::Error::Msg, "invalid subpath"
       class Msg < Error
+        # notify-rust's +Debug+ text for the error, which Rust formats from
+        # the message where Ruby code made the exception.
+        #
+        # === Example
+        #
+        #   Ferro::NotifyRust::Error::Msg.new("invalid subpath").debug
+        #   # => "Error { kind: Msg(\"invalid subpath\") }"
+        def debug
+          @debug || Native.error_debug(:Msg, message)
+        end
       end
 
       # A number did not parse. The message is
@@ -83,6 +118,15 @@ module Ferro
       #   rescue Ferro::NotifyRust::Error::SpecVersion => e
       #     warn "odd server version: #{e.message}"
       class SpecVersion < Error
+        # notify-rust's +Debug+ text for the error, which Rust formats from
+        # the message where Ruby code made the exception.
+        #
+        # === Example
+        #
+        #   Ferro::NotifyRust::Error::SpecVersion.new("0.9").debug # => "Error { kind: SpecVersion(\"0.9\") }"
+        def debug
+          @debug || Native.error_debug(:SpecVersion, message)
+        end
       end
 
       # A value could not be converted, such as an urgency name
@@ -105,7 +149,18 @@ module Ferro
         #   Ferro::NotifyRust::Error::Conversion.new("invalid input \"x\"").message
         #   # => "Conversion Error: invalid input \"x\""
         def initialize(conversion = "")
-          super("Conversion Error: #{conversion}")
+          @conversion = conversion.to_s
+          super("Conversion Error: #{@conversion}")
+        end
+
+        # notify-rust's +Debug+ text for the error, which Rust formats from
+        # the reason where Ruby code made the exception.
+        #
+        # === Example
+        #
+        #   Ferro::NotifyRust::Error::Conversion.new("x").debug # => "Error { kind: Conversion(\"x\") }"
+        def debug
+          @debug || Native.error_debug(:Conversion, @conversion)
         end
       end
 
@@ -128,6 +183,15 @@ module Ferro
         #   # => "No Dbus implementation available, please compile with either feature =\"z\" or feature=\"d\""
         def initialize(message = nil)
           super(message || 'No Dbus implementation available, please compile with either feature ="z" or feature="d"')
+        end
+
+        # notify-rust's +Debug+ text for the error.
+        #
+        # === Example
+        #
+        #   Ferro::NotifyRust::Error::ImplementationMissing.new.debug # => "Error { kind: ImplementationMissing }"
+        def debug
+          @debug || Native.error_debug(:ImplementationMissing, nil)
         end
       end
     end

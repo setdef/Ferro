@@ -19,6 +19,7 @@ use magnus::{
 use notify_rust::NotificationResponse;
 
 use crate::notification::{Holds, Notification};
+use crate::slot::Slot;
 use crate::{error, gvl, panic_of, values};
 
 /// The platform's name, as `Ferro::NotifyRust::PLATFORM` reports it.
@@ -26,84 +27,108 @@ pub const NAME: &str = "macos";
 
 /// The Ruby `Ferro::NotifyRust::NotificationHandle` on macOS
 /// (`src/macos/nsusernotifications.rs:5-12`). It holds notify-rust's handle
-/// until a wait or the end of `show`'s block takes it; then it holds
-/// nothing, and its waits return without calling the block, as notify-rust's
-/// do for a handle with no notification (plan 003, decision 4).
+/// until a wait or the end of `show` takes it, as notify-rust's waits take
+/// `self` (`:32`, `:73`, `:113`) and Rust drops a handle at the end of its
+/// scope; then every call raises `IOError` naming the call that took it
+/// (plan 003, decision 4; ADR 001, 2026-11-05).
 #[magnus::wrap(
     class = "Ferro::NotifyRust::NotificationHandle",
     free_immediately,
     size
 )]
-pub struct Handle(Mutex<Option<notify_rust::NotificationHandle>>);
+pub struct Handle(Mutex<Slot<notify_rust::NotificationHandle>>);
 
 impl Handle {
     const fn new(handle: notify_rust::NotificationHandle) -> Self {
-        Self(Mutex::new(Some(handle)))
+        Self(Mutex::new(Slot::Live(handle)))
     }
 
-    /// Takes notify-rust's handle out, leaving nothing.
-    fn take(&self) -> Option<notify_rust::NotificationHandle> {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner).take()
+    fn slot(&self) -> std::sync::MutexGuard<'_, Slot<notify_rust::NotificationHandle>> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Runs `work` on the handle, taken out, with the GVL released.
+    /// Takes notify-rust's handle out for the consuming call `by` and runs
+    /// `work` on it with the GVL released; raises `IOError` if a consuming
+    /// call already took it.
     fn consume<T>(
         ruby: &Ruby,
         rb_self: &Self,
+        by: &'static str,
         work: impl FnOnce(notify_rust::NotificationHandle) -> T,
-    ) -> Result<Option<T>, Error> {
-        let Some(handle) = rb_self.take() else {
-            return Ok(None);
-        };
+    ) -> Result<T, Error> {
+        let taken = rb_self.slot().take(by);
+        let handle = taken.map_err(|earlier| error::consumed(ruby, earlier))?;
         gvl::without_gvl(ruby, || work(handle))?
-            .map(Some)
             .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))
     }
 
-    /// `#native_drop`: drops notify-rust's handle, which sends the
-    /// notification if no wait has (`nsusernotifications.rs:142-162`).
-    fn drop_handle(ruby: &Ruby, rb_self: &Self) -> Result<(), Error> {
-        Self::consume(ruby, rb_self, drop).map(|_| ())
+    /// `#native_release`: at the end of `show`, drops notify-rust's handle,
+    /// which sends the notification (`nsusernotifications.rs:142-162`),
+    /// unless a wait has taken it; a drop does nothing to a handle moved
+    /// away before.
+    fn release(ruby: &Ruby, rb_self: &Self) -> Result<(), Error> {
+        let Some(handle) = rb_self.slot().release("Builder#show") else {
+            return Ok(());
+        };
+        gvl::without_gvl(ruby, || drop(handle))?
+            .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))
+    }
+
+    /// `#native_debug`: notify-rust's derived `Debug`
+    /// (`nsusernotifications.rs:9`), which shows the notification the
+    /// handle holds, `None` once one was sent.
+    fn debug(ruby: &Ruby, rb_self: &Self) -> Result<String, Error> {
+        let text = rb_self.slot().get_mut().map(|handle| format!("{handle:?}"));
+        text.map_err(|by| error::consumed(ruby, by))
     }
 
     /// `#native_wait_for_action` (`nsusernotifications.rs:23-62`).
     fn wait_for_action(ruby: &Ruby, rb_self: &Self) -> Result<Option<String>, Error> {
-        Ok(Self::consume(ruby, rb_self, |handle| {
-            let mut seen = None;
-            handle.wait_for_action(|action| seen = Some(action.to_owned()));
-            seen
-        })?
-        .flatten())
+        Self::consume(
+            ruby,
+            rb_self,
+            "NotificationHandle#wait_for_action",
+            |handle| {
+                let mut seen = None;
+                handle.wait_for_action(|action| seen = Some(action.to_owned()));
+                seen
+            },
+        )
     }
 
     /// `#native_wait_for_response` (`nsusernotifications.rs:64-106`).
     fn wait_for_response(ruby: &Ruby, rb_self: &Self) -> Result<Option<RArray>, Error> {
-        let outcome = Self::consume(ruby, rb_self, |handle| {
-            let mut seen = None;
-            handle
-                .wait_for_response(|response: &NotificationResponse| {
-                    seen = Some(response.clone());
-                })
-                .map(|()| seen)
-        })?;
+        let outcome = Self::consume(
+            ruby,
+            rb_self,
+            "NotificationHandle#wait_for_response",
+            |handle| {
+                let mut seen = None;
+                handle
+                    .wait_for_response(|response: &NotificationResponse| {
+                        seen = Some(response.clone());
+                    })
+                    .map(|()| seen)
+            },
+        )?;
         match outcome {
-            None => Ok(None),
-            Some(Ok(seen)) => Ok(seen.map(|response| values::response_to_ruby(ruby, &response))),
-            Some(Err(failure)) => Err(error::notify_error(ruby, &failure)),
+            Ok(seen) => Ok(seen.map(|response| values::response_to_ruby(ruby, &response))),
+            Err(failure) => Err(error::notify_error(ruby, &failure)),
         }
     }
 
     /// `#native_on_close` (`nsusernotifications.rs:108-139`).
     fn on_close(ruby: &Ruby, rb_self: &Self) -> Result<Option<Value>, Error> {
-        Ok(Self::consume(ruby, rb_self, |handle| {
-            // A close handler is `Fn` (`src/response.rs:145-166`), so it
-            // records the reason through a `Cell`.
-            let seen = std::cell::Cell::new(None);
-            handle.on_close(|reason: notify_rust::CloseReason| seen.set(Some(reason)));
-            seen.get()
-        })?
-        .flatten()
-        .map(|reason| values::close_reason_to_ruby(ruby, reason)))
+        Ok(
+            Self::consume(ruby, rb_self, "NotificationHandle#on_close", |handle| {
+                // A close handler is `Fn` (`src/response.rs:145-166`), so
+                // it records the reason through a `Cell`.
+                let seen = std::cell::Cell::new(None);
+                handle.on_close(|reason: notify_rust::CloseReason| seen.set(Some(reason)));
+                seen.get()
+            })?
+            .map(|reason| values::close_reason_to_ruby(ruby, reason)),
+        )
     }
 }
 
@@ -119,7 +144,7 @@ impl Drop for Handle {
             .0
             .get_mut()
             .unwrap_or_else(PoisonError::into_inner)
-            .take();
+            .release("the garbage collector");
         if let Some(handle) = held {
             std::thread::spawn(move || drop(handle));
         }
@@ -197,8 +222,15 @@ fn set_application(ruby: &Ruby, bundle_ident: String) -> Result<(), Error> {
     match crate::settle(ruby, outcome)? {
         Ok(()) => Ok(()),
         Err(failure) => {
+            // The exception keeps the Debug text of what set_application
+            // returned: mac-notification-sys's error, not notify-rust's.
             let target = typed_raise(&failure);
-            Err(error::raise(ruby, &target.path, &target.arguments))
+            Err(error::raise(
+                ruby,
+                &target.path,
+                &target.arguments,
+                Some(format!("{failure:?}")),
+            ))
         }
     }
 }
@@ -250,7 +282,8 @@ pub fn define(ruby: &Ruby, notify_rust: RModule, native: RModule) -> Result<(), 
     let handle = notify_rust.define_class("NotificationHandle", ruby.class_object())?;
     handle.undef_default_alloc_func();
     let _ = <Handle as TypedData>::class(ruby);
-    handle.define_private_method("native_drop", method!(Handle::drop_handle, 0))?;
+    handle.define_private_method("native_release", method!(Handle::release, 0))?;
+    handle.define_private_method("native_debug", method!(Handle::debug, 0))?;
     handle.define_private_method(
         "native_wait_for_action",
         method!(Handle::wait_for_action, 0),

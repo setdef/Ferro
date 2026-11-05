@@ -72,6 +72,36 @@ pub fn timeout_to_ruby(ruby: &Ruby, timeout: Timeout) -> Value {
     }
 }
 
+/// `CloseReason` from its tag: a name, or the raw code of `Other`
+/// (`src/response.rs:21-34`).
+pub fn close_reason_from_ruby(ruby: &Ruby, value: Value) -> Result<CloseReason, Error> {
+    let Some(name) = Symbol::from_value(value) else {
+        return Ok(CloseReason::Other(u32::try_convert(value)?));
+    };
+    match name.name()?.as_ref() {
+        "Expired" => Ok(CloseReason::Expired),
+        "Dismissed" => Ok(CloseReason::Dismissed),
+        "CloseAction" => Ok(CloseReason::CloseAction),
+        other => Err(type_error(ruby, format!("{other} is not a CloseReason"))),
+    }
+}
+
+/// `NotificationResponse` from its tag (`src/response.rs:63-83`).
+fn response_from_ruby(ruby: &Ruby, tag: RArray) -> Result<NotificationResponse, Error> {
+    Ok(match tag_name(tag.entry(0)?)?.as_str() {
+        "Default" => NotificationResponse::Default,
+        "Action" => NotificationResponse::Action(field(tag, 1)?),
+        "Reply" => NotificationResponse::Reply(field(tag, 1)?),
+        "Closed" => NotificationResponse::Closed(close_reason_from_ruby(ruby, tag.entry(1)?)?),
+        other => {
+            return Err(type_error(
+                ruby,
+                format!("{other} is not a NotificationResponse"),
+            ))
+        }
+    })
+}
+
 /// `reason` as its tag: a name, or the raw code of `Other`.
 pub fn close_reason_to_ruby(ruby: &Ruby, reason: CloseReason) -> Value {
     match reason {
@@ -203,6 +233,25 @@ pub fn timeout_from_i32(ruby: &Ruby, milliseconds: i32) -> Value {
     timeout_to_ruby(ruby, Timeout::from(milliseconds))
 }
 
+/// `Native.timeout_from_duration`: `From<Duration> for Timeout`
+/// (`src/timeout.rs:46-56`), given the Duration as seconds (ADR 001,
+/// 2026-11-05). A negative, NaN, or infinite count, or one too large for a
+/// `Duration`, raises `ArgumentError` with the text of core's
+/// `Duration::try_from_secs_f64`, where `Duration::from_secs_f64` would
+/// panic.
+pub fn timeout_from_duration(ruby: &Ruby, seconds: f64) -> Result<Value, Error> {
+    let duration = duration_from_secs(seconds)
+        .map_err(|message| Error::new(ruby.exception_arg_error(), message))?;
+    Ok(timeout_to_ruby(ruby, Timeout::from(duration)))
+}
+
+/// The `Duration` of `seconds`, or the text `Duration::from_secs_f64`
+/// panics with for them: core's `from_secs_f64` panics with
+/// `try_from_secs_f64`'s error, formatted by `Display`.
+fn duration_from_secs(seconds: f64) -> Result<std::time::Duration, String> {
+    std::time::Duration::try_from_secs_f64(seconds).map_err(|failure| failure.to_string())
+}
+
 /// `Native.timeout_from_str`: `FromStr for Timeout` (`src/timeout.rs:68-78`),
 /// raising `ArgumentError` with Rust's `ParseIntError` text (plan 003,
 /// decision 9).
@@ -280,4 +329,110 @@ pub fn hint_as_i32(ruby: &Ruby, tag: RArray) -> Result<Option<i32>, Error> {
 /// `Native.hint_as_str`: `Hint::as_str` (`src/hints.rs:117-126`).
 pub fn hint_as_str(ruby: &Ruby, tag: RArray) -> Result<Option<String>, Error> {
     Ok(hint_from_ruby(ruby, tag)?.as_str().map(str::to_owned))
+}
+
+// Each `*_debug` function builds notify-rust's value from its tag and
+// answers the `Debug` text notify-rust derives for it, so the text is
+// Rust's own (ADR 001, 2026-11-05). A tag holding a value of the wrong
+// type raises `TypeError`, as building the value would.
+
+/// `Native.urgency_debug` (`src/urgency.rs:27`).
+pub fn urgency_debug(ruby: &Ruby, tag: Value) -> Result<String, Error> {
+    Ok(format!("{:?}", urgency_from_ruby(ruby, tag)?))
+}
+
+/// `Native.timeout_debug` (`src/timeout.rs:13`).
+pub fn timeout_debug(ruby: &Ruby, tag: Value) -> Result<String, Error> {
+    Ok(format!("{:?}", timeout_from_ruby(ruby, tag)?))
+}
+
+/// `Native.close_reason_debug` (`src/response.rs:21`).
+pub fn close_reason_debug(ruby: &Ruby, tag: Value) -> Result<String, Error> {
+    Ok(format!("{:?}", close_reason_from_ruby(ruby, tag)?))
+}
+
+/// `Native.notification_response_debug` (`src/response.rs:63`).
+pub fn notification_response_debug(ruby: &Ruby, tag: RArray) -> Result<String, Error> {
+    Ok(format!("{:?}", response_from_ruby(ruby, tag)?))
+}
+
+/// `Native.action_response_debug` (`src/response.rs:110`). The key is
+/// copied out of Ruby first, since `ActionResponse` borrows it.
+pub fn action_response_debug(ruby: &Ruby, tag: RArray) -> Result<String, Error> {
+    let text = match tag_name(tag.entry(0)?)?.as_str() {
+        "Custom" => {
+            let key: String = field(tag, 1)?;
+            format!("{:?}", ActionResponse::Custom(&key))
+        }
+        "Closed" => format!(
+            "{:?}",
+            ActionResponse::Closed(close_reason_from_ruby(ruby, tag.entry(1)?)?)
+        ),
+        other => {
+            return Err(type_error(
+                ruby,
+                format!("{other} is not an ActionResponse"),
+            ))
+        }
+    };
+    Ok(text)
+}
+
+/// `Native.hint_debug` (`src/hints.rs:39`).
+pub fn hint_debug(ruby: &Ruby, tag: RArray) -> Result<String, Error> {
+    Ok(format!("{:?}", hint_from_ruby(ruby, tag)?))
+}
+
+/// `Native.notification_id_debug` (`src/notification_id.rs:19`), from
+/// `[:Xdg, number]` or `[:Mac, text]`.
+pub fn notification_id_debug(ruby: &Ruby, tag: RArray) -> Result<String, Error> {
+    let id = match tag_name(tag.entry(0)?)?.as_str() {
+        "Xdg" => NotificationId::Xdg(field(tag, 1)?),
+        "Mac" => NotificationId::Mac(field(tag, 1)?),
+        other => return Err(type_error(ruby, format!("{other} is not a NotificationId"))),
+    };
+    Ok(format!("{id:?}"))
+}
+
+/// `Native.server_information_debug`: the crate root's `ServerInformation`
+/// (`src/lib.rs:235-246`), built from its four fields. On Linux,
+/// `get_server_information` returns the XDG module's copy,
+/// `xdg::ServerInformation` (`src/xdg/mod.rs:549-562`), which is private;
+/// both derive `Debug` for the same name and fields, so they read alike.
+pub fn server_information_debug(
+    name: String,
+    vendor: String,
+    version: String,
+    spec_version: String,
+) -> String {
+    format!(
+        "{:?}",
+        notify_rust::ServerInformation {
+            name,
+            vendor,
+            version,
+            spec_version,
+        }
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::duration_from_secs;
+    use crate::{capture, Panic};
+    use std::time::Duration;
+
+    /// ADR 001's error rule: the text `ArgumentError` carries is the one
+    /// the real `Duration::from_secs_f64` panics with.
+    #[test]
+    fn a_duration_core_would_panic_on_is_refused_with_the_panics_text() {
+        for seconds in [-1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 1e300] {
+            let panicked = capture(|| Duration::from_secs_f64(seconds));
+            let Err(Panic(message)) = panicked else {
+                panic!("from_secs_f64({seconds}) did not panic");
+            };
+            assert_eq!(duration_from_secs(seconds), Err(message), "{seconds}");
+        }
+        assert_eq!(duration_from_secs(1.5), Ok(Duration::from_millis(1500)));
+    }
 }

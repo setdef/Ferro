@@ -25,10 +25,9 @@ module Ferro
       def image_path: (String path) -> self
       def sound_name: (String name) -> self
       def timeout: () -> (Timeout::Unit | Timeout::Milliseconds)
-                 | (Timeout | Integer timeout) -> self
+                 | (Timeout | Numeric timeout) -> self
       def timeout=: (Timeout timeout) -> void
       def actions: () -> Array[String]
-                 | (Array[String] actions) -> self
       def actions=: (Array[String] actions) -> void
       def action: (String identifier, String label) -> self
       def id: (Integer id) -> self
