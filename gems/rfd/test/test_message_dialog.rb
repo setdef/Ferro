@@ -20,6 +20,16 @@ class TestMessageDialog < Minitest::Test
     assert_equal "AsyncMessageDialog(#{DEFAULT})", Ferro::Rfd::AsyncMessageDialog.new.inspect
   end
 
+  # rfd derives Default for both message builders, and new is it
+  # (src/message_dialog.rs:14, :29-31, :92, :96-98).
+  def test_default_is_a_new_dialog
+    [Ferro::Rfd::MessageDialog, Ferro::Rfd::AsyncMessageDialog].each do |builder|
+      assert_instance_of builder, builder.default
+      assert_equal builder.new.inspect, builder.default.inspect
+      refute_same builder.default, builder.default
+    end
+  end
+
   def test_every_setter_reaches_rfd
     [Ferro::Rfd::MessageDialog, Ferro::Rfd::AsyncMessageDialog].each do |builder|
       configured = builder.new
@@ -57,6 +67,18 @@ class TestMessageDialog < Minitest::Test
     end
   end
 
+  # A subclass is still the variant it inherits, as a handle subclass is.
+  def test_a_subclass_of_a_custom_set_reaches_rfd_as_its_variant
+    buttons = Ferro::Rfd::MessageButtons
+    {
+      Class.new(buttons::OkCustom).new("x") => 'OkCustom("x")',
+      Class.new(buttons::OkCancelCustom).new("a", "b") => 'OkCancelCustom("a", "b")',
+      Class.new(buttons::YesNoCancelCustom).new("a", "b", "c") => 'YesNoCancelCustom("a", "b", "c")',
+    }.each do |value, debug|
+      assert_includes Ferro::Rfd::MessageDialog.new.set_buttons(value).inspect, "buttons: #{debug},"
+    end
+  end
+
   def test_each_setter_returns_the_dialog
     [Ferro::Rfd::MessageDialog.new, Ferro::Rfd::AsyncMessageDialog.new].each do |subject|
       assert_same subject, subject.set_title("t")
@@ -73,6 +95,9 @@ class TestMessageDialog < Minitest::Test
     assert_equal "wrong argument type Symbol (expected Ferro::Rfd::MessageLevel)", error.message
 
     assert_raises(TypeError) { Ferro::Rfd::MessageDialog.new.set_buttons(Ferro::Rfd::MessageLevel::Info) }
+    stranger = Object.new.extend(Ferro::Rfd::MessageButtons)
+    error = assert_raises(TypeError) { Ferro::Rfd::MessageDialog.new.set_buttons(stranger) }
+    assert_equal "wrong argument type Object (expected Ferro::Rfd::MessageButtons)", error.message
     assert_raises(TypeError) do
       Ferro::Rfd::MessageDialog.new.set_buttons(Ferro::Rfd::MessageButtons::OkCustom.new(:label))
     end

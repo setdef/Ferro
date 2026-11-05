@@ -12,6 +12,11 @@ require "test_helper"
 class TestEnums < Minitest::Test
   include RfdSuite
 
+  def test_the_private_value_class_of_each_enum_module_is_not_reachable
+    assert_raises(NameError) { Ferro::Rfd::MessageButtons::Value }
+    assert_raises(NameError) { Ferro::Rfd::MessageDialogResult::Value }
+  end
+
   def test_the_unit_variants_are_frozen_constants_named_for_rfds
     {
       Ferro::Rfd::MessageLevel => %i[Info Warning Error],
@@ -27,6 +32,20 @@ class TestEnums < Minitest::Test
       end
       assert_raises(NoMethodError) { enum.new(:Other) }
     end
+  end
+
+  # Every variant of rfd's enums has the enum's type
+  # (src/message_dialog.rs:161-187).
+  def test_the_variants_with_data_are_of_their_enum
+    buttons = Ferro::Rfd::MessageButtons
+    result = Ferro::Rfd::MessageDialogResult
+
+    assert_kind_of buttons, buttons::OkCustom.new("a")
+    assert_kind_of buttons, buttons::OkCancelCustom.new("a", "b")
+    assert_kind_of buttons, buttons::YesNoCancelCustom.new("a", "b", "c")
+    assert_kind_of result, result::Custom.new("x")
+    assert_operator buttons::OkCustom, :<, Data
+    assert_operator result::Custom, :<, Data
   end
 
   # rfd derives Default with #[default] on Info, Ok, and Cancel
@@ -63,5 +82,18 @@ class TestEnums < Minitest::Test
     refute_equal result::Custom.new("Save"), result::Custom.new("Discard")
     refute_equal result::Ok, result::Custom.new("Ok")
     assert_equal result::Yes, result::Yes
+  end
+
+  # rfd derives Clone with PartialEq, so a copy equals its original.
+  def test_a_copied_result_equals_its_original
+    result = Ferro::Rfd::MessageDialogResult
+
+    [result::Ok.clone, result::Ok.dup, Marshal.load(Marshal.dump(result::Ok))].each do |copy|
+      assert_equal result::Ok, copy
+      assert result::Ok.eql?(copy)
+      assert_equal result::Ok.hash, copy.hash
+    end
+    refute_equal result::Ok, result::Cancel.dup
+    refute_equal result::Ok, Object.new
   end
 end

@@ -24,6 +24,16 @@ class TestFileDialog < Minitest::Test
     assert_equal DEFAULT, dialog.inspect
   end
 
+  # rfd derives Default for both file builders, and new is it
+  # (src/file_dialog.rs:19, :38-40, :182, :189-191).
+  def test_default_is_a_new_dialog
+    [Ferro::Rfd::FileDialog, Ferro::Rfd::AsyncFileDialog].each do |builder|
+      assert_instance_of builder, builder.default
+      assert_equal builder.new.inspect, builder.default.inspect
+      refute_same builder.default, builder.default
+    end
+  end
+
   def test_every_setter_reaches_rfd
     configured = dialog
       .add_filter("text", ["txt", "rs"])
@@ -112,9 +122,18 @@ class TestFileDialog < Minitest::Test
     assert_raises(TypeError) { dialog.set_file_name(42) }
   end
 
-  def test_can_create_directories_takes_ruby_truthiness
-    assert_includes dialog.set_can_create_directories(nil).inspect, "can_create_directories: Some(false)"
-    assert_includes dialog.set_can_create_directories("yes").inspect, "can_create_directories: Some(true)"
+  # rfd takes a bool (src/file_dialog.rs:105-110), and Rust's type
+  # checker would refuse anything else.
+  def test_can_create_directories_takes_true_or_false
+    assert_includes dialog.set_can_create_directories(false).inspect, "can_create_directories: Some(false)"
+    assert_includes dialog.set_can_create_directories(true).inspect, "can_create_directories: Some(true)"
+    [nil, "yes", 1].each do |value|
+      [dialog, Ferro::Rfd::AsyncFileDialog.new].each do |subject|
+        error = assert_raises(TypeError) { subject.set_can_create_directories(value) }
+        named = value.nil? ? "nil" : value.class
+        assert_equal "no implicit conversion of #{named} into true or false", error.message
+      end
+    end
   end
 
   # rfd's builder is Clone; a copy's setters leave the original alone.

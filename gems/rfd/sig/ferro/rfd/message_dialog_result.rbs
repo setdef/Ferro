@@ -3,24 +3,34 @@
 
 module Ferro
   module Rfd
-    class MessageDialogResult
+    module MessageDialogResult
+      class Value
+        include MessageDialogResult
+
+        @name: Symbol
+
+        private def self.new: (Symbol name) -> instance
+
+        def initialize: (Symbol name) -> void
+        def inspect: () -> String
+        def to_s: () -> String
+        def ==: (Object other) -> bool
+        def eql?: (Object other) -> bool
+        def hash: () -> Integer
+      end
+
       Yes: MessageDialogResult
       No: MessageDialogResult
       Ok: MessageDialogResult
       Cancel: MessageDialogResult
 
-      @name: Symbol
-
-      private def self.new: (Symbol name) -> instance
-      private def self.from_native: (native_result tuple) -> (MessageDialogResult | Custom)
+      private def self.from_native: (native_result tuple) -> MessageDialogResult
 
       def self.default: () -> MessageDialogResult
 
-      def initialize: (Symbol name) -> void
-      def inspect: () -> String
-      def to_s: () -> String
-
       class Custom < Data
+        include MessageDialogResult
+
         attr_reader custom: String
 
         def self.new: (String custom) -> instance

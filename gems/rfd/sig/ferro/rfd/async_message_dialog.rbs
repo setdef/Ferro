@@ -6,11 +6,13 @@ module Ferro
     class AsyncMessageDialog
       @message_dialog: MessageDialog
 
+      def self.default: () -> AsyncMessageDialog
+
       def initialize: () -> void
       def set_level: (MessageLevel level) -> self
       def set_title: (String text) -> self
       def set_description: (String text) -> self
-      def set_buttons: (message_buttons btn) -> self
+      def set_buttons: (MessageButtons btn) -> self
       def set_parent: (_Parent parent) -> self
       def show: () -> Future
       def inspect: () -> String

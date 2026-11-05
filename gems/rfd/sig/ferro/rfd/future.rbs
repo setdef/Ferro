@@ -4,7 +4,7 @@
 module Ferro
   module Rfd
     class Future
-      type value = FileHandle | Array[FileHandle] | MessageDialogResult | MessageDialogResult::Custom | String | nil
+      type value = FileHandle | Array[FileHandle] | MessageDialogResult | String | nil
 
       @native: Native::Future
       @lock: Thread::Mutex

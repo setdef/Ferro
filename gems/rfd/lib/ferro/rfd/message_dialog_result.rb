@@ -21,15 +21,19 @@ module Ferro
     # reports it differently, and a dialog closed with the Escape key or
     # its close box reports no button at all.
     #
-    # MessageDialog#show returns one of these, and an AsyncMessageDialog's
-    # Future#value does too. The four constants are the standard buttons.
+    # MessageDialog#show returns a MessageDialogResult, and an
+    # AsyncMessageDialog's Future#value does too. The four constants are
+    # the standard buttons.
     # A dialog with labels of your own (MessageButtons::OkCustom and the
     # like) returns Custom with the label of the button pressed. A dialog
     # closed without a button, or one that could not open, returns Cancel,
     # the default.
     #
-    # Results compare with <tt>==</tt>, as rfd's derive +PartialEq+ does:
-    # the constants by identity, Custom by its label.
+    # Every result, Custom included, is a MessageDialogResult, as every
+    # variant of a Rust enum has the enum's type. Results compare with
+    # <tt>==</tt>, as rfd's derived +PartialEq+ does: by variant, and
+    # Custom by its label too, so a copy made with +dup+, +clone+, or
+    # +Marshal+ equals its original, as rfd's +Clone+ does.
     #
     # Mirrors rfd's +MessageDialogResult+ (<tt>src/message_dialog.rs:179-203</tt>).
     #
@@ -45,50 +49,80 @@ module Ferro
     #     .show
     #   save if result == Ferro::Rfd::MessageDialogResult::Custom.new("Save")
     #   result.to_s # => "Custom(Save)"
-    class MessageDialogResult
-      private_class_method :new
+    module MessageDialogResult
+      # A standard result: the class of the four constants. Private to the
+      # gem; the four constants are its only instances, and their copies.
+      class Value # :nodoc:
+        include MessageDialogResult
 
-      # Creates the result named +name+. The four constants are the only
-      # instances.
-      #
-      # [name] Symbol, the rfd variant's name.
-      def initialize(name)
-        @name = name
-        freeze
-      end
+        private_class_method :new
 
-      # The constant that holds this result.
-      #
-      # === Example
-      #
-      #   Ferro::Rfd::MessageDialogResult::Yes.inspect # => "Ferro::Rfd::MessageDialogResult::Yes"
-      def inspect
-        "#{self.class}::#{@name}"
-      end
+        # Creates the result named +name+.
+        #
+        # [name] Symbol, the rfd variant's name.
+        def initialize(name)
+          @name = name
+          freeze
+        end
 
-      # The result's name, as rfd displays it: <tt>"Yes"</tt>,
-      # <tt>"No"</tt>, <tt>"Ok"</tt>, or <tt>"Cancel"</tt>. Mirrors rfd's
-      # +Display+ (<tt>src/message_dialog.rs:189-203</tt>).
-      #
-      # === Example
-      #
-      #   puts "res: #{Ferro::Rfd::MessageDialogResult::Ok}" # prints "res: Ok"
-      def to_s
-        @name.to_s
+        # The constant that holds this result.
+        #
+        # === Example
+        #
+        #   Ferro::Rfd::MessageDialogResult::Yes.inspect # => "Ferro::Rfd::MessageDialogResult::Yes"
+        def inspect
+          "Ferro::Rfd::MessageDialogResult::#{@name}"
+        end
+
+        # The result's name, as rfd displays it: <tt>"Yes"</tt>,
+        # <tt>"No"</tt>, <tt>"Ok"</tt>, or <tt>"Cancel"</tt>. Mirrors rfd's
+        # +Display+ (<tt>src/message_dialog.rs:189-203</tt>).
+        #
+        # === Example
+        #
+        #   puts "res: #{Ferro::Rfd::MessageDialogResult::Ok}" # prints "res: Ok"
+        def to_s
+          @name.to_s
+        end
+
+        # Whether +other+ is the same result, as rfd's derived +PartialEq+
+        # compares: by variant, so a copy equals its original.
+        #
+        # [other] Object.
+        #
+        # === Example
+        #
+        #   Ferro::Rfd::MessageDialogResult::Ok == Ferro::Rfd::MessageDialogResult::Ok.dup # => true
+        def ==(other)
+          other.instance_of?(Value) && to_s == other.to_s
+        end
+        alias eql? ==
+
+        # A hash code that agrees with #eql?, so equal results are one
+        # Hash key. rfd derives no +Hash+; Ruby needs one consistent with
+        # #eql?.
+        #
+        # === Example
+        #
+        #   {Ferro::Rfd::MessageDialogResult::Ok => 1}[Ferro::Rfd::MessageDialogResult::Ok.dup] # => 1
+        def hash
+          [Value, @name].hash
+        end
       end
+      private_constant :Value
 
       # The user pressed Yes.
-      Yes = new(:Yes)
+      Yes = Value.__send__(:new, :Yes)
 
       # The user pressed No.
-      No = new(:No)
+      No = Value.__send__(:new, :No)
 
       # The user pressed OK.
-      Ok = new(:Ok)
+      Ok = Value.__send__(:new, :Ok)
 
       # The user pressed Cancel, or closed the dialog without a button, or
       # it could not open. The default.
-      Cancel = new(:Cancel)
+      Cancel = Value.__send__(:new, :Cancel)
 
       # The user pressed the button labelled +custom+, one of the labels
       # you gave MessageButtons::OkCustom, OkCancelCustom, or
@@ -98,6 +132,8 @@ module Ferro
       #
       #   Ferro::Rfd::MessageDialogResult::Custom.new("Save").to_s # => "Custom(Save)"
       class Custom < Data.define(:custom)
+        include MessageDialogResult
+
         ##
         # :attr_reader: custom
         # The label of the button pressed, a String.

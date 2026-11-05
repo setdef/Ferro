@@ -215,8 +215,9 @@ The API is rfd's, translated where Rust has no Ruby meaning:
   FileHandle.new also take anything with +to_path+).
 * Enums are constants (MessageLevel::Warning, MessageButtons::YesNo,
   MessageDialogResult::Cancel); variants with data are Data classes
-  (MessageButtons::OkCustom, MessageDialogResult::Custom). +Default+ is
-  <tt>.default</tt>.
+  (MessageButtons::OkCustom, MessageDialogResult::Custom). MessageButtons
+  and MessageDialogResult are modules that every variant includes.
+  +Default+ is <tt>.default</tt>.
 * A Rust future is a Future, and <tt>.await</tt> is Future#value.
 * FileHandle answers #to_path, so Ruby's file methods take it.
 * +pick_file_or_folder+ and +pick_files_or_folders+ exist only on macOS,

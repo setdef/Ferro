@@ -7,24 +7,24 @@ module Ferro
       attr_reader hwnd: Integer
       attr_reader hinstance: Integer?
 
-      def self.new: (Integer hwnd, Integer? hinstance) -> instance
-                  | (hwnd: Integer, hinstance: Integer?) -> instance
+      def self.new: (Integer hwnd, ?Integer? hinstance) -> instance
+                  | (hwnd: Integer, ?hinstance: Integer?) -> instance
     end
 
     class XlibWindowHandle < Data
       attr_reader window: Integer
       attr_reader visual_id: Integer
 
-      def self.new: (Integer window, Integer visual_id) -> instance
-                  | (window: Integer, visual_id: Integer) -> instance
+      def self.new: (Integer window, ?Integer visual_id) -> instance
+                  | (window: Integer, ?visual_id: Integer) -> instance
     end
 
     class XcbWindowHandle < Data
       attr_reader window: Integer
       attr_reader visual_id: Integer?
 
-      def self.new: (Integer window, Integer? visual_id) -> instance
-                  | (window: Integer, visual_id: Integer?) -> instance
+      def self.new: (Integer window, ?Integer? visual_id) -> instance
+                  | (window: Integer, ?visual_id: Integer?) -> instance
     end
 
     class AppKitWindowHandle < Data

@@ -87,6 +87,19 @@ module Ferro
         @parent = nil
       end
 
+      # A dialog with rfd's defaults, the same as +new+ gives.
+      #
+      # Mirrors rfd's derived +Default+ for +MessageDialog+
+      # (<tt>src/message_dialog.rs:14</tt>), which <tt>MessageDialog::new</tt> calls
+      # (<tt>src/message_dialog.rs:29-31</tt>).
+      #
+      # === Example
+      #
+      #   dialog = Ferro::Rfd::MessageDialog.default
+      def self.default
+        new
+      end
+
       # Sets how serious the message is, a MessageLevel. Returns the
       # dialog.
       #

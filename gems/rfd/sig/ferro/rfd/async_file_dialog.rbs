@@ -6,13 +6,15 @@ module Ferro
     class AsyncFileDialog
       @file_dialog: FileDialog
 
+      def self.default: () -> AsyncFileDialog
+
       def initialize: () -> void
       def add_filter: (String name, Array[_ToS] extensions) -> self
       def set_directory: (String | _ToPath path) -> self
       def set_file_name: (String file_name) -> self
       def set_title: (String title) -> self
       def set_parent: (_Parent parent) -> self
-      def set_can_create_directories: (boolish can) -> self
+      def set_can_create_directories: (bool can) -> self
       def pick_file: () -> Future
       def pick_files: () -> Future
       def pick_folder: () -> Future

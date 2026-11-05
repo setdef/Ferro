@@ -87,6 +87,32 @@ impl ParentSpec {
     pub const fn needs_main_thread(&self) -> bool {
         cfg!(target_os = "macos") && matches!(self.window, Some(WindowSpec::AppKit { .. }))
     }
+
+    /// Whether the parent answered a window. rfd keeps only the window
+    /// handle as its `parent` (`src/message_dialog.rs:72-79`), so a parent
+    /// that answered a display alone is, to rfd, no parent.
+    pub const fn has_window(&self) -> bool {
+        self.window.is_some()
+    }
+}
+
+#[cfg(test)]
+impl ParentSpec {
+    /// A parent that answers this window and no display.
+    pub const fn of_window(window: WindowSpec) -> Self {
+        Self {
+            window: Some(window),
+            display: None,
+        }
+    }
+
+    /// A parent that answers an `AppKit` display and no window.
+    pub const fn display_only() -> Self {
+        Self {
+            window: None,
+            display: Some(DisplaySpec::AppKit),
+        }
+    }
 }
 
 /// A parent window for rfd: the two raw handles `set_parent` reads, and
@@ -459,5 +485,18 @@ mod tests {
         };
         assert_eq!(outcome, expected);
         assert_eq!(appkit(7).needs_main_thread(), cfg!(target_os = "macos"));
+    }
+
+    /// rfd's macOS backend tells a sheet from a free alert by the window
+    /// handle alone (`src/backend/macos/message_dialog.rs:172-183`), and a
+    /// parent that answers no window leaves rfd's `parent` `None`
+    /// (`src/message_dialog.rs:72-79`), whatever display it answers.
+    #[test]
+    fn only_a_parent_with_a_window_has_one_for_rfd() {
+        let display_only = ParentSpec::display_only();
+        assert!(!display_only.has_window());
+        assert!(appkit(7).has_window());
+        let dialog = rfd::MessageDialog::new().set_parent(&Parent::without_lookup(display_only));
+        assert!(format!("{dialog:?}").contains("parent: None, parent_display: Some(AppKit("));
     }
 }

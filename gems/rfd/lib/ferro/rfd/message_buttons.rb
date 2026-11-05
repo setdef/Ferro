@@ -23,7 +23,8 @@ module Ferro
     # "Save", "Don't Save".
     #
     # The four constants are the standard sets. The three classes below
-    # carry labels of your own. Pass either kind to
+    # carry labels of your own. Every one of them is a MessageButtons, as
+    # every variant of a Rust enum has the enum's type. Pass any to
     # MessageDialog#set_buttons:
     #
     # - Ok: a single OK button. The default.
@@ -52,38 +53,47 @@ module Ferro
     #   labels = Ferro::Rfd::MessageButtons::OkCancelCustom.new("Save", "Don't Save")
     #   Ferro::Rfd::MessageDialog.new.set_buttons(labels).show
     #   # => Ferro::Rfd::MessageDialogResult::Custom.new("Save") when the user saves
-    class MessageButtons
-      private_class_method :new
+    module MessageButtons
+      # A standard set: the class of the four constants. Private to the
+      # gem; the four constants are its only instances.
+      class Value # :nodoc:
+        include MessageButtons
 
-      # Creates the set named +name+. The four constants are the only
-      # instances.
-      #
-      # [name] Symbol, the rfd variant's name.
-      def initialize(name)
-        @name = name
-        freeze
-      end
+        private_class_method :new
 
-      # The constant that holds this set.
-      #
-      # === Example
-      #
-      #   Ferro::Rfd::MessageButtons::YesNo.inspect # => "Ferro::Rfd::MessageButtons::YesNo"
-      def inspect
-        "#{self.class}::#{@name}"
+        # Creates the set named +name+.
+        #
+        # [name] Symbol, the rfd variant's name.
+        def initialize(name)
+          @name = name
+          freeze
+        end
+
+        # The constant that holds this set.
+        #
+        # === Example
+        #
+        #   Ferro::Rfd::MessageButtons::YesNo.inspect # => "Ferro::Rfd::MessageButtons::YesNo"
+        def inspect
+          "Ferro::Rfd::MessageButtons::#{@name}"
+        end
+
+        # The variant's name, which the native layer takes.
+        private attr_reader :name
       end
+      private_constant :Value
 
       # A single OK button: the default.
-      Ok = new(:Ok)
+      Ok = Value.__send__(:new, :Ok)
 
       # OK and Cancel.
-      OkCancel = new(:OkCancel)
+      OkCancel = Value.__send__(:new, :OkCancel)
 
       # Yes and No.
-      YesNo = new(:YesNo)
+      YesNo = Value.__send__(:new, :YesNo)
 
       # Yes, No, and Cancel.
-      YesNoCancel = new(:YesNoCancel)
+      YesNoCancel = Value.__send__(:new, :YesNoCancel)
 
       # One button labelled +ok_text+.
       #
@@ -91,6 +101,8 @@ module Ferro
       #
       #   Ferro::Rfd::MessageButtons::OkCustom.new("Got it")
       class OkCustom < Data.define(:ok_text)
+        include MessageButtons
+
         ##
         # :attr_reader: ok_text
         # The button's label, a String.
@@ -102,6 +114,8 @@ module Ferro
       #
       #   Ferro::Rfd::MessageButtons::OkCancelCustom.new("Save", "Don't Save")
       class OkCancelCustom < Data.define(:ok_text, :cancel_text)
+        include MessageButtons
+
         ##
         # :attr_reader: ok_text
         # The first button's label, a String.
@@ -117,6 +131,8 @@ module Ferro
       #
       #   Ferro::Rfd::MessageButtons::YesNoCancelCustom.new("Save", "Discard", "Keep Editing")
       class YesNoCancelCustom < Data.define(:yes_text, :no_text, :cancel_text)
+        include MessageButtons
+
         ##
         # :attr_reader: yes_text
         # The first button's label, a String.
@@ -141,18 +157,26 @@ module Ferro
       end
 
       # The tagged Array the native layer takes for +buttons+:
-      # <tt>[:Ok]</tt>, or the variant and its labels. Anything else raises
+      # <tt>[:Ok]</tt>, or the variant and its labels. The variant is the
+      # class matched, so a subclass is the variant it inherits. Anything
+      # else, a stranger that includes this module among them, raises
       # +TypeError+, as Rust's type checker would refuse it.
       def self.variant(buttons) # :nodoc:
         case buttons
-        when MessageButtons then [buttons.instance_variable_get(:@name)]
-        when OkCustom, OkCancelCustom, YesNoCancelCustom
-          name = buttons.class.name.to_s.split("::").last.to_s.to_sym
-          [name, *buttons.deconstruct.map { |text| Rfd.__send__(:string, text) }]
+        when Value then [buttons.__send__(:name)]
+        when OkCustom then [:OkCustom, *labels(buttons)]
+        when OkCancelCustom then [:OkCancelCustom, *labels(buttons)]
+        when YesNoCancelCustom then [:YesNoCancelCustom, *labels(buttons)]
         else raise TypeError, "wrong argument type #{buttons.class} (expected #{self})"
         end
       end
       private_class_method :variant
+
+      # A custom set's labels, each refused unless it is a String.
+      def self.labels(buttons) # :nodoc:
+        buttons.deconstruct.map { |text| Rfd.__send__(:string, text) }
+      end
+      private_class_method :labels
     end
 
     #--

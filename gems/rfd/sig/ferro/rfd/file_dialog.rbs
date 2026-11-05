@@ -11,13 +11,15 @@ module Ferro
       @parent: native_parent?
       @can_create_directories: bool?
 
+      def self.default: () -> FileDialog
+
       def initialize: () -> void
       def add_filter: (String name, Array[_ToS] extensions) -> self
       def set_directory: (String | _ToPath path) -> self
       def set_file_name: (String file_name) -> self
       def set_title: (String title) -> self
       def set_parent: (_Parent parent) -> self
-      def set_can_create_directories: (boolish can) -> self
+      def set_can_create_directories: (bool can) -> self
       def pick_file: () -> String?
       def pick_files: () -> Array[String]?
       def pick_folder: () -> String?

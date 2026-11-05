@@ -3,23 +3,35 @@
 
 module Ferro
   module Rfd
-    class MessageButtons
+    module MessageButtons
+      class Value
+        include MessageButtons
+
+        @name: Symbol
+
+        private def self.new: (Symbol name) -> instance
+
+        def initialize: (Symbol name) -> void
+        def inspect: () -> String
+
+        private
+
+        attr_reader name: Symbol
+      end
+
       Ok: MessageButtons
       OkCancel: MessageButtons
       YesNo: MessageButtons
       YesNoCancel: MessageButtons
 
-      @name: Symbol
-
-      private def self.new: (Symbol name) -> instance
       private def self.variant: (Object buttons) -> Array[Symbol | String]
+      private def self.labels: (OkCustom | OkCancelCustom | YesNoCancelCustom buttons) -> Array[String]
 
       def self.default: () -> MessageButtons
 
-      def initialize: (Symbol name) -> void
-      def inspect: () -> String
-
       class OkCustom < Data
+        include MessageButtons
+
         attr_reader ok_text: String
 
         def self.new: (String ok_text) -> instance
@@ -27,6 +39,8 @@ module Ferro
       end
 
       class OkCancelCustom < Data
+        include MessageButtons
+
         attr_reader ok_text: String
         attr_reader cancel_text: String
 
@@ -35,6 +49,8 @@ module Ferro
       end
 
       class YesNoCancelCustom < Data
+        include MessageButtons
+
         attr_reader yes_text: String
         attr_reader no_text: String
         attr_reader cancel_text: String

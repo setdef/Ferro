@@ -7,8 +7,6 @@ module Ferro
 
     type window_handle = BasicObject
     type display_handle = BasicObject
-    type message_buttons = MessageButtons | MessageButtons::OkCustom | MessageButtons::OkCancelCustom
-                         | MessageButtons::YesNoCancelCustom
 
     interface _Parent
       def window_handle: () -> window_handle?

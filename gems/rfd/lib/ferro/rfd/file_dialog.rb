@@ -100,6 +100,19 @@ module Ferro
         @can_create_directories = nil
       end
 
+      # A dialog with rfd's defaults, the same as +new+ gives.
+      #
+      # Mirrors rfd's derived +Default+ for +FileDialog+
+      # (<tt>src/file_dialog.rs:19</tt>), which <tt>FileDialog::new</tt> calls
+      # (<tt>src/file_dialog.rs:36-40</tt>).
+      #
+      # === Example
+      #
+      #   dialog = Ferro::Rfd::FileDialog.default
+      def self.default
+        new
+      end
+
       # Adds a file type filter named +name+, matching the file extensions
       # in +extensions+ (without the dot, such as <tt>"txt"</tt>). Returns
       # the dialog.
@@ -223,8 +236,10 @@ module Ferro
         self
       end
 
-      # Lets the user create folders from the dialog when +can+ is truthy,
-      # or forbids it. Returns the dialog.
+      # Lets the user create folders from the dialog when +can+ is +true+,
+      # or forbids it when +false+. Returns the dialog. Anything else
+      # raises +TypeError+, as Rust's type checker refuses anything but a
+      # +bool+.
       #
       # Supported on macOS. Folder pickers there allow it unless you
       # forbid it.
@@ -236,7 +251,12 @@ module Ferro
       #
       #   Ferro::Rfd::FileDialog.new.set_can_create_directories(false).pick_folder
       def set_can_create_directories(can)
-        @can_create_directories = can ? true : false
+        unless can == true || can == false
+          named = [nil, true, false].include?(can) ? can.inspect : can.class
+          raise TypeError, "no implicit conversion of #{named} into true or false"
+        end
+
+        @can_create_directories = can
         self
       end
 

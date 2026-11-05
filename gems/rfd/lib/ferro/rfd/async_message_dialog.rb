@@ -27,8 +27,9 @@ module Ferro
     #
     # This builder takes the same options as MessageDialog, but #show
     # returns a Future of the MessageDialogResult. On macOS, a dialog
-    # without a parent opens at once, on a thread of rfd's own, from any
-    # thread, with or without an application. On Windows and Linux it opens
+    # without a parent window (no parent, or one whose +window_handle+ is
+    # +nil+) opens at once, on a thread of rfd's own, from any thread, with
+    # or without an application. On Windows and Linux it opens
     # when you first call Future#value, on a thread of rfd's own.
     #
     # Use it to ask a question without stalling the thread that asked.
@@ -56,6 +57,19 @@ module Ferro
       #   dialog = Ferro::Rfd::AsyncMessageDialog.new
       def initialize
         @message_dialog = MessageDialog.new
+      end
+
+      # A dialog with rfd's defaults, the same as +new+ gives.
+      #
+      # Mirrors rfd's derived +Default+ for +AsyncMessageDialog+
+      # (<tt>src/message_dialog.rs:92</tt>), which <tt>AsyncMessageDialog::new</tt> calls
+      # (<tt>src/message_dialog.rs:96-98</tt>).
+      #
+      # === Example
+      #
+      #   dialog = Ferro::Rfd::AsyncMessageDialog.default
+      def self.default
+        new
       end
 
       # Sets how serious the message is. Returns the dialog. See

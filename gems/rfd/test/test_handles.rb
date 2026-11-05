@@ -59,6 +59,20 @@ class TestHandles < Minitest::Test
     assert_predicate WIN32, :frozen?
   end
 
+  # The structs are #[non_exhaustive], so new is how Rust makes one, and
+  # it fills the optional fields (raw-window-handle 0.6.2
+  # src/windows.rs:83-88, src/unix.rs:71-76, :145-150).
+  def test_the_short_constructors_take_raw_window_handles_defaults
+    assert_equal Ferro::Rfd::Win32WindowHandle.new(hwnd: 7, hinstance: nil), Ferro::Rfd::Win32WindowHandle.new(7)
+    assert_nil Ferro::Rfd::Win32WindowHandle.new(hwnd: 7).hinstance
+    assert_equal Ferro::Rfd::XlibWindowHandle.new(window: 5, visual_id: 0), Ferro::Rfd::XlibWindowHandle.new(5)
+    assert_equal 0, Ferro::Rfd::XlibWindowHandle.new(window: 5).visual_id
+    assert_equal Ferro::Rfd::XcbWindowHandle.new(window: 5, visual_id: nil), Ferro::Rfd::XcbWindowHandle.new(5)
+    assert_nil Ferro::Rfd::XcbWindowHandle.new(window: 5).visual_id
+    assert_equal 9, Ferro::Rfd::Win32WindowHandle.new(7, 9).hinstance
+    assert_raises(ArgumentError) { Ferro::Rfd::Win32WindowHandle.new }
+  end
+
   def test_a_win32_parent_reaches_rfd_where_rfd_takes_it
     skip "rfd takes no Win32 handle on macOS" if PLATFORM == :macos
     parent = Parent.new(Ferro::Rfd::Win32WindowHandle.new(hwnd: 7, hinstance: 9), Ferro::Rfd::WindowsDisplayHandle.new)
@@ -67,6 +81,8 @@ class TestHandles < Minitest::Test
 
     assert_includes debug, "parent: Some(Win32(Win32WindowHandle { hwnd: 7, hinstance: Some(9) })), " \
       "parent_display: Some(Windows(WindowsDisplayHandle))"
+    assert_includes Ferro::Rfd::FileDialog.new.set_parent(Parent.new(Ferro::Rfd::Win32WindowHandle.new(7), nil)).inspect,
+      "parent: Some(Win32(Win32WindowHandle { hwnd: 7, hinstance: None }))"
   end
 
   def test_x11_parents_reach_rfd_on_linux
@@ -79,6 +95,10 @@ class TestHandles < Minitest::Test
         "parent_display: Some(Xlib(XlibDisplayHandle { display: None, screen: 0 }))"
     assert_includes Ferro::Rfd::MessageDialog.new.set_parent(xcb).inspect,
       "parent: Some(Xcb(XcbWindowHandle { window: 60817415, visual_id: Some(33) }))"
+    assert_includes Ferro::Rfd::FileDialog.new.set_parent(Parent.new(Ferro::Rfd::XlibWindowHandle.new(5), nil)).inspect,
+      "parent: Some(Xlib(XlibWindowHandle { window: 5, visual_id: 0 }))"
+    assert_includes Ferro::Rfd::FileDialog.new.set_parent(Parent.new(Ferro::Rfd::XcbWindowHandle.new(5), nil)).inspect,
+      "parent: Some(Xcb(XcbWindowHandle { window: 5, visual_id: None }))"
   end
 
   def test_a_handle_rfd_would_panic_on_is_refused_with_rfds_message

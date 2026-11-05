@@ -473,24 +473,75 @@ pub fn message_dialog(ruby: &Ruby, args: MessageArgs) -> Result<RArray, Error> {
     Ok(result_to_ruby(ruby, result))
 }
 
+/// Whether an async message dialog with `parent` attaches to a window,
+/// as rfd's macOS backend decides: by the window handle alone, so a parent
+/// that answered only a display runs rfd's free alert
+/// (`src/backend/macos/message_dialog.rs:172-183`).
+fn attaches(parent: Option<ParentSpec>) -> bool {
+    parent.is_some_and(|parent| parent.has_window())
+}
+
+/// What `async_message_dialog` decides from its parent before it starts:
+/// the refusal rfd's fallback would make, and whether the future finishes
+/// on the main thread's run loop. The call site takes both from here, so
+/// a test of this function tests the call site's decision.
+fn async_message_launch(parent: Option<ParentSpec>) -> (Option<&'static str>, bool) {
+    let attaches = attaches(parent);
+    (
+        platform::refuse_async(attaches),
+        platform::needs_main_loop(attaches),
+    )
+}
+
 /// `Native.async_message_dialog`: an async message dialog's `show`,
 /// returning a `Ferro::Rfd::Future` (rfd `src/message_dialog.rs:147-150`).
-/// On macOS a message without a parent runs on a thread of its own, from
-/// any thread (rfd `src/backend/macos/message_dialog.rs:172-183`).
+/// On macOS a message without a parent window runs on a thread of its
+/// own, from any thread (rfd `src/backend/macos/message_dialog.rs:172-183`).
 pub fn async_message_dialog(ruby: &Ruby, args: MessageArgs) -> Result<Future, Error> {
     let settings = message_settings(ruby, args)?;
-    let attaches = settings.parent.is_some();
-    refuse(ruby, platform::refuse_async(attaches))?;
+    let (refusal, needs_main_loop) = async_message_launch(settings.parent);
+    refuse(ruby, refusal)?;
     let parent = settings.parent;
     let pending = make(ruby, parent, move |parent| {
         Output::result(async_message_dialog_of(&settings, parent).show())
     })?;
-    Ok(Future::new(pending, platform::needs_main_loop(attaches)))
+    Ok(Future::new(pending, needs_main_loop))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::has_nul;
+    use super::{async_message_launch, attaches, has_nul};
+    use crate::handles::{ParentSpec, WindowSpec};
+
+    /// rfd's macOS backend shows a message as a sheet only when its parent
+    /// has a window (`src/backend/macos/message_dialog.rs:172-183`); a
+    /// parent with a display alone runs rfd's free alert.
+    #[test]
+    fn a_message_attaches_only_to_a_parent_with_a_window() {
+        let window = WindowSpec::AppKit { window_number: 7 };
+        assert!(attaches(Some(ParentSpec::of_window(window))));
+        assert!(!attaches(Some(ParentSpec::display_only())));
+        assert!(!attaches(None));
+    }
+
+    /// The call site's decision: only a parent with a window finishes on
+    /// the main loop, and none refuses (the test runs off the main
+    /// thread with no application, where a window parent would refuse on
+    /// macOS).
+    #[test]
+    fn an_async_message_launch_follows_the_window_of_its_parent() {
+        let window = ParentSpec::of_window(WindowSpec::AppKit { window_number: 7 });
+        assert_eq!(
+            async_message_launch(Some(window)).1,
+            cfg!(target_os = "macos")
+        );
+        assert!(!async_message_launch(Some(ParentSpec::display_only())).1);
+        assert_eq!(
+            async_message_launch(Some(ParentSpec::display_only())).0,
+            None
+        );
+        assert!(!async_message_launch(None).1);
+    }
 
     #[test]
     fn a_nul_byte_in_a_filter_name_or_extension_is_found() {

@@ -13,7 +13,8 @@ require "test_helper"
 # never would on its own. That thread runs only if the dialog released the
 # GVL, so a dialog that held it would never close, and the watchdog would
 # fail the test. Each runs in a child process, since an abort still queued
-# when the dialog closes would close the next one.
+# when the dialog closes would close the next one. rfd's free message
+# alert takes no abortModal, so its test leaves it to close with its child.
 class TestMacosDialogs < Minitest::Test
   include RfdSuite
 

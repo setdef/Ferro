@@ -12,6 +12,22 @@ own API. Releases are tagged `ferro-rfd/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `FileDialog.default`, `AsyncFileDialog.default`, `MessageDialog.default`, and `AsyncMessageDialog.default`, rfd's derived `Default`.
+- `Win32WindowHandle.new(hwnd)`, `XlibWindowHandle.new(window)`, and `XcbWindowHandle.new(window)` default `hinstance` to `nil` and `visual_id` to 0 and `nil`, as raw-window-handle's `new` does.
+
+### Changed
+
+- `MessageButtons` and `MessageDialogResult` are modules, so `MessageButtons::OkCustom` and its siblings are `MessageButtons`, and `MessageDialogResult::Custom` is a `MessageDialogResult`. Breaking: both were classes, which code could subclass, and `MessageButtons::Ok.class` and `MessageDialogResult::Ok.instance_of?(MessageDialogResult)` no longer answer the enum, as the constants are instances of a private class that includes the module.
+- `set_can_create_directories` takes only `true` or `false`, and raises `TypeError` for anything else, as rfd's `bool` does. Breaking: it took any truthy value.
+
+### Fixed
+
+- On macOS, an `AsyncMessageDialog` whose parent answers `nil` for `window_handle` shows rfd's own alert from any thread, as rfd does, instead of raising `Ferro::Rfd::Error`.
+- `MessageDialogResult::Ok.dup`, `.clone`, and a `Marshal` copy equal `MessageDialogResult::Ok`, as rfd's `Clone` and `PartialEq` do.
+- `set_buttons` takes a subclass of `MessageButtons::OkCustom`, `OkCancelCustom`, or `YesNoCancelCustom` as the variant it inherits, instead of raising `ArgumentError` when the dialog shows.
+
 ## [0.1.0.pre.3] - 2026-10-27
 
 ### Added

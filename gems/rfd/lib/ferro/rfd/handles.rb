@@ -28,10 +28,24 @@ module Ferro
     # (raw-window-handle 0.6.2, <tt>src/windows.rs:52-57</tt>), which rfd
     # takes.
     #
-    # === Example
+    # === Examples
     #
     #   handle = Ferro::Rfd::Win32WindowHandle.new(hwnd: 0x0004_0A2C, hinstance: nil)
+    #   handle = Ferro::Rfd::Win32WindowHandle.new(0x0004_0A2C) # hinstance: nil
     class Win32WindowHandle < Data.define(:hwnd, :hinstance)
+      # Creates a handle for +hwnd+, with +hinstance+ +nil+ unless given,
+      # as raw-window-handle's <tt>Win32WindowHandle::new(hwnd)</tt> does
+      # (<tt>src/windows.rs:83-88</tt>). The struct is
+      # <tt>#[non_exhaustive]</tt>, so +new+ is how Rust code makes one.
+      #
+      # [hwnd] The window's +HWND+, an Integer.
+      # [hinstance] The module's +HINSTANCE+, an Integer, or +nil+.
+      def initialize(hwnd:, hinstance: nil) # steep:ignore MethodParameterMismatch
+        # Steep checks this against Data's own initialize; sig/ declares
+        # the shape as self.new, as AGENTS.md asks of Data classes.
+        super
+      end
+
       ##
       # :attr_reader: hwnd
       # The window's +HWND+, a non-zero Integer. Zero raises +RangeError+
@@ -58,10 +72,23 @@ module Ferro
     # Mirrors raw-window-handle's +XlibWindowHandle+
     # (raw-window-handle 0.6.2, <tt>src/unix.rs:48-53</tt>).
     #
-    # === Example
+    # === Examples
     #
     #   Ferro::Rfd::XlibWindowHandle.new(window: 0x3a0_0007, visual_id: 0)
+    #   Ferro::Rfd::XlibWindowHandle.new(0x3a0_0007) # visual_id: 0
     class XlibWindowHandle < Data.define(:window, :visual_id)
+      # Creates a handle for +window+, with +visual_id+ 0 unless given, as
+      # raw-window-handle's <tt>XlibWindowHandle::new(window)</tt> does
+      # (<tt>src/unix.rs:71-76</tt>).
+      #
+      # [window] The window's X11 ID, an Integer.
+      # [visual_id] The window's visual ID, an Integer.
+      def initialize(window:, visual_id: 0) # steep:ignore MethodParameterMismatch
+        # Steep checks this against Data's own initialize; sig/ declares
+        # the shape as self.new, as AGENTS.md asks of Data classes.
+        super
+      end
+
       ##
       # :attr_reader: window
       # The window's X11 ID, an Integer.
@@ -79,10 +106,23 @@ module Ferro
     # Mirrors raw-window-handle's +XcbWindowHandle+
     # (raw-window-handle 0.6.2, <tt>src/unix.rs:122-127</tt>).
     #
-    # === Example
+    # === Examples
     #
     #   Ferro::Rfd::XcbWindowHandle.new(window: 0x3a0_0007, visual_id: nil)
+    #   Ferro::Rfd::XcbWindowHandle.new(0x3a0_0007) # visual_id: nil
     class XcbWindowHandle < Data.define(:window, :visual_id)
+      # Creates a handle for +window+, with +visual_id+ +nil+ unless given,
+      # as raw-window-handle's <tt>XcbWindowHandle::new(window)</tt> does
+      # (<tt>src/unix.rs:145-150</tt>).
+      #
+      # [window] The window's X11 ID, an Integer.
+      # [visual_id] The window's visual ID, an Integer, or +nil+.
+      def initialize(window:, visual_id: nil) # steep:ignore MethodParameterMismatch
+        # Steep checks this against Data's own initialize; sig/ declares
+        # the shape as self.new, as AGENTS.md asks of Data classes.
+        super
+      end
+
       ##
       # :attr_reader: window
       # The window's X11 ID, a non-zero Integer. Zero raises +RangeError+

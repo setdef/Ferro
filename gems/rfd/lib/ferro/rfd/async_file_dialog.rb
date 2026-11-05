@@ -83,6 +83,19 @@ module Ferro
         @file_dialog = FileDialog.new
       end
 
+      # A dialog with rfd's defaults, the same as +new+ gives.
+      #
+      # Mirrors rfd's derived +Default+ for +AsyncFileDialog+
+      # (<tt>src/file_dialog.rs:182</tt>), which <tt>AsyncFileDialog::new</tt> calls
+      # (<tt>src/file_dialog.rs:188-191</tt>).
+      #
+      # === Example
+      #
+      #   dialog = Ferro::Rfd::AsyncFileDialog.default
+      def self.default
+        new
+      end
+
       # Adds a file type filter. Returns the dialog. See
       # FileDialog#add_filter.
       #
