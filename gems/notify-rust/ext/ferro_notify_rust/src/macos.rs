@@ -55,7 +55,7 @@ impl Handle {
         let Some(handle) = rb_self.take() else {
             return Ok(None);
         };
-        gvl::without_gvl(ruby, |_| work(handle))?
+        gvl::without_gvl(ruby, || work(handle))?
             .map(Some)
             .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))
     }
@@ -131,7 +131,7 @@ fn shown(
     ruby: &Ruby,
     operation: impl FnOnce() -> notify_rust::error::Result<notify_rust::NotificationHandle>,
 ) -> Result<Obj<Handle>, Error> {
-    match gvl::without_gvl(ruby, |_| operation())? {
+    match gvl::without_gvl(ruby, operation)? {
         Ok(Ok(handle)) => Ok(ruby.obj_wrap(Handle::new(handle))),
         Ok(Err(failure)) => Err(error::notify_error(ruby, &failure)),
         Err(payload) => Err(error::panicked(ruby, &panic_of(&payload))),
@@ -239,7 +239,7 @@ fn typed_raise(failure: &notify_rust::error::MacOsError) -> error::Raise {
 /// `Native.get_bundle_identifier_or_default` (mac-notification-sys
 /// `src/lib.rs:119-123`). It runs `AppleScript`, so the GVL is released.
 fn get_bundle_identifier_or_default(ruby: &Ruby, app_name: String) -> Result<String, Error> {
-    gvl::without_gvl(ruby, move |_| {
+    gvl::without_gvl(ruby, move || {
         notify_rust::get_bundle_identifier_or_default(&app_name)
     })?
     .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))

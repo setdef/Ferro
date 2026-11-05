@@ -20,6 +20,10 @@ use magnus::{
 use crate::{capture, settle, values, Panic};
 
 /// An object holding one of notify-rust's notifications.
+///
+/// An `operation` may run with the GVL released, when a Linux handle waits
+/// for its turn (`lock.rs`), so it must not touch Ruby: callers convert
+/// their arguments first and build Ruby values from what it returns.
 pub trait Holds {
     /// Runs `operation` on the notification. Raises when there is none, as
     /// on a Windows handle a wait has consumed (plan 003, decision 5).
@@ -28,6 +32,19 @@ pub trait Holds {
         ruby: &Ruby,
         operation: impl FnOnce(&mut notify_rust::Notification) -> R,
     ) -> Result<R, Error>;
+
+    /// Runs `operation` as `with` does, for one that does work (reads a
+    /// file) which must run without the GVL. A Linux handle takes its turn
+    /// with the GVL released even when it is free; the rest run it as
+    /// `with` does.
+    #[cfg(all(unix, not(target_os = "macos")))]
+    fn with_released<R>(
+        &self,
+        ruby: &Ruby,
+        operation: impl FnOnce(&mut notify_rust::Notification) -> R,
+    ) -> Result<R, Error> {
+        self.with(ruby, operation)
+    }
 
     /// Runs `operation` on the notification, read only, as Rust's `&self`
     /// methods borrow it.
@@ -480,7 +497,8 @@ pub fn try_set<T: Holds + TypedData>(
     operation: impl FnOnce(&mut notify_rust::Notification) -> Result<(), notify_rust::error::Error>,
 ) -> Result<(), Error> {
     rb_self.check_frozen()?;
-    let outcome = rb_self.with(ruby, |notification| capture(|| operation(notification)))?;
+    let outcome =
+        rb_self.with_released(ruby, |notification| capture(|| operation(notification)))?;
     settle(ruby, outcome)?.map_err(|failure| crate::error::notify_error(ruby, &failure))
 }
 

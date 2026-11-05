@@ -57,7 +57,7 @@ impl Handle {
         let Some(handle) = rb_self.lock().take() else {
             return Ok(None);
         };
-        gvl::without_gvl(ruby, |_| work(handle))?
+        gvl::without_gvl(ruby, || work(handle))?
             .map(Some)
             .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))
     }
@@ -129,7 +129,7 @@ impl Holds for Handle {
 /// `#native_show` (`src/notification.rs:550-554`): shows a copy.
 pub fn show<T: Holds + TypedData>(ruby: &Ruby, rb_self: Obj<T>) -> Result<Obj<Handle>, Error> {
     let copy = rb_self.with_ref(ruby, notify_rust::Notification::finalize)?;
-    match gvl::without_gvl(ruby, |_| copy.show())? {
+    match gvl::without_gvl(ruby, || copy.show())? {
         Ok(Ok(handle)) => Ok(ruby.obj_wrap(Handle::new(handle))),
         Ok(Err(failure)) => Err(error::notify_error(ruby, &failure)),
         Err(payload) => Err(error::panicked(ruby, &panic_of(&payload))),

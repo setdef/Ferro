@@ -68,6 +68,7 @@ module NotifySuite
       stdin.close
       output = Thread.new { stdout.binmode.read }
       errors = Thread.new { stderr.read }
+      [output, errors].each { |reader| reader.report_on_exception = false }
       unless thread.join(CHILD_LIMIT)
         Process.kill(:KILL, thread.pid)
         flunk "the child Ruby ran past #{CHILD_LIMIT} s and was killed: #{errors.value}"

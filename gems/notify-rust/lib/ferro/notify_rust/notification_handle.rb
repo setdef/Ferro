@@ -43,15 +43,23 @@ module Ferro
     # already sent.
     #
     # A wait or #close borrows the handle; a setter or #update needs it to
-    # itself, as Rust's <tt>&mut</tt> does. Rust refuses that at compile
-    # time, so on Linux a setter or #update while another thread waits on
-    # or closes the handle raises Error (<tt>already borrowed: ...</tt>) at
-    # once, and so does any call while #update runs. On Windows, after a
-    # wait has consumed the handle, every Builder method raises Error.
+    # itself, as Rust's <tt>&mut</tt> does. On Linux, a setter or #update
+    # while another thread waits on or closes the handle waits for that to
+    # end, as a second thread waits for a Mutex, and any call while #update
+    # runs waits for it; a #close or another wait does not wait behind a
+    # waiting setter. Ctrl-C, <tt>Thread#raise</tt>, and +Timeout+ end such
+    # a wait. A setter or #update on the very thread whose own wait holds
+    # the handle, as from a signal trap that runs during the wait, would
+    # wait for itself, so it raises +ThreadError+ (<tt>already borrowed:
+    # ...</tt>), as Mutex#lock does. On Windows, after a wait has consumed
+    # the handle, every Builder method raises Error.
     #
     # Every wait releases Ruby's global VM lock, so other threads keep
-    # running. On Linux an interrupt (Ctrl-C, <tt>Thread#raise</tt>,
-    # +Timeout+) ends a wait. On macOS and Windows nothing can end one
+    # running; it never runs with the lock held. On Linux an interrupt
+    # (Ctrl-C, <tt>Thread#raise</tt>, +Timeout+) ends a wait. One that
+    # arrives just as the user answers raises after the answer came, and
+    # the answer is lost, as Ruby's IO methods lose data read just before
+    # an interrupt. On macOS and Windows nothing can end a wait
     # early, so Ctrl-C and process exit wait until the user answers. On
     # macOS a wait needs the main thread's run loop: on the main thread it
     # runs the loop itself; on any other thread it finishes only while the

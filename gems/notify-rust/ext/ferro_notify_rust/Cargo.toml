@@ -16,7 +16,7 @@ crate-type = ["cdylib"]
 # d_vendored, tokio, z-with-tokio, debug_namespace, and preview-macos-un
 # stay off; plan 003, decision 2 says why.
 notify-rust = { version = "=4.18.2", features = ["images", "chrono"] }
-magnus = { version = "0.9.3", features = ["bytes"] }
+magnus = { version = "0.9.3", features = ["bytes", "rb-sys"] }
 rb-sys = "0.9.130"
 
 # chrono, notify-rust's own, to build the DateTime `schedule` takes (plan

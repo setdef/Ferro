@@ -16,10 +16,13 @@
 //!   into notify-rust runs under `catch_unwind` and raises
 //!   `Ferro::NotifyRust::Error` instead (plan 003, decision 15).
 //! - A call that talks to the notification server or waits for the user
-//!   runs with the GVL released (`gvl.rs`, plan 003, decision 6).
+//!   runs with the GVL released, and never with it held (`gvl.rs`, plan
+//!   003, decision 6).
 
 mod error;
 mod gvl;
+#[cfg(any(test, all(unix, not(target_os = "macos"))))]
+mod lock;
 mod notification;
 mod values;
 
@@ -85,22 +88,34 @@ pub(crate) fn path_from_ruby(path: Value) -> Result<PathBuf, Error> {
     Ok(PathBuf::from(std::ffi::OsString::from_vec(bytes)))
 }
 
+/// `Native.gvl_releases`: how many calls have run with the GVL released
+/// (`gvl::RELEASES`), for the tests that check which calls release it.
+fn gvl_releases() -> usize {
+    gvl::RELEASES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 #[magnus::init]
 fn init(ruby: &Ruby) -> Result<(), Error> {
     // SAFETY: Ruby asks a Ractor-safe extension to share no unshareable
     // object between Ractors and to be thread-safe, along with the libraries
     // it calls (doc/extension.rdoc:2207-2286 at Ruby v4.0.1). This crate
     // keeps no Ruby value in a static except magnus's class lookups, and
-    // classes are shareable (extension.rdoc:2239-2240). `Notification` and
+    // classes are shareable (extension.rdoc:2239-2240); its one other
+    // static, `gvl::RELEASES`, is an atomic counter. `Notification` and
     // `Image` hold `Send` and `Sync` values behind a `Mutex` or none, and
     // are the only types marked frozen-shareable; a handle stays with its
-    // Ractor. notify-rust's calls may come from any thread: zbus connects per
-    // call, and mac-notification-sys checks which thread it is on
-    // (objc/notify.m:168, :192). Its process-wide state, the bundle hook and
-    // the delegate, is set once under a `Once` and `dispatch_once`
-    // (src/lib.rs:53, :146-158; objc/notify.m:303-311). Every other value a
-    // function touches is an argument, which Ruby guarantees is the calling
-    // Ractor's own or shareable (extension.rdoc:2260-2261).
+    // Ractor. The Linux handle's lock (`lock.rs`) is std's `Mutex` and
+    // `Condvar` and records Ruby threads by `object_id`, an Integer, never
+    // a `VALUE`. The unblocking functions `gvl.rs` gives Ruby may run on
+    // another Ractor's thread, and touch only that lock or a waiter's own
+    // `Mutex` and atomic flag. notify-rust's calls may come from any
+    // thread: zbus connects per call, and mac-notification-sys checks which
+    // thread it is on (objc/notify.m:168, :192). Its process-wide state,
+    // the bundle hook and the delegate, is set once under a `Once` and
+    // `dispatch_once` (src/lib.rs:53, :146-158; objc/notify.m:303-311).
+    // Every other value a function touches is an argument, which Ruby
+    // guarantees is the calling Ractor's own or shareable
+    // (extension.rdoc:2260-2261).
     // `rb_ext_ractor_safe` takes a plain flag, called from `Init_` as
     // extension.rdoc:2218-2220 asks.
     #[allow(unsafe_code)]
@@ -134,6 +149,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     native.define_singleton_method("hint_as_bool", function!(values::hint_as_bool, 1))?;
     native.define_singleton_method("hint_as_i32", function!(values::hint_as_i32, 1))?;
     native.define_singleton_method("hint_as_str", function!(values::hint_as_str, 1))?;
+    native.define_singleton_method("gvl_releases", function!(gvl_releases, 0))?;
 
     notification::define(ruby, notify_rust)?;
     platform::define(ruby, notify_rust, native)

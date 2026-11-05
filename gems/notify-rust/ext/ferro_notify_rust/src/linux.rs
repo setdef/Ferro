@@ -16,14 +16,15 @@
 use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::pin::pin;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
+use magnus::rb_sys::{AsRawValue, FromRawValue};
 use magnus::{
     function, method, prelude::*, typed_data::Obj, Error, RArray, RClass, RModule, RString, Ruby,
     TypedData, Value,
 };
 use notify_rust::{CloseReason, ImageError, NotificationResponse};
 
+use crate::lock::{Lock, Owner, ReadGuard};
 use crate::notification::{plain_set, try_set, Holds, Notification};
 use crate::{capture, error, gvl, panic_of, path_from_ruby, settle, values};
 
@@ -113,37 +114,37 @@ fn from_rgba(ruby: &Ruby, width: i32, height: i32, data: RString) -> Result<Obj<
 /// so it runs with the GVL released.
 fn open(ruby: &Ruby, path: Value) -> Result<Obj<Image>, Error> {
     let path = path_from_ruby(path)?;
-    let made = gvl::without_gvl(ruby, |_| notify_rust::Image::open(&path))?;
+    let made = gvl::without_gvl(ruby, || notify_rust::Image::open(&path))?;
     image_result(ruby, made.map_err(|payload| panic_of(&payload)))
 }
 
 /// The Ruby `Ferro::NotifyRust::NotificationHandle` on Linux
 /// (`src/xdg/mod.rs:67-73`).
 ///
-/// It follows Rust's borrow rules at run time, as a `RefCell` does. A
-/// wait, `close`, and the readers borrow the handle shared, as
-/// notify-rust's `&self` methods do, each through its own `Arc`, so a wait
-/// and a `close` run together, as notify-rust's own `close_async` example
-/// does (`src/xdg/mod.rs:155-178`). A setter or `update` borrows it
-/// mutably, as `&mut self` does: while a wait or close holds a share, it
-/// raises `Error` at once rather than wait, since Rust would refuse it at
-/// compile time, and while `update` runs, every other call does. The
-/// `Mutex` is held only for a moment, with the GVL held, and never across
-/// a wait, so no thread waits behind another (plan 003, decision 5).
+/// It takes the turns Rust's borrow checker hands out, at run time, as a
+/// reader-writer lock does (`lock.rs`, plan 003, decision 5). A wait,
+/// `close`, `id`, and the field readers take a shared turn, as
+/// notify-rust's `&self` methods borrow the handle, so a wait and a
+/// `close` run together, as notify-rust's own `close_async` example does
+/// (`src/xdg/mod.rs:155-178`). A setter or `update` takes the exclusive
+/// turn, as `&mut self` does, and waits for the shared ones to end, with
+/// the GVL released, as Ruby's `Mutex` makes a second thread wait; while
+/// `update` runs, every other call waits for it. `Thread#raise`,
+/// `Thread#kill`, and Ctrl-C end such a wait. A thread that asks for the
+/// exclusive turn while its own wait holds a shared one (from a signal
+/// trap that runs during the wait) would wait for itself forever, so it
+/// raises `ThreadError` instead, as Ruby's `Mutex#lock` does.
 #[magnus::wrap(
     class = "Ferro::NotifyRust::NotificationHandle",
     free_immediately,
     size
 )]
-pub struct Handle(Mutex<Option<Arc<notify_rust::NotificationHandle>>>);
+pub struct Handle(Lock<notify_rust::NotificationHandle>);
 
-/// What a mutable borrow raises while a shared one is out.
+/// What a setter or `update` raises on the thread whose own wait or close
+/// holds the handle.
 const BORROWED: &str =
-    "already borrowed: a wait or close in progress is using this NotificationHandle";
-
-/// What any borrow raises while `update` holds the handle.
-const MUTABLY_BORROWED: &str =
-    "already mutably borrowed: update in progress is using this NotificationHandle";
+    "already borrowed: this thread's own wait or close is using this NotificationHandle";
 
 /// `value`, which the compiler checks is `Send`: a future polled across
 /// `gvl::wait`'s tries may be polled on another native thread, as a Ruby
@@ -152,52 +153,69 @@ const fn sendable<T: Send>(value: T) -> T {
     value
 }
 
+/// The current Ruby thread, as the lock records who holds a turn.
+fn owner(ruby: &Ruby) -> Result<Owner, Error> {
+    let thread = ruby.thread_current();
+    // SAFETY: `rb_obj_id` (`gc.c:2233-2240` at Ruby v4.0.9) takes any
+    // object's `VALUE` and returns an Integer `VALUE`; `thread` is a live
+    // Thread, and this runs with the GVL held. Unlike `funcall("__id__")`,
+    // no Ruby method that code could redefine is dispatched.
+    #[allow(unsafe_code)]
+    let id = unsafe { Value::from_raw(rb_sys::rb_obj_id(thread.as_raw())) };
+    Owner::try_convert(id)
+}
+
 impl Handle {
     fn new(handle: notify_rust::NotificationHandle) -> Self {
-        Self(Mutex::new(Some(Arc::new(handle))))
+        Self(Lock::new(handle))
     }
 
-    fn slot(&self) -> MutexGuard<'_, Option<Arc<notify_rust::NotificationHandle>>> {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner)
+    /// A shared turn: at once if no setter or `update` has the handle,
+    /// else waited for with the GVL released.
+    fn shared(&self, ruby: &Ruby) -> Result<ReadGuard<'_, notify_rust::NotificationHandle>, Error> {
+        let owner = owner(ruby)?;
+        if let Some(turn) = self.0.try_read(owner) {
+            return Ok(turn);
+        }
+        let waiter = self.0.waiter(owner);
+        gvl::wait_until(ruby, &waiter, || waiter.read(), |turn| turn)?
+            .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))
     }
 
-    /// A shared borrow: a clone of the handle's `Arc`.
-    fn shared(&self, ruby: &Ruby) -> Result<Arc<notify_rust::NotificationHandle>, Error> {
-        let shared = self.slot().as_ref().map(Arc::clone);
-        shared.ok_or_else(|| error::base(ruby, MUTABLY_BORROWED))
-    }
-
-    /// Runs a short `operation` on the handle, mutably borrowed.
+    /// Waits for the exclusive turn with the GVL released and runs
+    /// `operation` in it, there, or raises `ThreadError` when this thread
+    /// holds a shared turn. The first try for the turn is `try_write`'s,
+    /// when `operation` is short enough to run with the GVL held.
     fn exclusive<R>(
         &self,
         ruby: &Ruby,
+        short: bool,
         operation: impl FnOnce(&mut notify_rust::NotificationHandle) -> R,
     ) -> Result<R, Error> {
-        let mut slot = self.slot();
-        let outcome = slot.as_mut().map_or(Err(MUTABLY_BORROWED), |handle| {
-            Arc::get_mut(handle).map(operation).ok_or(BORROWED)
-        });
-        drop(slot);
-        outcome.map_err(|message| error::base(ruby, message))
-    }
-
-    /// Takes the handle out of its slot, if no share is out, for `update`.
-    fn take_unique(&self) -> Result<notify_rust::NotificationHandle, &'static str> {
-        let mut slot = self.slot();
-        let taken = slot.take().ok_or(MUTABLY_BORROWED);
-        let outcome = taken.and_then(|shared| {
-            Arc::try_unwrap(shared).map_err(|shared| {
-                *slot = Some(shared);
-                BORROWED
-            })
-        });
-        drop(slot);
-        outcome
+        if short {
+            if let Some(mut turn) = self.0.try_write() {
+                return Ok(operation(&mut turn));
+            }
+        }
+        let owner = owner(ruby)?;
+        if self.0.holds(owner) {
+            return Err(Error::new(ruby.exception_thread_error(), BORROWED));
+        }
+        let waiter = self.0.waiter(owner);
+        gvl::wait_until(
+            ruby,
+            &waiter,
+            || waiter.write(),
+            |mut turn| operation(&mut turn),
+        )?
+        .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))
     }
 
     /// Waits for the server's answer through `wait_for_action_async`
     /// (`src/xdg/mod.rs:146-195`), and returns the response it passed the
-    /// closure, if any: the wait also ends when the connection does.
+    /// closure, if any: the wait also ends when the connection does. An
+    /// interrupt that raises just as the response arrives discards it
+    /// (`gvl.rs`).
     fn response(&self, ruby: &Ruby) -> Result<Option<NotificationResponse>, Error> {
         let handle = self.shared(ruby)?;
         let mut seen = None;
@@ -249,19 +267,15 @@ impl Handle {
     }
 
     /// `#native_update`: `update` (`src/xdg/mod.rs:290-317`), which
-    /// notify-rust runs only through `block_on`, so nothing can cancel it.
-    /// The handle leaves the slot while it runs, so every other call
-    /// raises rather than wait for it. It takes `&mut self`, as the
-    /// setters do, so a frozen handle refuses it.
+    /// notify-rust runs only through `block_on`, so nothing can cancel it
+    /// once it starts; the wait for its turn can be. Its turn is taken and
+    /// given back with the GVL released, so no Ruby code runs while it
+    /// holds the handle. It takes `&mut self`, as the setters do, so a
+    /// frozen handle refuses it.
     fn update(ruby: &Ruby, rb_self: Obj<Self>) -> Result<(), Error> {
         rb_self.check_frozen()?;
-        let mut handle = rb_self
-            .take_unique()
-            .map_err(|message| error::base(ruby, message))?;
-        let outcome = gvl::without_gvl(ruby, |_| handle.update());
-        *rb_self.slot() = Some(Arc::new(handle));
-        outcome?
-            .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))?
+        rb_self
+            .exclusive(ruby, false, notify_rust::NotificationHandle::update)?
             .map_err(|failure| error::notify_error(ruby, &failure))
     }
 
@@ -277,7 +291,15 @@ impl Holds for Handle {
         ruby: &Ruby,
         operation: impl FnOnce(&mut notify_rust::Notification) -> R,
     ) -> Result<R, Error> {
-        self.exclusive(ruby, |handle| operation(handle))
+        self.exclusive(ruby, true, |handle| operation(handle))
+    }
+
+    fn with_released<R>(
+        &self,
+        ruby: &Ruby,
+        operation: impl FnOnce(&mut notify_rust::Notification) -> R,
+    ) -> Result<R, Error> {
+        self.exclusive(ruby, false, |handle| operation(handle))
     }
 
     fn with_ref<R>(
@@ -436,7 +458,7 @@ fn blocking<T>(
     ruby: &Ruby,
     work: impl FnOnce() -> notify_rust::error::Result<T>,
 ) -> Result<T, Error> {
-    gvl::without_gvl(ruby, |_| work())?
+    gvl::without_gvl(ruby, work)?
         .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))?
         .map_err(|failure| error::notify_error(ruby, &failure))
 }
@@ -464,7 +486,7 @@ fn get_server_information(ruby: &Ruby) -> Result<(String, String, String, String
 /// so it runs with the GVL released; notify-rust falls back to 1.1 when
 /// that fails.
 fn spec_version(ruby: &Ruby) -> Result<(u64, u64), Error> {
-    gvl::without_gvl(ruby, |_| {
+    gvl::without_gvl(ruby, || {
         let version = *notify_rust::SPEC_VERSION;
         (version.major, version.minor)
     })?

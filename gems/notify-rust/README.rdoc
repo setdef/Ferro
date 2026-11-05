@@ -107,13 +107,14 @@ click, an action, and a close apart without keywords, and +on_close+ yields
 the CloseReason when the notification goes away. A handle can also +close+
 the notification, or change it and +update+ it in place.
 
-Every wait releases Ruby's global VM lock, so other threads keep running.
-On Linux an interrupt (Ctrl-C, <tt>Thread#raise</tt>, +Timeout+) ends it;
-notify-rust offers no way to stop a wait on macOS or Windows, or
-+handle_action+, +update+, +get_capabilities+, and
-+get_server_information+ on Linux, so there they end only when the user
-answers or the call returns. zbus sets no timeout on a D-Bus call, so a
-server that never answers blocks those Linux calls for good, as it does
+Every wait releases Ruby's global VM lock, so other threads keep running,
+and no call ever runs with the lock held. On Linux an interrupt (Ctrl-C,
+<tt>Thread#raise</tt>, +Timeout+) ends a wait; notify-rust offers no way
+to stop a wait on macOS or Windows, or +handle_action+, +update+,
++get_capabilities+, and +get_server_information+ on Linux, so there the
+interrupt takes effect when the user answers or the call returns, and
+discards what the call returned. zbus sets no timeout on a D-Bus call, so
+a server that never answers blocks those Linux calls for good, as it does
 in Rust.
 
 === macOS
@@ -189,9 +190,11 @@ What differs from calling notify-rust from Rust:
   second wait returns without calling its block.
 * Rust refuses at compile time to change a handle a wait borrows. In
   Ruby, a setter or +update+ on a Linux handle while another thread waits
-  on it or closes it raises Ferro::NotifyRust::Error
-  (<tt>already borrowed: ...</tt>), rather than wait; on Windows, a handle
-  a wait consumed raises from every setter and field.
+  on it or closes it waits for that to end, as with a Mutex, and Ctrl-C,
+  <tt>Thread#raise</tt>, and +Timeout+ end that wait; on the waiting
+  thread itself, from a signal trap, it raises +ThreadError+
+  (<tt>already borrowed: ...</tt>). On Windows, a handle a wait consumed
+  raises from every setter and field.
 * A panic inside notify-rust would end your Ruby process. It raises
   Ferro::NotifyRust::Error with <tt>notify-rust panicked: ...</tt>
   instead, and Notification.at_bus raises Error::Msg for a sub-bus

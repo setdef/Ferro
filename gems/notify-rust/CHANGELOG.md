@@ -19,10 +19,12 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 
 ### Changed
 
+- On Linux, a `NotificationHandle` setter or `update` while another thread waits on or closes the handle waits for that to end, which Ctrl-C, `Thread#raise`, and `Thread#kill` can cut short, instead of raising `Error` ("already borrowed"); any call while `update` runs waits for it instead of raising ("already mutably borrowed"). From a signal trap on the waiting thread itself it raises `ThreadError`. Breaking: code that rescued `Error` for "already borrowed" or "already mutably borrowed" now waits, or gets `ThreadError`.
 - `Error::Conversion.new(reason)` builds notify-rust's message, `Conversion Error: ` and the reason, as `ErrorKind::Conversion` displays it; errors notify-rust raises keep the same message.
 
 ### Fixed
 
+- A blocking call (showing, waiting, `update`, `handle_action`, AppleScript's bundle lookup) no longer stalls every Ruby thread when interrupts keep arriving, or when it is made from an `Exception#backtrace` with one pending: it never runs with the global VM lock held.
 - A frozen `Notification`, such as one shared between Ractors, could be reset to a new one by calling `initialize` again through `send`; it now raises `FrozenError`, and so does `update` on a frozen Linux `NotificationHandle`.
 
 ## [0.1.0.pre.4] - 2026-11-01

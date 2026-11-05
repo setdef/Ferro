@@ -170,24 +170,142 @@ class TestLinux < Minitest::Test
     assert closed
   end
 
-  # A setter needs the handle mutably, which a wait borrows; Rust refuses
-  # that at compile time, and the gem raises at once rather than queue
-  # behind the wait, so a close from a third thread still ends it.
-  def test_a_setter_during_a_wait_raises_and_close_still_ends_the_wait
+  # A setter needs the handle mutably, which a wait borrows. The setter
+  # waits for the wait, with the lock released, as Ruby's Mutex makes a
+  # second thread wait, and a close from a third thread still ends the
+  # wait, since readers go first (lock.rs). The setter's thread sleeps
+  # while the waiter is still waiting, which shows both blocking with the
+  # lock released while this thread runs.
+  def test_a_setter_during_a_wait_waits_for_it_and_close_still_ends_the_wait
     handle = notification("borrowed").timeout(NotifyRust::Timeout::Never).show
-    refused = nil
-    closer = once_listening do
-      refused = assert_raises(NotifyRust::Error) { handle.summary("changed") }
-      Thread.new { handle.close }.join
-    end
     responses = []
-    handle.wait_for_response { |response| responses << response }
-    closer.join
+    waiter = setter = nil
+    closer = once_listening do
+      setter = Thread.new { handle.summary("changed") }
+      setter.report_on_exception = false
+      Thread.pass until setter.status != "run"
+      waiting = [setter.status, waiter.status, handle.summary]
+      handle.close
+      waiting
+    end
+    waiter = Thread.new { handle.wait_for_response { |response| responses << response } }
 
-    assert_match(/\Aalready borrowed: /, refused.message)
+    assert_equal ["sleep", "sleep", "borrowed"], closer.value, "the setter waits for the wait"
+    waiter.join
+    assert_same handle, setter.value
+    assert_equal [NotifyRust::NotificationResponse::Closed.new(NotifyRust::CloseReason::CloseAction)], responses
+    assert_equal "changed", handle.summary
+  end
+
+  # A setter waiting for another thread's wait has an unblocking function,
+  # so Thread#raise and Thread#kill end its wait (thread.c:2969-2982,
+  # :3007-3027 at v4.0.9) while the wait it waited for goes on. The joins'
+  # bounds only turn a lost wake into a failure rather than a hang.
+  def test_thread_raise_and_kill_end_a_setter_waiting_for_a_wait
+    handle = notification("borrowed").timeout(NotifyRust::Timeout::Never).show
+    responses = []
+    waiter = nil
+    setters = once_listening do
+      raised = Thread.new { handle.summary("raised") }
+      raised.report_on_exception = false
+      Thread.pass until raised.status != "run"
+      waited = raised.status
+      raised.raise(IOError, "raised")
+      error = begin
+        raised.join(30) || flunk("Thread#raise did not end the setter's wait")
+        nil
+      rescue IOError => e
+        e.message
+      end
+      killed = Thread.new { handle.body("killed") }
+      Thread.pass until killed.status != "run"
+      waited = [waited, killed.status]
+      killed.kill
+      killed.join(30) || flunk("Thread#kill did not end the setter's wait")
+      [waited, error, killed.status, waiter.status]
+    end
+    waiter = Thread.new { handle.wait_for_response { |response| responses << response } }
+    outcome = setters.value
+
+    assert_equal [%w[sleep sleep], "raised", false, "sleep"], outcome, "each setter waited and ended while the wait went on"
+    handle.close
+    waiter.join
     assert_equal [NotifyRust::NotificationResponse::Closed.new(NotifyRust::CloseReason::CloseAction)], responses
     assert_equal "borrowed", handle.summary
-    assert_same handle, handle.summary("free again"), "the borrow ends with the wait"
+    assert_equal "", handle.body
+    assert_same handle, handle.summary("free again"), "the turn ends with the wait"
+  end
+
+  # image(path) on a handle reads and decodes the file, as Image.open does,
+  # so it runs with the GVL released. The file is a FIFO: the reader blocks
+  # in open until this thread opens the other end, and then in read until
+  # this thread closes it. With the GVL held by the reader this thread
+  # could never run again, and the child is killed at CHILD_LIMIT.
+  def test_image_path_on_a_handle_reads_the_file_without_the_gvl
+    outcome, = in_child(<<~RUBY)
+      require "tmpdir"
+      Dir.mktmpdir do |dir|
+        fifo = File.join(dir, "image.png")
+        File.mkfifo(fifo)
+        handle = Ferro::NotifyRust::Notification.new.summary("x")
+          .timeout(Ferro::NotifyRust::Timeout::Never).show
+        reader = Thread.new do
+          handle.image(fifo)
+          nil
+        rescue Ferro::NotifyRust::Error => e
+          e.class.name
+        end
+        File.open(fifo, "w") { sleep 0.2 }
+        error = reader.value
+        handle.close
+        error
+      end
+    RUBY
+
+    assert_equal "Ferro::NotifyRust::Error::Image", outcome
+  end
+
+  # A setter called on the thread whose own wait holds the handle, from a
+  # signal trap that runs during that wait, would wait for itself forever,
+  # so it raises ThreadError, as Ruby's Mutex#lock does for a thread that
+  # holds it. The wait goes on after the trap, and a close ends it. The
+  # signal waits, as once_listening does, for the wait's match rules, so
+  # the trap runs inside the wait and the close's signal reaches it.
+  def test_a_setter_in_a_trap_during_its_own_threads_wait_raises_thread_error
+    outcome, = in_child(<<~RUBY)
+      rules = lambda do
+        IO.popen(%w[dbus-send --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus
+          org.freedesktop.DBus.Debug.Stats.GetAllMatchRules], &:read).scan("member='NotificationClosed'").size
+      end
+      handle = Ferro::NotifyRust::Notification.new.summary("trapped")
+        .timeout(Ferro::NotifyRust::Timeout::Never).show
+      before = rules.call
+      error = nil
+      closer = nil
+      Signal.trap(:USR1) do
+        error = begin
+          handle.summary("changed")
+          nil
+        rescue ThreadError => e
+          [e.class.name, e.message]
+        end
+        closer = Thread.new { handle.close }
+      end
+      Thread.new do
+        sleep 0.05 until rules.call > before
+        Process.kill(:USR1, Process.pid)
+      end
+      responses = []
+      handle.wait_for_response { |response| responses << response.inspect }
+      closer.join
+      [error, responses, handle.summary]
+    RUBY
+
+    assert_equal [
+      ["ThreadError", "already borrowed: this thread's own wait or close is using this NotificationHandle"],
+      ["#<data Ferro::NotifyRust::NotificationResponse::Closed reason=Ferro::NotifyRust::CloseReason::CloseAction>"],
+      "trapped",
+], outcome
   end
 
   # notify-rust's close_async example (src/xdg/mod.rs:155-178) closes while

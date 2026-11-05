@@ -28,6 +28,7 @@ module Ferro
       def self.hint_as_bool: (hint_tag tag) -> bool?
       def self.hint_as_i32: (hint_tag tag) -> Integer?
       def self.hint_as_str: (hint_tag tag) -> String?
+      def self.gvl_releases: () -> Integer
     end
   end
 end
