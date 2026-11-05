@@ -33,11 +33,12 @@ class TestRactor < Minitest::Test
     text = run_script(<<~RUBY)
       Ractor.new do
         hotkey = Ferro::GlobalHotkey::Hotkey::HotKey.from_str("alt+shift+F19")
-        [hotkey.to_s, hotkey.mods.inspect, hotkey.matches(hotkey.mods, hotkey.key)]
+        [hotkey.to_s, hotkey.mods.debug, hotkey.debug, hotkey.matches(hotkey.mods, hotkey.key)]
       end.value
     RUBY
 
-    assert_equal ["shift+alt+F19", "Ferro::GlobalHotkey::Hotkey::Modifiers(ALT | SHIFT)", true], text
+    assert_equal ["shift+alt+F19", "Modifiers(ALT | SHIFT)", "HotKey { mods: Modifiers(ALT | SHIFT), key: F19, id: 33620146 }", true],
+      text
   end
 
   def test_another_ractor_reads_a_shared_receiver

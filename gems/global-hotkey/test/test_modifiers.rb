@@ -122,15 +122,47 @@ class TestModifiers < Minitest::Test
   def test_iteration_yields_flags_in_order_then_unknown_bits
     mods = Mods::SHIFT | Mods::ALT | Mods.from_bits_retain(0x1_0000)
 
-    assert_equal [["ALT", Mods::ALT], ["SHIFT", Mods::SHIFT]], mods.iter_names
-    assert_equal [Mods::ALT, Mods::SHIFT, Mods.from_bits_retain(0x1_0000)], mods.iter
-    assert_equal [], Mods.empty.iter
+    assert_equal [["ALT", Mods::ALT], ["SHIFT", Mods::SHIFT]], mods.iter_names.to_a
+    assert_equal [Mods::ALT, Mods::SHIFT, Mods.from_bits_retain(0x1_0000)], mods.iter.to_a
+    assert_equal [], Mods.empty.iter.to_a
   end
 
-  def test_inspect_is_bitflags_debug_text
-    assert_equal "Ferro::GlobalHotkey::Hotkey::Modifiers(CONTROL | SHIFT)", (Mods::SHIFT | Mods::CONTROL).inspect
-    assert_equal "Ferro::GlobalHotkey::Hotkey::Modifiers(0x0)", Mods.empty.inspect
-    assert_equal "Ferro::GlobalHotkey::Hotkey::Modifiers(ALT | 0x10000)", Mods.from_bits_retain(0x1_0001).inspect
+  # bitflags' iter and iter_names return iterators (src/iter.rs), so the
+  # Ruby methods return Enumerators, never Arrays (ADR 001, amendment of
+  # 2026-11-05: iterators); IntoIterator is each.
+  def test_iterators_are_enumerators_and_into_iterator_is_each
+    mods = Mods::SHIFT | Mods::ALT
+
+    assert_instance_of Enumerator, mods.iter
+    assert_instance_of Enumerator, mods.iter_names
+    assert_equal Mods::ALT, mods.iter.next
+    assert_instance_of Enumerator, mods.each
+    seen = []
+    mods.each { |flag| seen << flag }
+    assert_equal [Mods::ALT, Mods::SHIFT], seen
+  end
+
+  def test_debug_is_bitflags_debug_text
+    assert_equal "Modifiers(CONTROL | SHIFT)", (Mods::SHIFT | Mods::CONTROL).debug
+    assert_equal "Modifiers(0x0)", Mods.empty.debug
+    assert_equal "Modifiers(ALT | 0x10000)", Mods.from_bits_retain(0x1_0001).debug
+    assert_match(/\A#<Ferro::GlobalHotkey::Hotkey::Modifiers:0x\h+ @bits=512>\z/, Mods::SHIFT.inspect)
+  end
+
+  # bitflags derives Debug for Flag (src/traits.rs:13); the Rust test
+  # checks the text against every real flag.
+  def test_a_flags_debug_is_bitflags_derived_debug
+    assert_equal 'Flag { name: "SHIFT", value: Modifiers(SHIFT) }', Mods::FLAGS.find { |flag| flag.name == "SHIFT" }.debug
+    assert_equal 'Flag { name: "", value: Modifiers(0x10000) }', Mods::Flag.new("", Mods.from_bits_retain(0x1_0000)).debug
+    assert_raises(TypeError) { Mods::Flag.new("SHIFT", 0x200).debug }
+  end
+
+  # The known bits were a private constant the signatures declared
+  # public, which RBS cannot mark private; Modifiers.all holds them now.
+  def test_no_private_constant_backs_the_known_bits
+    refute Mods.const_defined?(:ALL_BITS, false)
+    assert_equal 0x3FFF, Mods.all.bits
+    assert_equal 0x3FFF, Mods.from_bits_truncate(0xFFFF_FFFF).bits
   end
 
   def test_values_order_and_hash_by_bits

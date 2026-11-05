@@ -8,8 +8,10 @@
 //! live on `Ferro::GlobalHotkey::Native`, a private module, beside
 //! `Native::Manager`, which owns global-hotkey's manager. A hotkey crosses
 //! as its three public fields (`hotkey.rs`), and a call that can fail
-//! returns `[:ok, value]` or `[:error, path, message, hotkey, os_error]` for the Ruby
-//! side to raise (`error.rs`).
+//! returns `[:ok, value]` or `[:error, path, message, field]` for the Ruby
+//! side to raise (`error.rs`). The test hooks exist only in a build with the
+//! `test-hooks` feature, which the repository's own compiles turn on
+//! (`Cargo.toml`).
 //!
 //! Two rules hold for every function:
 //!
@@ -145,6 +147,37 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     native.define_singleton_method("set_event_handler", function!(events::set_event_handler, 1))?;
     native.define_singleton_method("handler_recv", function!(events::handler_recv, 0))?;
     native.define_singleton_method("handler_close", function!(events::handler_close, 0))?;
+
+    native.define_singleton_method("code_debug", function!(hotkey::code_debug, 1))?;
+    native.define_singleton_method("hotkey_debug", function!(hotkey::hotkey_debug, 1))?;
+    native.define_singleton_method("flag_debug", function!(hotkey::flag_debug, 2))?;
+    native.define_singleton_method("state_debug", function!(events::state_debug, 1))?;
+    native.define_singleton_method("event_debug", function!(events::event_debug, 2))?;
+    native.define_singleton_method("receiver_debug", function!(events::receiver_debug, 0))?;
+    native.define_singleton_method("error_debug", function!(error::error_debug, 2))?;
+
+    #[cfg(feature = "test-hooks")]
+    define_test_hooks(native)?;
+    Ok(())
+}
+
+/// The test hooks, private singleton methods of `Native` that only a
+/// build with the `test-hooks` feature has (`Cargo.toml`), so a gem built
+/// without the option has none, and `rbs:parity`, which checks public methods, needs no
+/// signature for them. `Native::TEST_HOOKS` marks such a build, so the
+/// packaging check refuses any package that has it without listing hooks.
+#[cfg(feature = "test-hooks")]
+fn define_test_hooks(native: magnus::RModule) -> Result<(), Error> {
+    native.const_set("TEST_HOOKS", true)?;
+    let hooks = native.singleton_class()?;
+    hooks.define_private_method(
+        "handler_forward",
+        function!(events::hooks::handler_forward, 2),
+    )?;
+    hooks.define_private_method(
+        "handler_pending",
+        function!(events::hooks::handler_pending, 0),
+    )?;
     Ok(())
 }
 

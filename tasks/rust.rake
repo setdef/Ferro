@@ -20,9 +20,13 @@ end
 namespace :rust do
   FERRO_GEMS.each do |gem|
     namespace :clippy do
+      # A gem with test hooks is linted as it installs, without them, and
+      # as it builds here, with them (FerroGem#test_hooks).
       desc "Run Clippy, warnings as errors, on #{gem.name}"
       task gem.short_name do
-        cargo!("clippy", "--locked", "--all-targets", "--", "-D", "warnings", chdir: gem.dir)
+        [[], gem.test_hooks_features].uniq.each do |features|
+          cargo!("clippy", "--locked", "--all-targets", *features, "--", "-D", "warnings", chdir: gem.dir)
+        end
       end
     end
 

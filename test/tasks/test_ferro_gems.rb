@@ -53,6 +53,34 @@ class TestFerroGems < Minitest::Test
 ], FerroGem.rbs_validate_arguments([plain, urlish, other])
   end
 
+  # A gem builds its test hooks only in the repository (ADR 001, amendment
+  # of 2026-11-05): the compile passes its extconf.rb the option, Cargo
+  # the feature, and the packaging check rebuilds it from the package.
+  def test_test_hooks_are_built_only_for_a_gem_that_has_them
+    plain = gem
+    hooked = gem(test_hooks: true)
+
+    assert_empty plain.test_hooks_features
+    assert_empty plain.test_hooks_config
+    refute plain.package_target.rebuild
+    assert_equal ["--features", "test-hooks"], hooked.test_hooks_features
+    assert_equal ["--enable-test-hooks"], hooked.test_hooks_config
+    assert hooked.package_target.rebuild
+  end
+
+  # Each gem that says it has test hooks declares the feature and reads
+  # the option, so neither half can drift from the other.
+  def test_every_gem_with_test_hooks_declares_the_feature_and_reads_the_option
+    hooked = FERRO_GEMS.select(&:test_hooks)
+
+    refute_empty hooked
+    hooked.each do |ferro_gem|
+      crate = File.join(ROOT, ferro_gem.dir, ferro_gem.crate)
+      assert_match(/^\[features\]\n(?:#.*\n)*test-hooks = \[\]$/, File.read(File.join(crate, "Cargo.toml")), ferro_gem.name)
+      assert_includes File.read(File.join(crate, "extconf.rb")), %(enable_config("test-hooks", false)), ferro_gem.name
+    end
+  end
+
   # Steep checks each gem with the same libraries rbs validate loads.
   def test_steep_targets_come_from_the_registered_gems
     steepfile = File.read(File.join(ROOT, "Steepfile"))

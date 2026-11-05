@@ -35,9 +35,22 @@ class TestCode < Minitest::Test
     assert_equal "Unrecognized code", Hotkey::UnrecognizedCodeError.new.message
   end
 
-  def test_text_and_inspect
+  def test_text_debug_and_inspect
     assert_equal "BracketLeft", Code::BracketLeft.to_s
-    assert_equal "Ferro::GlobalHotkey::Hotkey::Code::BracketLeft", Code::BracketLeft.inspect
+    assert_equal "BracketLeft", Code::BracketLeft.debug
+    assert_match(/\A#<Ferro::GlobalHotkey::Hotkey::Code:0x\h+ @name=:BracketLeft, @index=2>\z/, Code::BracketLeft.inspect)
+  end
+
+  # Code's integer value is Rust's `as u32`, which global-hotkey puts in
+  # the low bits of the id HotKey::new computes (src/hotkey.rs:99), so a
+  # hotkey with no modifiers has the code's value as its id.
+  def test_to_i_is_the_value_global_hotkey_puts_in_an_id
+    codes = Code.constants(false).map { |name| quietly { Code.const_get(name, false) } }.grep(Code)
+
+    assert_equal 216, codes.size
+    codes.each { |code| assert_equal Hotkey::HotKey.new(nil, code).id, code.to_i, code.to_s }
+    assert_equal 215, Code::ZoomToggle.to_i
+    assert_equal 0, Code::Backquote.to_i
   end
 
   def test_codes_order_as_keyboard_types_declares_them

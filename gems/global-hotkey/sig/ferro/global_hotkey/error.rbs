@@ -5,40 +5,45 @@ module Ferro
   module GlobalHotkey
     class Error < StandardError
       class OsError < Error
-        attr_reader io_error: (SystemCallError | IOError)?
+        include TupleVariant
 
-        def initialize: (?String? message, ?(SystemCallError | IOError)? io_error) -> void
+        @raw_os_error: Integer?
+
+        private attr_writer raw_os_error: Integer?
+        private def native_field: () -> [Integer?, String?]
       end
 
       class HotKeyParseError < Error
+        include TupleVariant
       end
 
       class UnrecognizedHotKeyCode < Error
+        include TupleVariant
       end
 
       class EmptyHotKeyToken < Error
+        include TupleVariant
       end
 
       class UnexpectedHotKeyFormat < Error
+        include TupleVariant
       end
 
       class FailedToRegister < Error
+        include TupleVariant
       end
 
       class FailedToUnRegister < Error
-        attr_reader hotkey: Hotkey::HotKey?
-
-        def initialize: (?String? message, ?Hotkey::HotKey? hotkey) -> void
+        include TupleVariant
       end
 
       class AlreadyRegistered < Error
-        attr_reader hotkey: Hotkey::HotKey?
-
-        def initialize: (?String? message, ?Hotkey::HotKey? hotkey) -> void
+        include TupleVariant
       end
 
       class FailedToWatchMediaKeyEvent < Error
         def initialize: (?String? message) -> void
+        def debug: () -> String
       end
     end
   end

@@ -198,6 +198,21 @@ module Ferro
           GlobalHotkey.__send__(:settle, Native.hotkey_into_string(GlobalHotkey.__send__(:parts, self)))
         end
 
+        # global-hotkey's derived +Debug+ text for this hotkey, formatted by
+        # Rust from the same literal:
+        # <tt>HotKey { mods: Modifiers(SHIFT), key: KeyQ, id: 33554467 }</tt>,
+        # the text Error::AlreadyRegistered's message shows. +inspect+
+        # stays Data's. Mirrors global-hotkey's derived +Debug+
+        # (<tt>src/hotkey.rs:51</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::GlobalHotkey::Hotkey::HotKey.from_str("shift+KeyQ").debug
+        #   # => "HotKey { mods: Modifiers(SHIFT), key: KeyQ, id: 33554467 }"
+        def debug
+          Native.hotkey_debug(GlobalHotkey.__send__(:parts, self))
+        end
+
         # The same text as #into_string, global-hotkey's +Display+
         # (<tt>src/hotkey.rs:138-142</tt>).
         #

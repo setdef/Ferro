@@ -18,10 +18,10 @@ module Ferro
 
       def initialize: (Symbol name, Integer index) -> void
       def _dump: (Integer level) -> String
-      def inspect: () -> String
+      def debug: () -> String
+      def to_i: () -> Integer
       def <=>: (Object other) -> Integer?
 
-      attr_reader index: Integer
     end
   end
 end

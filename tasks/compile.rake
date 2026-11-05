@@ -47,9 +47,13 @@ end
 
 # One extension task per gem. rake-compiler names them after the
 # extension (compile:ferro_arboard); compile:<gem> is the short name.
+#
+# A gem with test hooks gets <tt>--enable-test-hooks</tt> for its extconf.rb,
+# so every development and test compile builds them (FerroGem#test_hooks).
 FERRO_GEMS.each do |gem|
   FerroExtensionTask.new(gem) do |ext|
     ext.lib_dir = gem.extension_dir
+    ext.config_options += gem.test_hooks_config
   end
 
   desc "Compile #{gem.name}'s native extension"

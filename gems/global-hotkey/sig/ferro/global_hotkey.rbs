@@ -7,8 +7,8 @@ module Ferro
     PLATFORM: :macos | :linux | :windows
 
     type parts = [Integer, String, Integer]
-    type os_error = [Integer?, String]
-    type native_error = [:error, String, String, parts?, os_error?]
+    type native_field = [:text, String] | [:hotkey, parts] | [:os, Integer?, String]
+    type native_error = [:error, String, String, native_field?]
     type native_result[T] = [:ok, T] | native_error
     type native_event = [Integer, :Pressed | :Released]
 
@@ -45,6 +45,13 @@ module Ferro
       def self.set_event_handler: (bool forward) -> nil
       def self.handler_recv: () -> native_result[native_event]
       def self.handler_close: () -> nil
+      def self.code_debug: (String name) -> String
+      def self.hotkey_debug: (parts hotkey) -> String
+      def self.flag_debug: (String name, Integer bits) -> String
+      def self.state_debug: (Symbol name) -> String
+      def self.event_debug: (Integer id, Symbol state) -> String
+      def self.receiver_debug: () -> String
+      def self.error_debug: (String path, (String | parts | [Integer?, String?] | SystemCallError | IOError)? field) -> String
 
       class Manager
       end

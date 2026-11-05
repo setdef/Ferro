@@ -22,7 +22,7 @@ class TestPlatform < Minitest::Test
       assert GlobalHotkey::GlobalHotKeyManager.method_defined?(name), name
     end
     %i[receiver set_event_handler].each { |name| assert GlobalHotkey::GlobalHotKeyEvent.respond_to?(name), name }
-    %i[try_recv recv recv_timeout iter try_iter is_empty is_full len capacity same_channel].each do |name|
+    %i[try_recv recv recv_timeout iter try_iter each is_empty is_full len capacity same_channel debug].each do |name|
       assert GlobalHotkey::GlobalHotKeyEventReceiver.method_defined?(name), name
     end
     %i[matches into_string to_s].each { |name| assert Hotkey::HotKey.method_defined?(name), name }

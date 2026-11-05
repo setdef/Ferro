@@ -21,6 +21,24 @@ crossbeam-channel = "0.5"
 magnus = { version = "0.9.3", features = ["bytes", "rb-sys"] }
 rb-sys = "0.9.130"
 
+[dev-dependencies]
+# keyboard-types' Modifiers gets its FLAGS table from bitflags' Flags
+# trait, which neither keyboard-types nor global-hotkey re-exports; a Rust
+# test reads the real table through it to check Flag#debug (plan 004,
+# Follow-up: ADR 001's rulings). The version keyboard-types already locks.
+bitflags = "=2.13.2"
+
+[features]
+# Hooks the gem's own tests read inside the native layer, such as how many
+# events wait in the handler's channel (plan 004, Follow-up: ADR 001's
+# rulings). global-hotkey has no such methods, and a gem adds nothing its
+# crate lacks, so only the repository's development and test builds turn
+# this on (ADR 001, amendment of 2026-11-05: test hooks). The hooks are off
+# unless the installer passes `--enable-test-hooks` to extconf.rb, which
+# only the repository's own build does, and it is no option an app
+# chooses (ADR 002).
+test-hooks = []
+
 # Each crate states its lints itself instead of inheriting them with
 # `workspace = true`: an installed gem ships only its own workspace.
 [lints.clippy]

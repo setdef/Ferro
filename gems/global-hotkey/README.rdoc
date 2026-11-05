@@ -102,7 +102,12 @@ to the block, not the receiver. global-hotkey calls its handler on the
 thread that saw the key, where Ruby cannot run, so the gem passes each
 event to a Ruby thread it starts, and that thread calls your block. An
 exception from the block ends that thread; Ruby reports it, and later
-events are dropped.
+events are dropped. A panicking Rust handler differs: on Linux it ends
+global-hotkey's X11 thread, whose connection the X server then releases
+every grab for, so later registrations quietly succeed, whereas here the
+grabs stay and their keys stay swallowed; on macOS it aborts the process,
+and on Windows so does a panic on the press (a panic on the release ends
+only the thread that sends it).
 
 === What your app must run
 
@@ -153,14 +158,19 @@ The API is global-hotkey's, translated where Rust has no Ruby meaning:
   give the same result.
 * GlobalHotKeyEvent is a Data. The receiver is global-hotkey's crossbeam
   channel, with crossbeam's method names; +iter+ and +try_iter+ return
-  Enumerators, and +recv_timeout+ takes seconds.
+  Enumerators, as Modifiers' +iter+ and +iter_names+ do, +IntoIterator+
+  is +each+, and +recv_timeout+ takes any Numeric number of seconds.
 * Each error variant is a subclass of Ferro::GlobalHotkey::Error with
-  global-hotkey's message; Error::AlreadyRegistered and
-  Error::FailedToUnRegister carry the +hotkey+. A bad hotkey string raises
+  global-hotkey's message. A tuple variant's field is positional, as in
+  Rust: <tt>in Error::AlreadyRegistered[hotkey]</tt>, or +to_a+. A bad
+  hotkey string raises
   Hotkey::HotKeyParseError's subclasses, and crossbeam's receive errors
   sit under GlobalHotKeyEventReceiver.
-* keyboard-types' deprecated items warn in Ruby's <tt>:deprecated</tt>
-  category: <tt>Modifiers::HYPER</tt>, <tt>Modifiers::SUPER</tt>,
+* Rust's +Debug+ text is +debug+, formatted by Rust; +inspect+ stays
+  Ruby's. A fieldless enum's <tt>as u32</tt> is +to_i+ (Code,
+  HotKeyState).
+* keyboard-types' deprecated items are left out of the API docs, and
+  warn in Ruby's <tt>:deprecated</tt> category: <tt>Modifiers::HYPER</tt>, <tt>Modifiers::SUPER</tt>,
   <tt>Code::Hyper</tt>, <tt>Code::Super</tt>, and <tt>Code::Turbo</tt>.
 
 What differs from calling global-hotkey from Rust:

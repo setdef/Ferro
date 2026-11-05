@@ -142,6 +142,29 @@ class TestHotKey < Minitest::Test
     refute_kind_of GlobalHotkey::Error, unsupported
   end
 
+  # Each variant carries the String global-hotkey built it with
+  # (src/hotkey.rs:187, :197, :231), by position, and its Debug text.
+  def test_each_parse_error_carries_the_part_global_hotkey_names
+    unsupported = assert_raises(Hotkey::HotKeyParseError::UnsupportedKey) { HotKey.from_str("Shift+Nope") }
+    empty = assert_raises(Hotkey::HotKeyParseError::EmptyToken) { HotKey.from_str("Shift++KeyA") }
+    invalid = assert_raises(Hotkey::HotKeyParseError::InvalidFormat) { HotKey.from_str("Shift+Ctrl") }
+
+    assert_equal ["Nope"], unsupported.to_a
+    assert_equal ["Shift++KeyA"], empty.deconstruct
+    assert_equal ["Shift+Ctrl"], invalid.to_a
+    assert_equal 'UnsupportedKey("Nope")', unsupported.debug
+    assert_equal 'InvalidFormat("Shift+Ctrl")', invalid.debug
+  end
+
+  def test_debug_is_global_hotkeys_derived_debug
+    hotkey = HotKey.from_str("shift+KeyQ")
+
+    assert_equal "HotKey { mods: Modifiers(SHIFT), key: KeyQ, id: #{hotkey.id} }", hotkey.debug
+    assert_equal "HotKey { mods: Modifiers(0x0), key: F19, id: 1 }",
+      HotKey.new(mods: Hotkey::Modifiers.empty, key: Hotkey::Code::F19, id: 1).debug
+    assert_match(/\A#<data Ferro::GlobalHotkey::Hotkey::HotKey mods=/, hotkey.inspect)
+  end
+
   def test_try_from_is_from_str
     assert_equal HotKey.from_str("ctrl+F19"), HotKey.try_from("ctrl+F19")
     assert_raises(Hotkey::HotKeyParseError::InvalidFormat) { HotKey.try_from("F19+ctrl") }

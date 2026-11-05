@@ -16,12 +16,22 @@ its own API. Releases are tagged `ferro-global-hotkey/vX.Y.Z`.
 
 - `TryRecvError#is_empty` and `#is_disconnected`; `RecvTimeoutError#is_timeout` and `#is_disconnected`.
 - `TryRecvError.from` and `RecvTimeoutError.from`, which convert a `RecvError` to a `Disconnected` with crossbeam's text.
-- `Error::OsError#io_error`, the `io::Error` as a `SystemCallError` on Unix and an `IOError` otherwise.
 - `Hotkey::Modifiers::FLAGS`, an Array of `Hotkey::Modifiers::Flag` (`name`, `value`, `is_named`, `is_unnamed`); `Modifiers#known_bits`, `#unknown_bits`, `#contains_unknown_bits`, and `Modifiers.all_named`.
+- `deconstruct` and `to_a` on every error variant with a field: the String, the `HotKey`, or `OsError`'s `io::Error` (a `SystemCallError` on Unix, an `IOError` otherwise), so `in Error::AlreadyRegistered[hotkey]` matches as in Rust.
+- `debug`, global-hotkey's, keyboard-types', bitflags', or crossbeam's `Debug` text formatted by Rust, on `Code`, `HotKeyState`, `Modifiers`, `Modifiers::Flag`, `HotKey`, `GlobalHotKeyEvent`, `GlobalHotKeyEventReceiver`, each error variant, `UnrecognizedCodeError`, and the receive errors.
+- `Code#to_i` and `HotKeyState#to_i`, Rust's `as u32`.
+- `GlobalHotKeyEventReceiver#each` and `Modifiers#each`, Rust's `IntoIterator`.
 
 ### Changed
 
 - `RecvError.new`, `TryRecvError::Empty.new`, `TryRecvError::Disconnected.new`, `RecvTimeoutError::Timeout.new`, and `RecvTimeoutError::Disconnected.new` carry crossbeam's text as their message, not the class name.
+- `Modifiers#iter` and `#iter_names` return Enumerators, not Arrays.
+- `inspect` on `Code`, `HotKeyState`, and `Modifiers` is Ruby's own; their Rust text is `debug`.
+- The deprecated `Code::Hyper`, `Super`, `Turbo`, `Modifiers::HYPER`, and `SUPER` are left out of the RDoc; they still exist and warn.
+
+### Removed
+
+- `Error::AlreadyRegistered#hotkey` and `Error::FailedToUnRegister#hotkey`, names global-hotkey does not give its tuple fields: use `to_a` or a pattern.
 
 ### Fixed
 

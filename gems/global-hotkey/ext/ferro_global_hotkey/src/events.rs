@@ -15,7 +15,7 @@ use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::{unbounded, Receiver, RecvError, RecvTimeoutError, Sender, TryRecvError};
-use global_hotkey::GlobalHotKeyEvent;
+use global_hotkey::{GlobalHotKeyEvent, HotKeyState};
 use magnus::{Error, RArray, RString, Ruby, Symbol};
 
 use crate::error::{error, ok, panicked, Failure};
@@ -104,9 +104,15 @@ pub fn receiver_try_recv(ruby: &Ruby) -> RArray {
 /// `ArgumentError` with Rust's text, where `Duration::from_secs_f64`
 /// would panic.
 fn deadline(ruby: &Ruby, seconds: f64) -> Result<Option<Instant>, Error> {
-    let timeout = Duration::try_from_secs_f64(seconds)
-        .map_err(|reason| Error::new(ruby.exception_arg_error(), reason.to_string()))?;
+    let timeout =
+        timeout(seconds).map_err(|reason| Error::new(ruby.exception_arg_error(), reason))?;
     Ok(Instant::now().checked_add(timeout))
+}
+
+/// The `Duration` of `seconds`, or the text `Duration::from_secs_f64`
+/// panics with for it (`a_bad_timeout_has_the_panics_text` pins it).
+fn timeout(seconds: f64) -> Result<Duration, String> {
+    Duration::try_from_secs_f64(seconds).map_err(|reason| reason.to_string())
 }
 
 /// The tagged result of a wait on `receiver`.
@@ -170,11 +176,7 @@ pub fn receiver_capacity() -> Option<usize> {
 /// thread reads it; without, `None`.
 pub fn set_event_handler(forward: bool) {
     if forward {
-        GlobalHotKeyEvent::set_event_handler(Some(|found: GlobalHotKeyEvent| {
-            if HANDLER_OPEN.load(Ordering::Acquire) {
-                let _ = HANDLER.0.send(found);
-            }
-        }));
+        GlobalHotKeyEvent::set_event_handler(Some(forward_event));
     } else {
         GlobalHotKeyEvent::set_event_handler(None::<fn(GlobalHotKeyEvent)>);
     }
@@ -193,9 +195,110 @@ pub fn handler_close() {
     HANDLER.1.try_iter().for_each(drop);
 }
 
+/// The handler `set_event_handler` installs: sends `found` to `HANDLER`
+/// while a Ruby thread reads it, and drops it after.
+fn forward_event(found: GlobalHotKeyEvent) {
+    if HANDLER_OPEN.load(Ordering::Acquire) {
+        let _ = HANDLER.0.send(found);
+    }
+}
+
+/// The `HotKeyState` named `name` (`src/lib.rs:63-71`); `TypeError` for
+/// any other name.
+fn state(ruby: &Ruby, name: Symbol) -> Result<HotKeyState, Error> {
+    match &*name.name()? {
+        "Pressed" => Ok(HotKeyState::Pressed),
+        "Released" => Ok(HotKeyState::Released),
+        other => Err(Error::new(
+            ruby.exception_type_error(),
+            format!("no HotKeyState named {other}"),
+        )),
+    }
+}
+
+/// The `Debug` global-hotkey derives for the `HotKeyState` named `name`
+/// (`src/lib.rs:63`): the variant's name.
+pub fn state_debug(ruby: &Ruby, name: Symbol) -> Result<String, Error> {
+    Ok(format!("{:?}", state(ruby, name)?))
+}
+
+/// The `Debug` global-hotkey derives for the event literal
+/// `GlobalHotKeyEvent { id, state }` (`src/lib.rs:74-81`).
+pub fn event_debug(ruby: &Ruby, id: u32, name: Symbol) -> Result<String, Error> {
+    let state = state(ruby, name)?;
+    Ok(format!("{:?}", GlobalHotKeyEvent { id, state }))
+}
+
+/// crossbeam's `Debug` for the receiver (`src/channel.rs:1189-1193`).
+pub fn receiver_debug() -> String {
+    format!("{:?}", GlobalHotKeyEvent::receiver())
+}
+
+/// Test hooks, built only with the `test-hooks` feature (`Cargo.toml`).
+#[cfg(feature = "test-hooks")]
+pub mod hooks {
+    use global_hotkey::GlobalHotKeyEvent;
+    use magnus::{Error, Ruby, Symbol};
+
+    /// Hands the event `{ id, state }` to the handler `set_event_handler`
+    /// installs, as global-hotkey does when a key is pressed
+    /// (`src/lib.rs:126-132`), so a test drives the handler thread with no
+    /// key press.
+    pub fn handler_forward(ruby: &Ruby, id: u32, name: Symbol) -> Result<(), Error> {
+        let state = super::state(ruby, name)?;
+        super::forward_event(GlobalHotKeyEvent { id, state });
+        Ok(())
+    }
+
+    /// How many forwarded events wait for the Ruby handler thread: none
+    /// once it has ended, since `handler_close` stops forwarding.
+    pub fn handler_pending() -> usize {
+        super::HANDLER.1.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{converted_text, error_text};
+    use super::{converted_text, error_text, timeout};
+    use std::time::Duration;
+
+    /// A timeout `Duration::from_secs_f64` would panic on is refused with
+    /// the text of that panic, which the real panic gives here.
+    #[test]
+    fn a_bad_timeout_has_the_panics_text() {
+        for seconds in [-1.0, f64::NAN, 1e20] {
+            let panic = std::panic::catch_unwind(|| Duration::from_secs_f64(seconds))
+                .expect_err("from_secs_f64 panics");
+            let text = panic
+                .downcast_ref::<String>()
+                .cloned()
+                .or_else(|| panic.downcast_ref::<&str>().map(|text| (*text).to_owned()));
+            assert_eq!(timeout(seconds).err(), text);
+        }
+        assert_eq!(
+            timeout(-1.0).err().as_deref(),
+            Some("cannot convert float seconds to Duration: value is negative")
+        );
+        assert_eq!(timeout(1.5), Ok(Duration::from_millis(1500)));
+    }
+
+    #[test]
+    fn a_states_and_an_events_debug_are_global_hotkeys() {
+        use global_hotkey::{GlobalHotKeyEvent, HotKeyState};
+        assert_eq!(format!("{:?}", HotKeyState::Released), "Released");
+        let event = GlobalHotKeyEvent {
+            id: 7,
+            state: HotKeyState::Pressed,
+        };
+        assert_eq!(
+            format!("{event:?}"),
+            "GlobalHotKeyEvent { id: 7, state: Pressed }"
+        );
+        assert_eq!(
+            format!("{:?}", GlobalHotKeyEvent::receiver()),
+            "Receiver { .. }"
+        );
+    }
 
     #[test]
     fn each_receive_error_has_crossbeams_display_text() {

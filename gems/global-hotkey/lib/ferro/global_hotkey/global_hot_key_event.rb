@@ -35,7 +35,7 @@ module Ferro
     #   receiver = Ferro::GlobalHotkey::GlobalHotKeyEvent.receiver
     #   begin
     #     event = receiver.try_recv
-    #     puts "#{event.id} #{event.state.inspect}"
+    #     puts "#{event.id} #{event.state.debug}"
     #   rescue Ferro::GlobalHotkey::GlobalHotKeyEventReceiver::TryRecvError::Empty
     #     # No hotkey since the last look.
     #   end
@@ -66,6 +66,26 @@ module Ferro
       #   event.new(id: 1, state: pressed) < event.new(id: 2, state: pressed) # => true
       def <=>(other)
         [id, state] <=> [other.id, other.state] if other.is_a?(GlobalHotKeyEvent)
+      end
+
+      # global-hotkey's derived +Debug+ text for the event, formatted by
+      # Rust from the literal <tt>GlobalHotKeyEvent { id, state }</tt>.
+      # +inspect+ stays Data's. An event whose fields are not a +u32+ and
+      # a HotKeyState has no Rust value, so its +debug+ raises +TypeError+
+      # or +RangeError+.
+      #
+      # Mirrors global-hotkey's derived +Debug+ (<tt>src/lib.rs:74</tt>).
+      #
+      # === Example
+      #
+      #   event = Ferro::GlobalHotkey::GlobalHotKeyEvent
+      #   event.new(id: 7, state: Ferro::GlobalHotkey::HotKeyState::Pressed).debug
+      #   # => "GlobalHotKeyEvent { id: 7, state: Pressed }"
+      def debug
+        given = state
+        raise TypeError, "wrong argument type #{given.class} (expected #{HotKeyState})" unless given.is_a?(HotKeyState)
+
+        Native.event_debug(id, given.debug.to_sym)
       end
 
       class << self
@@ -106,9 +126,20 @@ module Ferro
         # event, once it can take the global VM lock. An exception your
         # handler raises ends that thread, and Ruby reports it as it
         # reports any thread's; later events are dropped, as global-hotkey
-        # never returns them to the receiver. Call this from the main
-        # Ractor: the handler lives on this module, which other Ractors
-        # cannot change.
+        # never returns them to the receiver. A Rust handler that panics
+        # differs. On Linux the panic unwinds global-hotkey's X11 thread,
+        # which drops its connection, so the X server releases every grab
+        # and later +register+ calls quietly return +Ok+
+        # (<tt>x11/mod.rs:42-50, 229</tt>); here the grabs stay, and the
+        # keys stay swallowed, with no event reaching anyone. On macOS a
+        # panic unwinds out of a system callback and aborts the process;
+        # on Windows only a panic on the press does
+        # (<tt>windows/mod.rs:147</tt>), since the release comes from a
+        # thread the crate spawns (<tt>windows/mod.rs:153-167</tt>), where
+        # a panic ends only that thread. A Ruby exception never aborts
+        # here. Call this from
+        # the main Ractor: the handler lives on this module, which other
+        # Ractors cannot change.
         #
         # Mirrors <tt>GlobalHotKeyEvent::set_event_handler</tt>
         # (<tt>src/lib.rs:112-124</tt>).

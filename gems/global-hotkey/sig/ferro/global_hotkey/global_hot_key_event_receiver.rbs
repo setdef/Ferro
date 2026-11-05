@@ -11,15 +11,18 @@ module Ferro
 
         class Empty < TryRecvError
           def initialize: (?String? message) -> void
+          def debug: () -> String
         end
 
         class Disconnected < TryRecvError
           def initialize: (?String? message) -> void
+          def debug: () -> String
         end
       end
 
       class RecvError < StandardError
         def initialize: (?String? message) -> void
+        def debug: () -> String
       end
 
       class RecvTimeoutError < StandardError
@@ -29,10 +32,12 @@ module Ferro
 
         class Timeout < RecvTimeoutError
           def initialize: (?String? message) -> void
+          def debug: () -> String
         end
 
         class Disconnected < RecvTimeoutError
           def initialize: (?String? message) -> void
+          def debug: () -> String
         end
       end
 
@@ -44,6 +49,9 @@ module Ferro
       def recv: () -> GlobalHotKeyEvent
       def recv_timeout: (Numeric timeout) -> GlobalHotKeyEvent
       def iter: () -> Enumerator[GlobalHotKeyEvent, nil]
+      def each: () { (GlobalHotKeyEvent event) -> void } -> nil
+              | () -> Enumerator[GlobalHotKeyEvent, nil]
+      def debug: () -> String
       def try_iter: () -> Enumerator[GlobalHotKeyEvent, nil]
       def is_empty: () -> bool
       def is_full: () -> bool

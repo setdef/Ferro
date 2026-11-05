@@ -112,6 +112,7 @@ dependencies = [
 name = "ferro_global_hotkey"
 version = "0.1.0-pre.1"
 dependencies = [
+ "bitflags",
  "crossbeam-channel",
  "global-hotkey",
  "magnus",

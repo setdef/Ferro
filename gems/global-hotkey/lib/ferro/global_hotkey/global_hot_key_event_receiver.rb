@@ -146,6 +146,16 @@ module Ferro
           def initialize(message = nil)
             super(message || Native.receive_error_text("TryRecvError::Empty"))
           end
+
+          # crossbeam's derived +Debug+ text, formatted by Rust: the
+          # variant's name (<tt>src/err.rs:59</tt>).
+          #
+          # === Example
+          #
+          #   TryRecvError::Empty.new.debug # => "Empty"
+          def debug
+            Native.error_debug(GlobalHotkey.__send__(:variant_path, self), nil)
+          end
         end
 
         # The channel is empty and disconnected, which cannot happen to
@@ -166,6 +176,16 @@ module Ferro
           #   TryRecvError::Disconnected.new.is_disconnected # => true
           def initialize(message = nil)
             super(message || Native.receive_error_text("TryRecvError::Disconnected"))
+          end
+
+          # crossbeam's derived +Debug+ text, formatted by Rust: the
+          # variant's name (<tt>src/err.rs:59</tt>).
+          #
+          # === Example
+          #
+          #   TryRecvError::Disconnected.new.debug # => "Disconnected"
+          def debug
+            Native.error_debug(GlobalHotkey.__send__(:variant_path, self), nil)
           end
         end
       end
@@ -189,6 +209,16 @@ module Ferro
         #   RecvError.new.message # => "receiving on an empty and disconnected channel"
         def initialize(message = nil)
           super(message || Native.receive_error_text("RecvError"))
+        end
+
+        # crossbeam's derived +Debug+ text, formatted by Rust: the type's
+        # name, as it has no fields (<tt>src/err.rs:53</tt>).
+        #
+        # === Example
+        #
+        #   RecvError.new.debug # => "RecvError"
+        def debug
+          Native.error_debug(GlobalHotkey.__send__(:variant_path, self), nil)
         end
       end
 
@@ -260,6 +290,16 @@ module Ferro
           def initialize(message = nil)
             super(message || Native.receive_error_text("RecvTimeoutError::Timeout"))
           end
+
+          # crossbeam's derived +Debug+ text, formatted by Rust: the
+          # variant's name (<tt>src/err.rs:74</tt>).
+          #
+          # === Example
+          #
+          #   RecvTimeoutError::Timeout.new.debug # => "Timeout"
+          def debug
+            Native.error_debug(GlobalHotkey.__send__(:variant_path, self), nil)
+          end
         end
 
         # The channel is empty and disconnected, which cannot happen to
@@ -279,6 +319,16 @@ module Ferro
           #   RecvTimeoutError::Disconnected.new.message # => "channel is empty and disconnected"
           def initialize(message = nil)
             super(message || Native.receive_error_text("RecvTimeoutError::Disconnected"))
+          end
+
+          # crossbeam's derived +Debug+ text, formatted by Rust: the
+          # variant's name (<tt>src/err.rs:74</tt>).
+          #
+          # === Example
+          #
+          #   RecvTimeoutError::Disconnected.new.debug # => "Disconnected"
+          def debug
+            Native.error_debug(GlobalHotkey.__send__(:variant_path, self), nil)
           end
         end
       end
@@ -336,6 +386,32 @@ module Ferro
             events << recv
           end
         end
+      end
+
+      # Yields each event in turn, forever, waiting for each as recv does;
+      # without a block, returns iter's Enumerator. Mirrors crossbeam's
+      # +IntoIterator+ for a receiver (<tt>src/channel.rs:1195-1212</tt>),
+      # whose iterator is +iter+'s, so <tt>for event in receiver</tt> reads
+      # as Rust's +for+ does.
+      #
+      # === Example
+      #
+      #   receiver.each { |event| p event }
+      def each(&block)
+        return iter unless block
+
+        iter.each(&block)
+      end
+
+      # crossbeam's +Debug+ text for a receiver, formatted by Rust:
+      # <tt>Receiver { .. }</tt> (<tt>src/channel.rs:1189-1193</tt>).
+      # +inspect+ stays Ruby's.
+      #
+      # === Example
+      #
+      #   receiver.debug # => "Receiver { .. }"
+      def debug
+        Native.receiver_debug
       end
 
       # An Enumerator over the events already in the channel, which ends

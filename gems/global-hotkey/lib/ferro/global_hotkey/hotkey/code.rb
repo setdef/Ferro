@@ -67,13 +67,26 @@ module Ferro
           @name.to_s
         end
 
-        # The constant that holds this code.
+        # keyboard-types' derived +Debug+ text for this code, formatted
+        # by Rust: the variant's name (<tt>src/code.rs:22</tt>).
+        # +inspect+ stays Ruby's.
         #
         # === Example
         #
-        #   Ferro::GlobalHotkey::Hotkey::Code::KeyA.inspect # => "Ferro::GlobalHotkey::Hotkey::Code::KeyA"
-        def inspect
-          "Ferro::GlobalHotkey::Hotkey::Code::#{@name}"
+        #   Ferro::GlobalHotkey::Hotkey::Code::KeyA.debug # => "KeyA"
+        def debug
+          Native.code_debug(@name.to_s)
+        end
+
+        # The code's integer value, Rust's <tt>Code::KeyA as u32</tt>: its
+        # place in keyboard-types' list, which global-hotkey puts in the
+        # low bits of every HotKey#id.
+        #
+        # === Example
+        #
+        #   Ferro::GlobalHotkey::Hotkey::Code::KeyA.to_i # => 19
+        def to_i
+          @index
         end
 
         # Orders codes as keyboard-types derives +Ord+: by their place in
@@ -85,7 +98,7 @@ module Ferro
         #
         #   Ferro::GlobalHotkey::Hotkey::Code::KeyA <=> Ferro::GlobalHotkey::Hotkey::Code::KeyB # => -1
         def <=>(other)
-          @index <=> other.index if other.is_a?(Code)
+          @index <=> other.to_i if other.is_a?(Code)
         end
 
         # The code's name, for Marshal: a dumped code loads as the same
@@ -108,9 +121,6 @@ module Ferro
         def self._load(name)
           from_str(name)
         end
-
-        # The code's place in keyboard-types' list.
-        protected attr_reader :index
 
         # The Code named +string+, by keyboard-types' +FromStr+: its exact
         # W3C name, such as <tt>"KeyA"</tt>. Anything else raises
@@ -599,17 +609,17 @@ module Ferro
         # The key whose W3C code value is +Hyper+; keyboard-types describes it no further.
         #
         # Deprecated: marked as legacy in the spec, use Meta instead.
-        Hyper = new(:Hyper, 142)
+        Hyper = new(:Hyper, 142) # :nodoc:
 
         # The key whose W3C code value is +Super+; keyboard-types describes it no further.
         #
         # Deprecated: marked as legacy in the spec, use Meta instead.
-        Super = new(:Super, 143)
+        Super = new(:Super, 143) # :nodoc:
 
         # The key whose W3C code value is +Turbo+; keyboard-types describes it no further.
         #
         # Deprecated: marked as legacy in the spec, use Meta instead.
-        Turbo = new(:Turbo, 144)
+        Turbo = new(:Turbo, 144) # :nodoc:
 
         # The key whose W3C code value is +Abort+; keyboard-types describes it no further.
         Abort = new(:Abort, 145)

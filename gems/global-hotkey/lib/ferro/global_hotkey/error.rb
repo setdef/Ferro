@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 #++
 
+require_relative "tuple_variant"
+
 module Ferro
   module GlobalHotkey
     #--
@@ -24,13 +26,17 @@ module Ferro
     #
     # Each of global-hotkey's errors is a subclass, named for its variant,
     # with global-hotkey's message. Rescue the one you can handle, or this
-    # class for all of them.
+    # class for all of them. A variant that carries a value, such as the
+    # hotkey another registration holds, gives it as Rust does, by
+    # position: <tt>in Error::AlreadyRegistered[hotkey]</tt>.
+    # Each variant answers +debug+ with global-hotkey's +Debug+ text, which
+    # Rust formats; +inspect+ stays Ruby's.
     #
     # A variant a later global-hotkey adds raises this class itself, with
     # global-hotkey's message, until ferro-global-hotkey names it. So does
     # a panic inside global-hotkey, with the message
     # <tt>global-hotkey panicked: ...</tt>, which would otherwise end the
-    # Ruby process.
+    # Ruby process. This class itself is no variant, so it has no +debug+.
     #
     # Mirrors global-hotkey's +Error+ (<tt>src/error.rs:9-31</tt>).
     #
@@ -39,7 +45,8 @@ module Ferro
     #   begin
     #     manager.register(hotkey)
     #   rescue Ferro::GlobalHotkey::Error::AlreadyRegistered => e
-    #     warn "#{e.hotkey} is taken"
+    #     taken, = e.to_a
+    #     warn "#{taken} is taken"
     #   rescue Ferro::GlobalHotkey::Error => e
     #     warn "No hotkey: #{e.message}"
     #   end
@@ -48,133 +55,121 @@ module Ferro
       # such as Windows' when the hidden window that receives hotkeys
       # could not be made.
       #
+      # The variant's field is the +io::Error+ the call failed with, as a
+      # Ruby value: on Unix, the +SystemCallError+ (an +Errno+ class) of
+      # its OS error code; otherwise an +IOError+ with Rust's text, as
+      # ferro-rfd and ferro-url give theirs. global-hotkey's variant is
+      # <tt>#[error(transparent)]</tt>, so the error has no cause.
+      #
       # === Example
       #
       #   rescue Ferro::GlobalHotkey::Error::OsError => e
       #     warn e.message # => "Access is denied. (os error 5)"
+      #     io_error, = e.to_a
       class OsError < Error
-        # The +io::Error+ the system call failed with, as a Ruby value: on
-        # Unix, the +SystemCallError+ (an +Errno+ class) of its OS error
-        # code; otherwise an +IOError+ with Rust's text. It is +nil+ for
-        # an error built without one. global-hotkey's variant is
-        # <tt>#[error(transparent)]</tt>, so the error has no cause.
-        #
-        # === Example
-        #
-        #   error.io_error.errno # => 13
-        attr_reader :io_error
+        include TupleVariant
 
-        # Creates the error.
-        #
-        # [message] String, the system's description.
-        # [io_error] SystemCallError or IOError, or +nil+.
-        #
-        # === Example
-        #
-        #   Ferro::GlobalHotkey::Error::OsError.new("Access is denied. (os error 5)", SystemCallError.new(nil, 5)).io_error
-        def initialize(message = nil, io_error = nil)
-          @io_error = io_error
-          super(message)
+        # The OS error code global-hotkey's +io::Error+ had, kept for
+        # +debug+, since a Windows +IOError+ does not carry it.
+        private attr_writer :raw_os_error
+
+        # The +io::Error+ as the native layer rebuilds it: its OS error
+        # code, if it has one, and its text.
+        private def native_field
+          io_error = @field
+          if io_error.is_a?(SystemCallError)
+            [@raw_os_error || io_error.errno, io_error.message]
+          elsif io_error.is_a?(IOError)
+            [@raw_os_error, io_error.message]
+          else
+            [@raw_os_error, nil]
+          end
         end
       end
 
       # A hotkey did not parse. global-hotkey 0.9.0 never raises it:
       # Hotkey::HotKey.from_str raises Hotkey::HotKeyParseError instead.
-      # The class exists because global-hotkey's +Error+ has the variant.
+      # The class exists because global-hotkey's +Error+ has the variant,
+      # whose field is a String, the message.
       #
       # === Example
       #
-      #   raise Ferro::GlobalHotkey::Error::HotKeyParseError, "bad hotkey"
+      #   raise Ferro::GlobalHotkey::Error::HotKeyParseError.new("bad hotkey", "bad hotkey")
       class HotKeyParseError < Error
+        include TupleVariant
       end
 
       # A key name global-hotkey did not recognize. global-hotkey 0.9.0
-      # never raises it; the class exists because +Error+ has the variant.
+      # never raises it; the class exists because +Error+ has the variant,
+      # whose field is a String, the name.
       #
       # === Example
       #
       #   raise Ferro::GlobalHotkey::Error::UnrecognizedHotKeyCode, "no such key"
       class UnrecognizedHotKeyCode < Error
+        include TupleVariant
       end
 
       # An empty part in a hotkey's text. global-hotkey 0.9.0 never raises
-      # it; the class exists because +Error+ has the variant.
+      # it; the class exists because +Error+ has the variant, whose field
+      # is a String, the text.
       #
       # === Example
       #
       #   raise Ferro::GlobalHotkey::Error::EmptyHotKeyToken, "empty token"
       class EmptyHotKeyToken < Error
+        include TupleVariant
       end
 
       # A hotkey's text in the wrong shape. global-hotkey 0.9.0 never
-      # raises it; the class exists because +Error+ has the variant.
+      # raises it; the class exists because +Error+ has the variant, whose
+      # field is a String, the text.
       #
       # === Example
       #
       #   raise Ferro::GlobalHotkey::Error::UnexpectedHotKeyFormat, "wrong shape"
       class UnexpectedHotKeyFormat < Error
+        include TupleVariant
       end
 
       # The system would not register the hotkey. The message is
-      # <tt>Unable to register hotkey: </tt> and the reason, such as
-      # <tt>Unknown scancode for F24</tt> for a key macOS has no code for,
-      # or <tt>Unable to find keycode for key: F24</tt> for a key the X
-      # server's keymap lacks.
+      # <tt>Unable to register hotkey: </tt> and the reason, the variant's
+      # String field, such as <tt>Unknown scancode for F24</tt> for a key
+      # macOS has no code for, or <tt>Unable to find keycode for key:
+      # F24</tt> for a key the X server's keymap lacks.
       #
       # === Example
       #
       #   rescue Ferro::GlobalHotkey::Error::FailedToRegister => e
-      #     warn e.message # => "Unable to register hotkey: Unknown scancode for F24"
+      #     e.message # => "Unable to register hotkey: Unknown scancode for F24"
+      #     e.to_a # => ["Unknown scancode for F24"]
       class FailedToRegister < Error
+        include TupleVariant
       end
 
-      # The system would not unregister the hotkey, which #hotkey holds.
+      # The system would not unregister the hotkey, the variant's field, a
+      # Hotkey::HotKey.
       #
       # === Example
       #
       #   rescue Ferro::GlobalHotkey::Error::FailedToUnRegister => e
-      #     warn "#{e.hotkey} stays registered"
+      #     hotkey, = e.to_a
+      #     warn "#{hotkey} stays registered"
       class FailedToUnRegister < Error
-        # The Hotkey::HotKey global-hotkey could not unregister, or +nil+.
-        attr_reader :hotkey
-
-        # Creates the error.
-        #
-        # [message] String, global-hotkey's message.
-        # [hotkey] Hotkey::HotKey, the hotkey, or +nil+.
-        #
-        # === Example
-        #
-        #   Ferro::GlobalHotkey::Error::FailedToUnRegister.new("Failed to unregister hotkey", hotkey).hotkey
-        def initialize(message = nil, hotkey = nil)
-          @hotkey = hotkey
-          super(message)
-        end
+        include TupleVariant
       end
 
-      # Another registration holds the hotkey, which #hotkey holds: another
-      # program's on Windows and Linux, or this manager's own.
+      # Another registration holds the hotkey, the variant's field, a
+      # Hotkey::HotKey: another program's on Windows and Linux, or this
+      # manager's own.
       #
       # === Example
       #
       #   rescue Ferro::GlobalHotkey::Error::AlreadyRegistered => e
-      #     warn "#{e.hotkey} is taken"
+      #     hotkey, = e.to_a
+      #     warn "#{hotkey} is taken"
       class AlreadyRegistered < Error
-        # The Hotkey::HotKey already registered, or +nil+.
-        attr_reader :hotkey
-
-        # Creates the error.
-        #
-        # [message] String, global-hotkey's message.
-        # [hotkey] Hotkey::HotKey, the hotkey, or +nil+.
-        #
-        # === Example
-        #
-        #   Ferro::GlobalHotkey::Error::AlreadyRegistered.new("HotKey already registered", hotkey).hotkey
-        def initialize(message = nil, hotkey = nil)
-          @hotkey = hotkey
-          super(message)
-        end
+        include TupleVariant
       end
 
       # macOS would not let global-hotkey watch the media keys
@@ -196,6 +191,16 @@ module Ferro
         #   Ferro::GlobalHotkey::Error::FailedToWatchMediaKeyEvent.new
         def initialize(message = nil)
           super(message || "Failed to watch media key event")
+        end
+
+        # global-hotkey's +Debug+ text for this variant, formatted by
+        # Rust: its name.
+        #
+        # === Example
+        #
+        #   Ferro::GlobalHotkey::Error::FailedToWatchMediaKeyEvent.new.debug # => "FailedToWatchMediaKeyEvent"
+        def debug
+          Native.error_debug(GlobalHotkey.__send__(:variant_path, self), nil)
         end
       end
     end

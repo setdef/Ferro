@@ -23,6 +23,7 @@ module Ferro
       private def self.start_handler: (_Handler handler) -> Thread
 
       def <=>: (Object other) -> Integer?
+      def debug: () -> String
     end
   end
 end

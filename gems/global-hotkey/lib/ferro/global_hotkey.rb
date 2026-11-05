@@ -64,24 +64,31 @@ module Ferro
   #
   #   # Inside your app's event loop:
   #   event = Ferro::GlobalHotkey::GlobalHotKeyEvent.receiver.recv
-  #   puts "#{event.state.inspect} #{event.id}" if event.id == shift_d.id
+  #   puts "#{event.state.debug} #{event.id}" if event.id == shift_d.id
   module GlobalHotkey
     private_constant :PLATFORM, :Native
 
     # The value in +result+, a native <tt>[:ok, value]</tt>, or the
-    # exception a native <tt>[:error, path, message, hotkey, os_error]</tt>
-    # names, raised. +path+ is a class path under this module; +os_error+
-    # is +nil+ or the <tt>[code, text]</tt> of an +OsError+'s +io::Error+.
+    # exception a native <tt>[:error, path, message, field]</tt> names,
+    # raised. +path+ is a class path under this module, and +field+ the
+    # value its variant carries: +nil+, <tt>[:text, string]</tt>,
+    # <tt>[:hotkey, parts]</tt>, or <tt>[:os, code, text]</tt> for an
+    # +OsError+'s +io::Error+.
     def self.settle(result) # :nodoc:
       case result
       in [:ok, value]
         value
-      in [:error, String => path, String => message, parts, os_error]
+      in [:error, String => path, String => message, field]
         error_class = path.split("::").reduce(self) { |namespace, name| namespace.const_get(name, false) }
-        raise error_class.new(message, Hotkey::HotKey.__send__(:from_parts, parts)) if parts
-        raise error_class.new(message, io_error(*os_error)) if os_error
-
-        raise error_class, message
+        case field
+        in nil then raise error_class, message
+        in [:text, String => text] then raise error_class.new(message, text)
+        in [:hotkey, parts] then raise error_class.new(message, Hotkey::HotKey.__send__(:from_parts, parts))
+        in [:os, code, String => text]
+          error = error_class.new(message, io_error(code, text))
+          error.__send__(:raw_os_error=, code)
+          raise error
+        end
       end
     end
     private_class_method :settle

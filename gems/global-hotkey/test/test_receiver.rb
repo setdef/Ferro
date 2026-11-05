@@ -191,6 +191,43 @@ class TestReceiver < Minitest::Test
     assert_instance_of Enumerator, receiver.iter
   end
 
+  # crossbeam's IntoIterator for a receiver is its iter
+  # (channel.rs:1195-1212): each yields what iter does, and without a
+  # block returns iter's Enumerator.
+  def test_each_is_into_iterator
+    subclass = Class.new(Receiver) do
+      def recv
+        :event
+      end
+    end
+    taken = []
+    subclass.__send__(:new).each do |event|
+      taken << event
+      break if taken.size == 2
+    end
+
+    assert_equal %i[event event], taken
+    assert_equal %i[event event event], subclass.__send__(:new).each.first(3)
+    assert_instance_of Enumerator, receiver.each
+  end
+
+  # A timeout is any Numeric number of seconds (ADR 001, amendment of
+  # 2026-11-05: durations), a Rational included.
+  def test_a_rational_timeout_is_seconds
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    assert_raises(Receiver::RecvTimeoutError::Timeout) { receiver.recv_timeout(1/5r) }
+
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :>=, 0.2
+  end
+
+  # crossbeam's Debug for a receiver (channel.rs:1189-1193); inspect stays
+  # Ruby's.
+  def test_debug_is_crossbeams_and_inspect_rubys
+    assert_equal "Receiver { .. }", receiver.debug
+    assert_match(/\A#<Ferro::GlobalHotkey::GlobalHotKeyEventReceiver:0x\h+>\z/, receiver.inspect)
+    assert_equal "Receiver { .. }", receiver.dup.debug
+  end
+
   # crossbeam's Receiver is Clone (channel.rs:1174-1187): a copy reads the
   # same channel, and here it is as frozen and shareable as the receiver.
   def test_a_cloned_receiver_reads_the_same_channel

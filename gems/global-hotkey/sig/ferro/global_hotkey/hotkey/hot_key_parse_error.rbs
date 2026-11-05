@@ -6,17 +6,21 @@ module Ferro
     module Hotkey
       class HotKeyParseError < StandardError
         class UnsupportedKey < HotKeyParseError
+          include TupleVariant
         end
 
         class EmptyToken < HotKeyParseError
+          include TupleVariant
         end
 
         class InvalidFormat < HotKeyParseError
+          include TupleVariant
         end
       end
 
       class UnrecognizedCodeError < StandardError
         def initialize: (?String? message) -> void
+        def debug: () -> String
       end
     end
   end

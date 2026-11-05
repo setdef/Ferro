@@ -24,7 +24,9 @@ require "tmpdir"
 # process that sees only the gem and the gems it declares.
 #
 # Fast mode (the default gate) unpacks each gem and loads it with the
-# native extension the repository already compiled. Full mode installs the
+# native extension the repository already compiled, or, for a gem whose
+# development build has test hooks (Target#rebuild), with one compiled
+# from the package, so the hooks never reach the check. Full mode installs the
 # gems into an empty GEM_HOME, so RubyGems compiles every extension from the
 # packaged sources (Tokra's plan 017,
 # https://github.com/setdef/Tokra/blob/trunk/doc/contributors/plan/017.md).
@@ -46,7 +48,18 @@ class PackageCheck
   #   directory.
   # [reuse] Whether the package must pass <tt>reuse lint</tt> on its own,
   #   so it carries its licensing wherever it is unpacked.
-  class Target < Data.define(:name, :dir, :packaged, :generated, :crate, :extension, :smoke, :reuse)
+  # [rebuild] Whether fast mode compiles the extension again from the
+  #   package, with its extconf.rb given no options, as RubyGems compiles
+  #   it, instead of copying the repository's: true for a gem whose
+  #   development build has test hooks (FerroGem#test_hooks), which an
+  #   installed gem lacks unless the installer asks for them. False by default.
+  class Target < Data.define(:name, :dir, :packaged, :generated, :crate, :extension, :smoke, :reuse, :rebuild)
+    # Creates the description, copying the repository's extension unless
+    # +rebuild+ is given.
+    def initialize(rebuild: false, **fields)
+      super
+    end
+
     # The gemspec file name.
     def gemspec
       "#{name}.gemspec"
@@ -137,7 +150,7 @@ class PackageCheck
         verify_files(gem, unpacked[gem.name])
         verify_crate(gem, unpacked[gem.name], specs[gem.name])
         verify_licensing(gem, unpacked[gem.name])
-        copy_extension(gem, unpacked[gem.name])
+        gem.rebuild ? build_extension(gem, unpacked[gem.name], specs[gem.name], work) : copy_extension(gem, unpacked[gem.name])
       end
       env = isolated_env(File.join(work, "gems"))
       @gems.each do |gem|
@@ -277,6 +290,28 @@ class PackageCheck
 
     FileUtils.mkdir_p(File.dirname(File.join(dir, gem.extension_file)))
     FileUtils.cp(source, File.join(dir, gem.extension_file))
+  end
+
+  # Compiles the extension from the unpacked package as RubyGems does: its
+  # extconf.rb with no options, then make, in a build directory of its
+  # own. Cargo keeps the repository's target directory, so the
+  # dependencies the repository compiled are reused and only the gem's own
+  # crate compiles again.
+  private def build_extension(gem, dir, spec, work)
+    extconf = spec.extensions.first
+    raise Failure, "#{gem.name}: rebuild needs an extension and an extconf.rb" unless gem.extension && extconf
+
+    build = File.join(work, "build", gem.name)
+    FileUtils.mkdir_p(build)
+    env = { "RB_SYS_CARGO_PROFILE" => "release" }
+    run!(env, Gem.ruby, File.join(dir, extconf), chdir: build)
+    run!(env, ENV.fetch("MAKE", "make"), chdir: build)
+    built = File.join(build, File.basename(gem.extension_file))
+    raise Failure, "#{gem.name}: make built no #{File.basename(built)}" unless File.exist?(built)
+
+    FileUtils.mkdir_p(File.dirname(File.join(dir, gem.extension_file)))
+    FileUtils.cp(built, File.join(dir, gem.extension_file))
+    @out.puts "✅ #{gem.name}: the extension compiles from the package"
   end
 
   # Runs the require-all script, then the gem's smoke script, each in a

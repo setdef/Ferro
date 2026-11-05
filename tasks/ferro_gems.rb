@@ -31,11 +31,37 @@ require_relative "package_check"
 # [smoke] Ruby source the packaging check runs against the built gem.
 # [rbs_libraries] The standard libraries whose types the gem's signatures
 #   name, such as +ipaddr+ for ferro-url's IPAddr; none by default.
+# [test_hooks] Whether the crate has the TEST_HOOKS feature, the hooks its
+#   tests read inside the native layer; false by default.
+#
+# A gem with test hooks builds them only here (ADR 001, amendment of
+# 2026-11-05: test hooks). Its crate declares the feature, empty, in its
+# Cargo.toml; its extconf.rb adds it to rb_sys's features when given
+# <tt>--enable-test-hooks</tt>, which the compile tasks pass and RubyGems
+# does not unless the installer asks for it; Clippy and the Rust tests build it too, and Clippy also
+# builds without it; and the packaging check compiles the gem again from
+# its package, as an installed gem is, rather than load the repository's
+# build with its hooks.
 class FerroGem < Data.define(:short_name, :name, :crate, :extension, :packaged, :native_namespace,
-  :platform_sigs, :platform_probe, :smoke, :rbs_libraries)
-  # Creates the description, with no standard libraries unless given.
-  def initialize(rbs_libraries: [], **fields)
+  :platform_sigs, :platform_probe, :smoke, :rbs_libraries, :test_hooks)
+  # The Cargo feature that gates a gem's test hooks.
+  TEST_HOOKS = "test-hooks"
+
+  # Creates the description, with no standard libraries and no test hooks
+  # unless given.
+  def initialize(rbs_libraries: [], test_hooks: false, **fields)
     super
+  end
+
+  # The cargo arguments that build the test hooks, if the gem has them.
+  def test_hooks_features
+    test_hooks ? ["--features", TEST_HOOKS] : []
+  end
+
+  # The extconf.rb arguments that build the test hooks, if the gem has
+  # them.
+  def test_hooks_config
+    test_hooks ? ["--enable-#{TEST_HOOKS}"] : []
   end
 
   # The arguments of <tt>rbs validate</tt> for +gems+: every standard
@@ -104,7 +130,8 @@ class FerroGem < Data.define(:short_name, :name, :crate, :extension, :packaged, 
 
   # The gem as the packaging check describes it.
   def package_target
-    PackageCheck::Target.new(name:, dir:, packaged:, generated: [], crate:, extension:, smoke:, reuse: true)
+    PackageCheck::Target.new(name:, dir:, packaged:, generated: [], crate:, extension:, smoke:, reuse: true,
+      rebuild: test_hooks)
   end
 
   # The platform the compiled extension was built for, read from the
@@ -222,6 +249,7 @@ FERRO_GEMS = [
     native_namespace: "Ferro::GlobalHotkey",
     platform_sigs: {},
     platform_probe: %(require "ferro/global_hotkey"; print Ferro::GlobalHotkey.const_get(:PLATFORM)),
+    test_hooks: true,
     smoke: <<~RUBY),
       require "ferro/global_hotkey"
       # Registering a hotkey takes it from every other program, so the
@@ -235,6 +263,9 @@ FERRO_GEMS = [
         abort "an event arrived with no hotkey registered"
       rescue Ferro::GlobalHotkey::GlobalHotKeyEventReceiver::TryRecvError::Empty
       end
+      # The package is built without the hooks the repository's tests
+      # read; a build with them defines Native::TEST_HOOKS.
+      abort "the package has test hooks" if Ferro::GlobalHotkey.const_get(:Native).const_defined?(:TEST_HOOKS)
       puts "ferro-global-hotkey \#{Ferro::GlobalHotkey::VERSION} loads its extension (\#{hotkey.class})"
     RUBY
   FerroGem.new(

@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+module Ferro
+  module GlobalHotkey
+    module TupleVariant : Exception
+      type field = String | Hotkey::HotKey | SystemCallError | IOError
+
+      @field: field?
+
+      def initialize: (?String? message, ?field? field) -> void
+      def deconstruct: () -> [field?]
+      def to_a: () -> [field?]
+      def debug: () -> String
+
+      private def native_field: () -> (String | parts | [Integer?, String?] | SystemCallError | IOError | nil)
+    end
+
+    private def self.variant_path: (Exception error) -> String
+  end
+end

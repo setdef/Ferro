@@ -79,9 +79,13 @@ class KeyboardTypesCodes
     variants.each_with_index.map do |variant, index|
       docs = variant.docs.map { |line| rdoc(line) }
       docs = ["The key whose W3C code value is +#{variant.name}+; keyboard-types describes it no further."] if docs.empty?
+      # A deprecated variant is bound, since Tauri re-exports Code whole and
+      # global-hotkey's parser returns one, but kept out of the documented
+      # API (ADR 001, amendment of 2026-11-05: hidden and deprecated items).
       docs += ["", "Deprecated: #{variant.deprecated}."] if variant.deprecated
       comment = docs.map { |line| line.empty? ? "        #" : "        # #{line}" }.join("\n")
-      "#{comment}\n        #{variant.name} = new(:#{variant.name}, #{index})\n"
+      nodoc = variant.deprecated ? " # :nodoc:" : ""
+      "#{comment}\n        #{variant.name} = new(:#{variant.name}, #{index})#{nodoc}\n"
     end.join("\n")
   end
 
@@ -98,7 +102,7 @@ class KeyboardTypesCodes
     File.write(File.join(root, TARGET), render(variants(File.read(File.join(dir, "src/code.rs"))), version))
   end
 
-  HEAD = <<~'RUBY'
+  HEAD = <<~RUBY
     # frozen_string_literal: true
 
     #--
@@ -168,13 +172,26 @@ class KeyboardTypesCodes
               @name.to_s
             end
 
-            # The constant that holds this code.
+            # keyboard-types' derived +Debug+ text for this code, formatted
+            # by Rust: the variant's name (<tt>src/code.rs:22</tt>).
+            # +inspect+ stays Ruby's.
             #
             # === Example
             #
-            #   Ferro::GlobalHotkey::Hotkey::Code::KeyA.inspect # => "Ferro::GlobalHotkey::Hotkey::Code::KeyA"
-            def inspect
-              "Ferro::GlobalHotkey::Hotkey::Code::#{@name}"
+            #   Ferro::GlobalHotkey::Hotkey::Code::KeyA.debug # => "KeyA"
+            def debug
+              Native.code_debug(@name.to_s)
+            end
+
+            # The code's integer value, Rust's <tt>Code::KeyA as u32</tt>: its
+            # place in keyboard-types' list, which global-hotkey puts in the
+            # low bits of every HotKey#id.
+            #
+            # === Example
+            #
+            #   Ferro::GlobalHotkey::Hotkey::Code::KeyA.to_i # => 19
+            def to_i
+              @index
             end
 
             # Orders codes as keyboard-types derives +Ord+: by their place in
@@ -186,7 +203,7 @@ class KeyboardTypesCodes
             #
             #   Ferro::GlobalHotkey::Hotkey::Code::KeyA <=> Ferro::GlobalHotkey::Hotkey::Code::KeyB # => -1
             def <=>(other)
-              @index <=> other.index if other.is_a?(Code)
+              @index <=> other.to_i if other.is_a?(Code)
             end
 
             # The code's name, for Marshal: a dumped code loads as the same
@@ -209,9 +226,6 @@ class KeyboardTypesCodes
             def self._load(name)
               from_str(name)
             end
-
-            # The code's place in keyboard-types' list.
-            protected attr_reader :index
 
             # The Code named +string+, by keyboard-types' +FromStr+: its exact
             # W3C name, such as <tt>"KeyA"</tt>. Anything else raises

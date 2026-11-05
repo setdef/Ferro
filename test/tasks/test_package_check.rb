@@ -56,9 +56,9 @@ class TestPackageCheck < Minitest::Test
   end
 
   private def target(name: "fixture", smoke: %(require "fixture"\nputs Fixture::PART\n), packaged: ["lib"],
-    generated: [], crate: nil, extension: nil, reuse: false
+    generated: [], crate: nil, extension: nil, reuse: false, rebuild: false
   )
-    PackageCheck::Target.new(name:, dir: name, packaged:, generated:, crate:, extension:, smoke:, reuse:)
+    PackageCheck::Target.new(name:, dir: name, packaged:, generated:, crate:, extension:, smoke:, reuse:, rebuild:)
   end
 
   private def check(*gems)
@@ -200,6 +200,29 @@ class TestPackageCheck < Minitest::Test
     check(target(extension: "lib/fixture/native", smoke:))
 
     assert_includes @out.string, "✅ fixture: compiled"
+  end
+
+  # A gem whose repository build has test hooks is compiled again from its
+  # package, with no extconf.rb options, as RubyGems compiles it, so the
+  # check never loads the repository's build. The fixture's extconf.rb
+  # writes a Makefile whose build records the options it was given.
+  def test_a_rebuilt_extension_compiles_from_the_package_without_options
+    skip "make is not installed" unless system("make", "--version", out: File::NULL, err: File::NULL)
+
+    dlext = RbConfig::CONFIG["DLEXT"]
+    write("fixture/lib/fixture/native.#{dlext}", "the repository's build\n")
+    write("fixture/fixture.gemspec", gemspec("fixture").sub(%(spec.license = "MIT"), %(spec.license = "MIT"\n  spec.extensions = ["ext/fixture/extconf.rb"])))
+    write("fixture/ext/fixture/extconf.rb", <<~RUBY)
+      File.write("built.txt", "rebuilt with \#{ARGV.inspect}\\n")
+      File.write("Makefile", "all:\\n\\tcp built.txt native.#{dlext}\\n")
+    RUBY
+    git("add", ".")
+    smoke = %(puts File.read(File.join(ARGV[0], "lib/fixture/native.#{dlext}")))
+
+    check(target(packaged: %w[lib ext], extension: "lib/fixture/native", smoke:, rebuild: true))
+
+    assert_includes @out.string, "✅ fixture: the extension compiles from the package"
+    assert_includes @out.string, "✅ fixture: rebuilt with []"
   end
 
   def test_a_missing_compiled_extension_fails

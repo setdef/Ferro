@@ -46,13 +46,27 @@ module Ferro
         freeze
       end
 
-      # The constant that holds this state.
+      # global-hotkey's derived +Debug+ text for this state, formatted by
+      # Rust: the variant's name. +inspect+ stays Ruby's.
+      #
+      # Mirrors global-hotkey's derived +Debug+ (<tt>src/lib.rs:63</tt>).
       #
       # === Example
       #
-      #   Ferro::GlobalHotkey::HotKeyState::Pressed.inspect # => "Ferro::GlobalHotkey::HotKeyState::Pressed"
-      def inspect
-        "Ferro::GlobalHotkey::HotKeyState::#{@name}"
+      #   Ferro::GlobalHotkey::HotKeyState::Pressed.debug # => "Pressed"
+      def debug
+        Native.state_debug(@name)
+      end
+
+      # The state's integer value, Rust's <tt>HotKeyState::Released as
+      # u32</tt>: its place in global-hotkey's declaration, Pressed 0 and
+      # Released 1.
+      #
+      # === Example
+      #
+      #   Ferro::GlobalHotkey::HotKeyState::Released.to_i # => 1
+      def to_i
+        @index
       end
 
       # Orders the states as global-hotkey derives +Ord+: Pressed, then
@@ -64,7 +78,7 @@ module Ferro
       #
       #   Ferro::GlobalHotkey::HotKeyState::Pressed < Ferro::GlobalHotkey::HotKeyState::Released # => true
       def <=>(other)
-        @index <=> other.index if other.is_a?(HotKeyState)
+        @index <=> other.to_i if other.is_a?(HotKeyState)
       end
 
       # The state's name, for Marshal: a dumped state loads as the same
@@ -91,9 +105,6 @@ module Ferro
         else raise ArgumentError, "no HotKeyState named #{name.inspect}"
         end
       end
-
-      # The state's place in global-hotkey's declaration.
-      protected attr_reader :index
 
       # The hotkey is pressed (the key is down).
       Pressed = new(:Pressed, 0)

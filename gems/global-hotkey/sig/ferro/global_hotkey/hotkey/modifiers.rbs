@@ -22,7 +22,6 @@ module Ferro
         HYPER: Modifiers
         SUPER: Modifiers
         FLAGS: Array[Flag]
-        ALL_BITS: Integer
 
         class Flag < Data
           attr_reader name: String
@@ -33,6 +32,7 @@ module Ferro
 
           def is_named: () -> bool
           def is_unnamed: () -> bool
+          def debug: () -> String
         end
 
         attr_reader bits: Integer
@@ -40,6 +40,8 @@ module Ferro
         private def self.new: (Integer bits) -> instance
 
         def self.empty: () -> Modifiers
+        ALL: Modifiers
+
         def self.all: () -> Modifiers
         def self.default: () -> Modifiers
         def self.from_bits: (Integer bits) -> Modifiers?
@@ -66,8 +68,10 @@ module Ferro
         def ^: (Modifiers other) -> Modifiers
         def complement: () -> Modifiers
         def ~: () -> Modifiers
-        def iter: () -> Array[Modifiers]
-        def iter_names: () -> Array[[String, Modifiers]]
+        def iter: () -> Enumerator[Modifiers, void]
+        def each: () { (Modifiers flag) -> void } -> void
+                | () -> Enumerator[Modifiers, void]
+        def iter_names: () -> Enumerator[[String, Modifiers], void]
         def shift: () -> bool
         def ctrl: () -> bool
         def alt: () -> bool
@@ -75,7 +79,7 @@ module Ferro
         def <=>: (Object other) -> Integer?
         def eql?: (Object other) -> bool
         def hash: () -> Integer
-        def inspect: () -> String
+        def debug: () -> String
 
         private
 

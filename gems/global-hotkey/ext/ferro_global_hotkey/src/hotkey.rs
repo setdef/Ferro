@@ -141,10 +141,79 @@ pub fn modifiers_from_name(name: RString) -> Result<Option<u32>, Error> {
     Ok(Modifiers::from_name(&name.to_string()?).map(|flag| flag.bits()))
 }
 
+/// The `Debug` keyboard-types derives for the `Code` named `name`
+/// (`src/code.rs:22`): the variant's name.
+pub fn code_debug(ruby: &Ruby, name: RString) -> Result<String, Error> {
+    code(&name.to_string()?)
+        .map(|found| format!("{found:?}"))
+        .map_err(|failure| Error::new(ruby.exception_type_error(), failure.message))
+}
+
+/// The `Debug` global-hotkey derives for the `HotKey` literal `parts`
+/// (`src/hotkey.rs:51`).
+pub fn hotkey_debug(ruby: &Ruby, parts: Parts) -> Result<String, Error> {
+    hotkey(parts)
+        .map(|found| format!("{found:?}"))
+        .map_err(|failure| Error::new(ruby.exception_type_error(), failure.message))
+}
+
+/// The `Debug` bitflags derives for its `Flag` (bitflags 2.13.2
+/// `src/traits.rs:13`), for a flag of `Modifiers` named `name` with
+/// `bits`. `Flag::new` takes a `&'static str`, which a Ruby string is
+/// not, so this writes the fields with the formatter's `debug_struct`, as
+/// the derive does; `flag_debug_is_bitflags_derived_debug` checks the two
+/// agree for every flag of the table.
+pub fn flag_debug(name: RString, bits: u32) -> Result<String, Error> {
+    Ok(flag_text(&name.to_string()?, bits))
+}
+
+/// `flag_debug` for a Rust string.
+fn flag_text(name: &str, bits: u32) -> String {
+    format!("{:?}", FlagText(name, Modifiers::from_bits_retain(bits)))
+}
+
+/// A flag's name and value, written as `#[derive(Debug)]` writes
+/// `Flag { name, value }`.
+struct FlagText<'a>(&'a str, Modifiers);
+
+impl std::fmt::Debug for FlagText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Flag")
+            .field("name", &self.0)
+            .field("value", &self.1)
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{code, code_count, hotkey, modifier_flags, modifiers_debug, parts};
+    use super::{code, code_count, flag_text, hotkey, modifier_flags, modifiers_debug, parts};
     use global_hotkey::hotkey::{Code, HotKey, Modifiers};
+
+    #[test]
+    fn flag_debug_is_bitflags_derived_debug() {
+        use bitflags::Flags;
+        for flag in Modifiers::FLAGS {
+            assert_eq!(
+                flag_text(flag.name(), flag.value().bits()),
+                format!("{flag:?}")
+            );
+        }
+        assert_eq!(
+            flag_text("SHIFT", 0x200),
+            "Flag { name: \"SHIFT\", value: Modifiers(SHIFT) }"
+        );
+    }
+
+    #[test]
+    fn a_hotkeys_debug_is_global_hotkeys() {
+        let hotkey = HotKey::new(Some(Modifiers::SHIFT), Code::KeyD);
+        assert_eq!(
+            format!("{hotkey:?}"),
+            "HotKey { mods: Modifiers(SHIFT), key: KeyD, id: 33554454 }"
+        );
+        assert_eq!(format!("{:?}", Code::KeyD), "KeyD");
+    }
 
     #[test]
     fn parts_round_trip_to_the_same_literal() {

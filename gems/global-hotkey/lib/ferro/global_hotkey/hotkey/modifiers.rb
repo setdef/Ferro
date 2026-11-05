@@ -46,7 +46,7 @@ module Ferro
       #   mods = Ferro::GlobalHotkey::Hotkey::Modifiers
       #   both = mods::SHIFT | mods::CONTROL
       #   both.contains(mods::SHIFT) # => true
-      #   both.inspect # => "Ferro::GlobalHotkey::Hotkey::Modifiers(CONTROL | SHIFT)"
+      #   both.debug # => "Modifiers(CONTROL | SHIFT)"
       #   (both - mods::SHIFT) == mods::CONTROL # => true
       #   mods.from_bits(0x8) # => mods::CONTROL
       class Modifiers
@@ -98,6 +98,21 @@ module Ferro
           def is_unnamed
             name.empty?
           end
+
+          # bitflags' derived +Debug+ text for the flag, formatted by Rust:
+          # <tt>Flag { name: "ALT", value: Modifiers(ALT) }</tt>
+          # (<tt>src/traits.rs:13</tt>). +inspect+ stays Data's.
+          #
+          # === Example
+          #
+          #   Ferro::GlobalHotkey::Hotkey::Modifiers::FLAGS.first.debug
+          #   # => "Flag { name: \"ALT\", value: Modifiers(ALT) }"
+          def debug
+            flag = value
+            raise TypeError, "wrong argument type #{flag.class} (expected #{Modifiers})" unless flag.is_a?(Modifiers)
+
+            Native.flag_debug(name, flag.bits)
+          end
         end
 
         # An Alt key, or Option on a Mac.
@@ -138,10 +153,15 @@ module Ferro
         SYMBOL_LOCK = new(0x800)
 
         # Hyper. Deprecated: marked as legacy in the spec, use META instead.
-        HYPER = new(0x1000)
+        # Bound because Tauri re-exports Modifiers whole, but not part of
+        # the documented API (ADR 001, amendment of 2026-11-05: hidden and
+        # deprecated items).
+        HYPER = new(0x1000) # :nodoc:
 
         # Super. Deprecated: marked as legacy in the spec, use META instead.
-        SUPER = new(0x2000)
+        # Bound because Tauri re-exports Modifiers whole, but not part of
+        # the documented API.
+        SUPER = new(0x2000) # :nodoc:
 
         # Every flag keyboard-types defines, in declaration order, as
         # bitflags' <tt>Flags::FLAGS</tt> lists them
@@ -168,11 +188,12 @@ module Ferro
           Flag.new("SUPER", SUPER),
         ])
 
-        # Every known bit.
-        ALL_BITS = FLAGS.sum { |flag| flag.value.bits }
-        private_constant :ALL_BITS
-
         deprecate_constant :HYPER, :SUPER
+
+        # Every known flag, computed once and frozen, which Modifiers.all
+        # returns.
+        ALL = new(FLAGS.sum { |flag| flag.value.bits })
+        private_constant :ALL
 
         class << self
           # No flags. Mirrors bitflags' +empty+.
@@ -190,7 +211,7 @@ module Ferro
           #
           #   Ferro::GlobalHotkey::Hotkey::Modifiers.all.bits # => 16383
           def all
-            new(ALL_BITS)
+            ALL
           end
 
           # Every named flag, which is every flag here. Mirrors bitflags'
@@ -220,7 +241,7 @@ module Ferro
           #   Ferro::GlobalHotkey::Hotkey::Modifiers.from_bits(0x10000) # => nil
           def from_bits(bits)
             value = new(bits)
-            value if value.bits.nobits?(~ALL_BITS)
+            value if value.bits.nobits?(~all.bits)
           end
 
           # The value for +bits+, dropping any bit that names no flag.
@@ -230,7 +251,7 @@ module Ferro
           #
           #   Ferro::GlobalHotkey::Hotkey::Modifiers.from_bits_truncate(0x10008).bits # => 8
           def from_bits_truncate(bits)
-            new(new(bits).bits & ALL_BITS)
+            new(new(bits).bits & all.bits)
           end
 
           # The value for +bits+, keeping every bit, known or not. Mirrors
@@ -270,7 +291,7 @@ module Ferro
         #
         #   Ferro::GlobalHotkey::Hotkey::Modifiers.all.is_all # => true
         def is_all
-          @bits.allbits?(ALL_BITS)
+          @bits.allbits?(Modifiers.all.bits)
         end
 
         # The bits set here that name a flag. Mirrors bitflags'
@@ -280,7 +301,7 @@ module Ferro
         #
         #   Ferro::GlobalHotkey::Hotkey::Modifiers.from_bits_retain(0x10200).known_bits # => 512
         def known_bits
-          @bits & ALL_BITS
+          @bits & Modifiers.all.bits
         end
 
         # The bits set here that name no flag. Mirrors bitflags'
@@ -290,7 +311,7 @@ module Ferro
         #
         #   Ferro::GlobalHotkey::Hotkey::Modifiers.from_bits_retain(0x10200).unknown_bits # => 65536
         def unknown_bits
-          @bits & ~ALL_BITS & 0xFFFF_FFFF
+          @bits & ~Modifiers.all.bits & 0xFFFF_FFFF
         end
 
         # Whether any bit is set that names no flag. Mirrors bitflags'
@@ -387,31 +408,50 @@ module Ferro
         #
         #   (~mods::all).is_empty # => true
         def complement
-          Modifiers.from_bits_retain(~@bits & ALL_BITS)
+          Modifiers.from_bits_retain(~@bits & Modifiers.all.bits)
         end
         alias ~ complement
 
-        # Each flag set here, as a Modifiers, in declaration order, then
-        # the bits that name no flag, if any, as one more. Mirrors
-        # bitflags' +iter+.
+        # An Enumerator over each flag set here, as a Modifiers, in
+        # declaration order, then the bits that name no flag, if any, as
+        # one more. Mirrors bitflags' +iter+, which returns an iterator.
         #
         # === Example
         #
-        #   (mods::SHIFT | mods::ALT).iter # => [mods::ALT, mods::SHIFT]
+        #   (mods::SHIFT | mods::ALT).iter.to_a # => [mods::ALT, mods::SHIFT]
         def iter
-          named, remaining = names_and_remaining
-          flags = named.map(&:last)
-          remaining.zero? ? flags : [*flags, Modifiers.from_bits_retain(remaining)]
+          Enumerator.new do |flags|
+            named, remaining = names_and_remaining
+            named.each { |_name, flag| flags << flag }
+            flags << Modifiers.from_bits_retain(remaining) unless remaining.zero?
+          end
         end
 
-        # Each flag set here with its name, in declaration order. Bits that
-        # name no flag are left out. Mirrors bitflags' +iter_names+.
+        # Yields each flag iter yields; without a block, returns iter's
+        # Enumerator. Mirrors bitflags' +IntoIterator+ for the flags type
+        # (bitflags 2.13.2 <tt>src/public.rs:326-335</tt>), whose iterator
+        # is +iter+'s.
         #
         # === Example
         #
-        #   (mods::SHIFT | mods::ALT).iter_names # => [["ALT", mods::ALT], ["SHIFT", mods::SHIFT]]
+        #   (mods::SHIFT | mods::ALT).each { |flag| p flag.debug }
+        def each(&block)
+          return iter unless block
+
+          iter.each(&block)
+        end
+
+        # An Enumerator over each flag set here with its name, in
+        # declaration order. Bits that name no flag are left out. Mirrors
+        # bitflags' +iter_names+, which returns an iterator.
+        #
+        # === Example
+        #
+        #   (mods::SHIFT | mods::ALT).iter_names.to_a # => [["ALT", mods::ALT], ["SHIFT", mods::SHIFT]]
         def iter_names
-          names_and_remaining.first
+          Enumerator.new do |pairs|
+            names_and_remaining.first.each { |pair| pairs << pair }
+          end
         end
 
         # Whether a Shift key is pressed. Mirrors keyboard-types'
@@ -486,16 +526,15 @@ module Ferro
           [Modifiers, @bits].hash
         end
 
-        # bitflags' +Debug+ text, with this class's Ruby path:
-        # <tt>...::Modifiers(CONTROL | SHIFT)</tt>, <tt>...::Modifiers(0x0)</tt>
-        # when empty, and unknown bits in hex.
+        # bitflags' +Debug+ text, formatted by Rust:
+        # <tt>Modifiers(CONTROL | SHIFT)</tt>, <tt>Modifiers(0x0)</tt> when
+        # empty, and unknown bits in hex. +inspect+ stays Ruby's.
         #
         # === Example
         #
-        #   Ferro::GlobalHotkey::Hotkey::Modifiers::SHIFT.inspect
-        #   # => "Ferro::GlobalHotkey::Hotkey::Modifiers(SHIFT)"
-        def inspect
-          Native.modifiers_debug(@bits).sub(/\AModifiers/, "Ferro::GlobalHotkey::Hotkey::Modifiers")
+        #   Ferro::GlobalHotkey::Hotkey::Modifiers::SHIFT.debug # => "Modifiers(SHIFT)"
+        def debug
+          Native.modifiers_debug(@bits)
         end
 
         # bitflags' name iterator (bitflags 2.13.2 <tt>src/iter.rs</tt>): a

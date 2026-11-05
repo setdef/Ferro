@@ -59,7 +59,7 @@ class TestWindowsEvents < Minitest::Test
       end
     end
     manager.unregister(hotkey)
-    [sent, inputs.size, hotkey.id, events.map { |event| [event.id, event.state.inspect] }]
+    [sent, inputs.size, hotkey.id, events.map { |event| [event.id, event.state.debug] }]
   RUBY
 
   def test_sendinput_delivers_the_press_and_the_release
@@ -69,7 +69,7 @@ class TestWindowsEvents < Minitest::Test
     skip "SendInput injected #{sent} of #{wanted} inputs: no interactive desktop" unless sent == wanted
     skip "SendInput injected every input, but no WM_HOTKEY arrived in 10 s: this desktop does not deliver hotkeys" if events.empty?
 
-    assert_equal [[id, "Ferro::GlobalHotkey::HotKeyState::Pressed"], [id, "Ferro::GlobalHotkey::HotKeyState::Released"]],
+    assert_equal [[id, "Pressed"], [id, "Released"]],
       events
   end
 end

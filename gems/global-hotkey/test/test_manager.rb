@@ -71,7 +71,7 @@ class TestManager < Minitest::Test
       assert_equal "Unable to register hotkey: RegisterEventHotKey failed for F19", error.message
     else
       error = assert_raises(Error::AlreadyRegistered) { @manager.register(hotkey) }
-      assert_equal hotkey, error.hotkey
+      assert_equal [hotkey], error.to_a
       assert_match(/\AHotKey already registered: HotKey \{ mods: Modifiers\(/, error.message)
     end
   end
@@ -91,6 +91,9 @@ class TestManager < Minitest::Test
       error = assert_raises(Error::FailedToRegister) { register(unusual(Code::Fn)) }
       assert_equal "Unable to register hotkey: Unknown scancode for key: Fn", error.message
     end
+    # The variant's String, by position (src/error.rs:23-24).
+    assert_equal [error.message.delete_prefix("Unable to register hotkey: ")], error.to_a
+    assert_equal "FailedToRegister(#{error.to_a.first.dump})", error.debug
   end
 
   # Unregistering a hotkey nobody registered: macOS and Linux find nothing
@@ -100,7 +103,7 @@ class TestManager < Minitest::Test
 
     if PLATFORM == :windows
       error = assert_raises(Error::FailedToUnRegister) { @manager.unregister(hotkey) }
-      assert_equal hotkey, error.hotkey
+      assert_equal [hotkey], error.to_a
     else
       assert_nil @manager.unregister(hotkey)
     end
@@ -113,8 +116,9 @@ class TestManager < Minitest::Test
 
     error = assert_raises(Error::OsError) { GlobalHotkey::GlobalHotKeyManager.new }
     assert_match(/\(os error \d+\)\z/, error.message)
-    assert_kind_of SystemCallError, error.io_error
-    assert_equal error.message[/\(os error (\d+)\)\z/, 1].to_i, error.io_error.errno
+    io_error, = error.to_a
+    assert_kind_of SystemCallError, io_error
+    assert_equal error.message[/\(os error (\d+)\)\z/, 1].to_i, io_error.errno
   end
 
   # A manager the garbage collector frees runs global-hotkey's Drop, which
@@ -213,7 +217,7 @@ class TestManager < Minitest::Test
     other = GlobalHotkey::GlobalHotKeyManager.new
 
     error = assert_raises(Error::AlreadyRegistered) { other.register(hotkey) }
-    assert_equal hotkey, error.hotkey
+    assert_equal [hotkey], error.to_a
   end
 
   # Without an X server global-hotkey's thread stops at once, and every

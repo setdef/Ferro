@@ -25,7 +25,7 @@ class TestLinuxEvents < Minitest::Test
       system("xdotool", "key", "--delay", "100", "ctrl+alt+shift+F24") or raise "xdotool failed"
     end
     def described(events)
-      events.map { |event| [event.id, event.state.inspect] }
+      events.map { |event| [event.id, event.state.debug] }
     end
   RUBY
 
@@ -39,7 +39,7 @@ class TestLinuxEvents < Minitest::Test
   end
 
   private def press_and_release(id)
-    [[id, "Ferro::GlobalHotkey::HotKeyState::Pressed"], [id, "Ferro::GlobalHotkey::HotKeyState::Released"]]
+    [[id, "Pressed"], [id, "Released"]]
   end
 
   def test_the_receiver_gets_the_press_and_the_release

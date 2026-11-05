@@ -63,6 +63,39 @@ citing the crate function it calls.
 - Code Ruby cannot reach (panic capture, a pure conversion) gets a Rust
   unit test.
 
+### Test hooks
+
+A test sometimes needs a probe inside the native layer, such as how many
+events wait in a channel. The crate has no such method and a gem adds
+nothing its crate lacks (ADR 001, amendment of 2026-11-05: test hooks), so
+the hook exists only in the repository's own build. global-hotkey is the
+model (plan 004, Follow-up: ADR 001's rulings):
+
+- `Cargo.toml` of the extension declares an empty feature,
+  `test-hooks = []`, and the Rust code gates each hook behind
+  `#[cfg(feature = "test-hooks")]`. The hooks are private singleton
+  methods of `Native` (`define_private_method` on its singleton class), so
+  `rbs:parity` and the shipped signatures never see them. The same block
+  sets a `Native::TEST_HOOKS` constant, which marks a build that has them.
+- `extconf.rb` adds the feature with
+  `r.features += ["test-hooks"] if enable_config("test-hooks", false)`.
+  The Make variable alone cannot add a feature; rb_sys passes
+  `--features` only when the list is not empty.
+- The gem's `FerroGem` in `tasks/ferro_gems.rb` says `test_hooks: true`.
+  The compile tasks then pass `--enable-test-hooks` to extconf.rb through
+  rake-compiler's `config_options`, Clippy runs with and without the
+  feature, and the Rust tests run with it.
+- The hooks are off unless the installer passes `--enable-test-hooks`
+  (`gem install -- --enable-test-hooks`, a Bundler build config, or
+  `CONFIGURE_ARGS`), which only the repository's own build does. The
+  packaging check therefore compiles such a gem's extension again from the
+  unpacked package, with no options, reusing the shared target directory
+  (`PackageCheck::Target#rebuild`), and the gem's smoke script aborts if
+  `Native.const_defined?(:TEST_HOOKS)`. Add that check to a new gem's
+  smoke script.
+- A test that uses a hook says so and notes that the hook exists only in
+  the repository's build.
+
 ## 5. Guard the boundary
 
 Work through [references/parity-checklist.md](references/parity-checklist.md).
