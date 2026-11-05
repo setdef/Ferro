@@ -167,6 +167,7 @@ FERRO_GEMS = [
       "windows" => "sig/ferro/arboard/windows.rbs",
     },
     platform_probe: %(require "ferro/arboard"; print Ferro::Arboard.const_get(:PLATFORM)),
+    test_hooks: true,
     smoke: <<~RUBY),
       require "ferro/arboard"
       %i[get_text set_text set_html get_image set_image clear clear_with get set].each do |name|
@@ -186,6 +187,9 @@ FERRO_GEMS = [
         rescue Ferro::Arboard::Error::ConversionFailure
         end
       end
+      # The package is built without the hooks the repository's tests
+      # read; a build with them defines Native::TEST_HOOKS.
+      abort "the package has test hooks" if Ferro::Arboard.const_get(:Native).const_defined?(:TEST_HOOKS)
       puts "ferro-arboard \#{Ferro::Arboard::VERSION} loads its extension (\#{clipboard.class})"
     RUBY
   FerroGem.new(
@@ -229,6 +233,7 @@ FERRO_GEMS = [
       "windows" => %w[sig/ferro/notify_rust/windows.rbs sig/ferro/notify_rust/deref.rbs],
     },
     platform_probe: %(require "ferro/notify_rust"; print Ferro::NotifyRust.const_get(:PLATFORM)),
+    test_hooks: true,
     smoke: <<~RUBY),
       require "ferro/notify_rust"
       # Showing a notification needs a desktop, so the smoke test shows
@@ -238,6 +243,9 @@ FERRO_GEMS = [
       notification = Ferro::NotifyRust::Notification.new.summary("Smoke").action("ok", "OK")
       abort "notify-rust did not see the summary: \#{notification.inspect}" unless notification.summary == "Smoke"
       abort "notify-rust did not parse an urgency" unless Ferro::NotifyRust::Urgency.try_from("High") == Ferro::NotifyRust::Urgency::Critical
+      # The package is built without the hooks the repository's tests
+      # read; a build with them defines Native::TEST_HOOKS.
+      abort "the package has test hooks" if Ferro::NotifyRust.const_get(:Native).const_defined?(:TEST_HOOKS)
       puts "ferro-notify-rust \#{Ferro::NotifyRust::VERSION} loads its extension (\#{notification.class})"
     RUBY
   FerroGem.new(
@@ -302,6 +310,7 @@ FERRO_GEMS = [
     platform_sigs: {},
     rbs_libraries: %w[ipaddr socket],
     platform_probe: %(require "ferro/url"; print "any"),
+    test_hooks: true,
     smoke: <<~RUBY),
       require "ferro/url"
       # url is pure computation, so the smoke test runs it: a parse, a
@@ -320,6 +329,9 @@ FERRO_GEMS = [
         abort "a backward slice reached Rust"
       rescue RangeError
       end
+      # The package is built without the hooks the repository's tests
+      # read; a build with them defines Native::TEST_HOOKS.
+      abort "the package has test hooks" if Ferro::Url.const_get(:Native).const_defined?(:TEST_HOOKS)
       puts "ferro-url \#{Ferro::Url::VERSION} loads its extension (\#{url})"
     RUBY
   FerroGem.new(

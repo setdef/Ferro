@@ -90,9 +90,24 @@ pub(crate) fn path_from_ruby(path: Value) -> Result<PathBuf, Error> {
 }
 
 /// `Native.gvl_releases`: how many calls have run with the GVL released
-/// (`gvl::RELEASES`), for the tests that check which calls release it.
+/// (`gvl::RELEASES`), for the tests that check which calls release it. A
+/// hook: only a build with the `test-hooks` feature has it (`Cargo.toml`).
+#[cfg(feature = "test-hooks")]
 fn gvl_releases() -> usize {
     gvl::RELEASES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The test hooks, private singleton methods of `Native` that only a build
+/// with the `test-hooks` feature has (`Cargo.toml`), so a gem built without
+/// the option has none, and `rbs:parity` needs no signature for them.
+/// `Native::TEST_HOOKS` marks such a build, so the packaging check refuses
+/// any package that has it.
+#[cfg(feature = "test-hooks")]
+fn define_test_hooks(native: magnus::RModule) -> Result<(), Error> {
+    native.const_set("TEST_HOOKS", true)?;
+    let hooks = native.singleton_class()?;
+    hooks.define_private_method("gvl_releases", function!(gvl_releases, 0))?;
+    Ok(())
 }
 
 #[magnus::init]
@@ -178,7 +193,8 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         function!(values::server_information_debug, 4),
     )?;
     native.define_singleton_method("error_debug", function!(error::error_debug, 2))?;
-    native.define_singleton_method("gvl_releases", function!(gvl_releases, 0))?;
+    #[cfg(feature = "test-hooks")]
+    define_test_hooks(native)?;
 
     notification::define(ruby, notify_rust)?;
     platform::define(ruby, notify_rust, native)

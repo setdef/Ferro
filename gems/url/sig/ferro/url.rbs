@@ -30,10 +30,6 @@ module Ferro
       def self.url_query_pairs: (Url url) -> Parse
       def self.url_socket_addrs_asks_for_port: (Url url) -> bool
       def self.url_socket_addrs: (Url url, Integer? default_port) -> Array[address]
-      def self.gvl_releases: () -> Integer
-      def self.gvl_fallbacks: () -> Integer
-      def self.gvl_hold_lookups: (bool held) -> bool
-      def self.gvl_refuse_threads: (bool refused) -> bool
       def self.url_set_option_str: (Url url, :set_fragment | :set_query name, String? value) -> nil
       def self.url_set_path: (Url url, String path) -> nil
       def self.url_set_port: (Url url, Integer? port) -> nil

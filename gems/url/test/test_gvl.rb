@@ -21,22 +21,27 @@ require "test_helper"
 # would, so the lookup runs on the calling thread. Both switches are
 # global, so each test that sets one runs in a child Ruby, which a
 # deadlock cannot outlive (UrlSuite#in_child).
+#
+# The native hooks (gvl_releases, gvl_fallbacks, gvl_hold_lookups,
+# gvl_refuse_threads) are private singleton methods of Native that exist
+# only in the repository's build (the test-hooks feature, ADR 001,
+# amendment of 2026-11-05: test hooks); the packaged gem has none.
 class TestGvl < Minitest::Test
   include UrlSuite
 
   NATIVE = Ferro::Url.const_get(:Native)
 
   private def releases
-    before = NATIVE.gvl_releases
+    before = NATIVE.__send__(:gvl_releases)
     yield
-    NATIVE.gvl_releases - before
+    NATIVE.__send__(:gvl_releases) - before
   end
 
   # Starts a thread that calls socket_addrs on localhost while lookups are
   # held, and returns once it sleeps in the released wait.
   HELD_LOOKUP = <<~RUBY
     native = Ferro::Url.const_get(:Native)
-    native.gvl_hold_lookups(true)
+    native.__send__(:gvl_hold_lookups, true)
     waiter = Thread.new { Ferro::Url::Url.parse("https://localhost/").socket_addrs.map(&:ip_address) }
     waiter.report_on_exception = false
     Thread.pass until waiter.status == "sleep"
@@ -75,11 +80,11 @@ class TestGvl < Minitest::Test
     end
 
     native = Ferro::Url.const_get(:Native)
-    native.gvl_hold_lookups(true)
+    native.__send__(:gvl_hold_lookups, true)
     reader = Thread.current
     releaser = Thread.new do
       Thread.pass until reader.status == "sleep"
-      native.gvl_hold_lookups(false)
+      native.__send__(:gvl_hold_lookups, false)
     end
     addresses = WhileRaising.run do
       Thread.current.wakeup
@@ -98,10 +103,10 @@ class TestGvl < Minitest::Test
   end
 
   def test_a_lookup_that_gets_a_thread_does_not_run_on_the_calling_thread
-    before = NATIVE.gvl_fallbacks
+    before = NATIVE.__send__(:gvl_fallbacks)
     url("https://localhost/").socket_addrs
 
-    assert_equal before, NATIVE.gvl_fallbacks
+    assert_equal before, NATIVE.__send__(:gvl_fallbacks)
   end
 
   def test_other_calls_keep_the_lock
@@ -119,7 +124,7 @@ class TestGvl < Minitest::Test
   def test_other_threads_run_during_the_wait
     addresses = in_child(<<~RUBY)
       #{HELD_LOOKUP}
-      native.gvl_hold_lookups(false)
+      native.__send__(:gvl_hold_lookups, false)
       waiter.value
     RUBY
 
@@ -162,7 +167,7 @@ class TestGvl < Minitest::Test
     error = in_child(<<~RUBY)
       require "timeout"
       native = Ferro::Url.const_get(:Native)
-      native.gvl_hold_lookups(true)
+      native.__send__(:gvl_hold_lookups, true)
       begin
         Timeout.timeout(0.2) { Ferro::Url::Url.parse("https://localhost/").socket_addrs }
       rescue Timeout::Error => e
@@ -181,10 +186,10 @@ class TestGvl < Minitest::Test
   def test_a_wakeup_that_raises_nothing_leaves_the_lookup_waiting
     addresses = in_child(<<~RUBY)
       #{HELD_LOOKUP}
-      before = native.gvl_releases
+      before = native.__send__(:gvl_releases)
       waiter.wakeup
-      Thread.pass until native.gvl_releases > before && waiter.status == "sleep"
-      native.gvl_hold_lookups(false)
+      Thread.pass until native.__send__(:gvl_releases) > before && waiter.status == "sleep"
+      native.__send__(:gvl_hold_lookups, false)
       waiter.value
     RUBY
 
@@ -194,10 +199,10 @@ class TestGvl < Minitest::Test
   def test_a_lookup_runs_on_the_calling_thread_when_no_thread_starts
     released, fallbacks, addresses = in_child(<<~RUBY)
       native = Ferro::Url.const_get(:Native)
-      native.gvl_refuse_threads(true)
-      before = native.gvl_releases
+      native.__send__(:gvl_refuse_threads, true)
+      before = native.__send__(:gvl_releases)
       addresses = Ferro::Url::Url.parse("https://localhost/").socket_addrs.map(&:ip_address)
-      [native.gvl_releases - before, native.gvl_fallbacks, addresses]
+      [native.__send__(:gvl_releases) - before, native.__send__(:gvl_fallbacks), addresses]
     RUBY
 
     assert_equal 1, released
@@ -210,9 +215,9 @@ class TestGvl < Minitest::Test
   # while the reader sleeps in it on its own thread.
   def test_a_lookup_on_the_calling_thread_made_while_raising_releases_the_gvl
     fallbacks, addresses = in_child(<<~RUBY)
-      Ferro::Url.const_get(:Native).gvl_refuse_threads(true)
+      Ferro::Url.const_get(:Native).__send__(:gvl_refuse_threads, true)
       #{WHILE_RAISING}
-      [native.gvl_fallbacks, addresses]
+      [native.__send__(:gvl_fallbacks), addresses]
     RUBY
 
     assert_equal 1, fallbacks

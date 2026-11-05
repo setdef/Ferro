@@ -67,7 +67,12 @@
 use std::ffi::c_void;
 use std::panic::{self, AssertUnwindSafe};
 use std::ptr;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+#[cfg(feature = "test-hooks")]
+use std::sync::atomic::AtomicBool;
+#[cfg(any(test, feature = "test-hooks"))]
+use std::sync::atomic::AtomicUsize;
+#[cfg(any(test, feature = "test-hooks"))]
+use std::sync::atomic::Ordering;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
@@ -76,17 +81,22 @@ use magnus::rb_sys::{protect, AsRawValue};
 use magnus::{Error, Ruby};
 
 /// How many times work has run with the GVL released in this process, for
-/// the tests (`Native.gvl_releases`): each wait for the lookup thread, and
-/// each lookup run on the calling thread.
+/// the tests (`Native.gvl_releases`, a hook that only a build with the
+/// `test-hooks` feature has): each wait for the lookup thread, and each
+/// lookup run on the calling thread. Only such a build, and this module's
+/// own tests, count at all.
+#[cfg(any(test, feature = "test-hooks"))]
 pub static RELEASES: AtomicUsize = AtomicUsize::new(0);
 
 /// How many lookups have run on the calling thread because no thread could
-/// start, for the tests (`Native.gvl_fallbacks`).
+/// start, for the tests (`Native.gvl_fallbacks`, a hook).
+#[cfg(feature = "test-hooks")]
 pub static FALLBACKS: AtomicUsize = AtomicUsize::new(0);
 
 /// Whether `start` refuses to start a thread, as an operating system out
 /// of threads would, so the tests reach the fallback
-/// (`Native.gvl_refuse_threads`).
+/// (`Native.gvl_refuse_threads`, a hook).
+#[cfg(feature = "test-hooks")]
 pub static REFUSE_THREADS: AtomicBool = AtomicBool::new(false);
 
 /// What reaches the waiting Ruby thread: the work's outcome, or the
@@ -121,6 +131,7 @@ extern "C" fn wait<T>(data: *mut c_void) -> *mut c_void {
     // channel's sender, a different object.
     #[allow(unsafe_code)]
     let state = unsafe { &mut *data.cast::<Wait<T>>() };
+    #[cfg(any(test, feature = "test-hooks"))]
     RELEASES.fetch_add(1, Ordering::Relaxed);
     state.wait();
     ptr::null_mut()
@@ -217,6 +228,7 @@ pub fn start<T: Send + 'static, F: FnOnce() -> T + Send + 'static>(
     work: F,
 ) -> Result<(Wait<T>, Sender<Message<T>>), F> {
     start_with(work, |job| {
+        #[cfg(feature = "test-hooks")]
         if REFUSE_THREADS.load(Ordering::Relaxed) {
             return Err(std::io::Error::other("the tests refused a thread"));
         }
@@ -310,6 +322,7 @@ extern "C" fn run_job<F: FnOnce() -> T, T>(data: *mut c_void) -> *mut c_void {
     // reference meanwhile.
     #[allow(unsafe_code)]
     let job = unsafe { &mut *data.cast::<Job<F, T>>() };
+    #[cfg(any(test, feature = "test-hooks"))]
     RELEASES.fetch_add(1, Ordering::Relaxed);
     job.run();
     ptr::null_mut()
@@ -375,6 +388,7 @@ fn run_once<F: FnOnce() -> T, T, E>(
 /// url runs it; an interrupt that arrives meanwhile raises once it
 /// returns, discarding its outcome.
 fn in_place<T, F: FnOnce() -> T>(ruby: &Ruby, work: F) -> Result<thread::Result<T>, Error> {
+    #[cfg(feature = "test-hooks")]
     FALLBACKS.fetch_add(1, Ordering::Relaxed);
     run_once(Job::new(work), |job| release_and_run(ruby, job))
 }

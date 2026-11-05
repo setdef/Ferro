@@ -48,6 +48,7 @@
 use std::ffi::c_void;
 use std::panic::{self, AssertUnwindSafe};
 use std::ptr;
+#[cfg(any(test, feature = "test-hooks"))]
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use magnus::rb_sys::{protect, AsRawValue};
@@ -55,12 +56,15 @@ use magnus::{Error, Ruby};
 
 /// How many times work has run with the GVL released in this process.
 ///
-/// The tests read it (`Clipboard#native_gvl_releases`) to tell which path a
-/// call took. Whether another Ruby thread actually runs meanwhile is up to
+/// The tests read it (`Clipboard#native_gvl_releases`, a hook that only a
+/// build with the `test-hooks` feature has) to tell which path a call
+/// took, so only such a build, and this module's own tests, count at all.
+/// Whether another Ruby thread actually runs meanwhile is up to
 /// Ruby's scheduler: from Ruby 4.0.6 on, a thread returning from a short
 /// blocking region takes the GVL straight back when the thread it woke has
 /// not started yet (`thread_pthread.c:846-867` and `:1055-1066` at
 /// v4.0.9), so a fast read can release the lock without anyone using it.
+#[cfg(any(test, feature = "test-hooks"))]
 pub static RELEASES: AtomicUsize = AtomicUsize::new(0);
 
 /// What Ruby calls when it wants the thread back from work running without
@@ -120,6 +124,7 @@ extern "C" fn run<W: FnMut() -> Option<G>, F: FnOnce(G) -> T, G, T>(
     // different object, which the call only borrows shared.
     #[allow(unsafe_code)]
     let call = unsafe { &mut *data.cast::<Call<W, F, T>>() };
+    #[cfg(any(test, feature = "test-hooks"))]
     RELEASES.fetch_add(1, Ordering::Relaxed);
     call.run();
     ptr::null_mut()

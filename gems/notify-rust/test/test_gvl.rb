@@ -21,6 +21,10 @@ require "test_helper"
 # identifier; on Linux notify-rust asks the session bus for the server's
 # specification version, which, with no bus, fails and falls back to 1.1.
 # Windows has no such call: every one shows a toast.
+#
+# The count comes from the private Native.gvl_releases, a hook that
+# exists only in the repository's build (the test-hooks feature, ADR 001,
+# amendment of 2026-11-05: test hooks); the packaged gem has none.
 class TestGvl < Minitest::Test
   include NotifySuite
 
@@ -45,9 +49,9 @@ class TestGvl < Minitest::Test
     call, expected = CALLS.fetch(PLATFORM)
     outcome, = in_child(<<~RUBY, NO_BUS)
       native = Ferro::NotifyRust.const_get(:Native)
-      before = native.gvl_releases
+      before = native.__send__(:gvl_releases)
       value = #{call}
-      [value, native.gvl_releases - before]
+      [value, native.__send__(:gvl_releases) - before]
     RUBY
 
     assert_equal [expected, 1], outcome
@@ -81,9 +85,9 @@ class TestGvl < Minitest::Test
           call, @call = @call, nil
           if call
             native = Ferro::NotifyRust.const_get(:Native)
-            before = native.gvl_releases
+            before = native.__send__(:gvl_releases)
             @value = call.call
-            @releases = native.gvl_releases - before
+            @releases = native.__send__(:gvl_releases) - before
           end
           super
         end

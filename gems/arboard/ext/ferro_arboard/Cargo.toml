@@ -29,6 +29,16 @@ rb-sys = "0.9.130"
 [target.'cfg(not(target_os = "macos"))'.dev-dependencies]
 image = { version = "=0.25.10", default-features = false, features = ["png"] }
 
+[features]
+# Hooks the gem's own tests read inside the native layer, such as how many
+# calls released the GVL. arboard has no such method, and a gem adds nothing
+# its crate lacks, so only the repository's development and test builds turn
+# this on (ADR 001, amendment of 2026-11-05: test hooks). The hooks are off
+# unless the installer passes `--enable-test-hooks` to extconf.rb, which
+# only the repository's own build does, and it is no option an app
+# chooses (ADR 002).
+test-hooks = []
+
 # Each crate states its lints itself instead of inheriting them with
 # `workspace = true`: an installed gem ships only its own workspace.
 [lints.clippy]

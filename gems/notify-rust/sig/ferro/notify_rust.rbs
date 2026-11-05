@@ -38,7 +38,6 @@ module Ferro
       def self.notification_id_debug: ([:Xdg, Integer] | [:Mac, String] tag) -> String
       def self.server_information_debug: (String name, String vendor, String version, String spec_version) -> String
       def self.error_debug: (Symbol kind, String? text) -> String?
-      def self.gvl_releases: () -> Integer
     end
   end
 end

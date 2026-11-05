@@ -761,9 +761,23 @@ impl Clipboard {
 }
 
 /// How many calls have run with the GVL released (`gvl::RELEASES`), for
-/// the tests that check which calls release it.
+/// the tests that check which calls release it. A hook: only a build with
+/// the `test-hooks` feature has it (`Cargo.toml`).
+#[cfg(feature = "test-hooks")]
 fn native_gvl_releases(_clipboard: &Clipboard) -> usize {
     gvl::RELEASES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The test hooks, private methods of `Clipboard` that only a build with
+/// the `test-hooks` feature has (`Cargo.toml`), so a gem built without the
+/// option has none, and `rbs:parity` needs no signature for them.
+/// `Native::TEST_HOOKS` marks such a build, so the packaging check refuses
+/// any package that has it.
+#[cfg(feature = "test-hooks")]
+fn define_test_hooks(class: magnus::RClass, native: magnus::RModule) -> Result<(), Error> {
+    native.const_set("TEST_HOOKS", true)?;
+    class.define_private_method("native_gvl_releases", method!(native_gvl_releases, 0))?;
+    Ok(())
 }
 
 #[magnus::init]
@@ -818,9 +832,10 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         "native_set_file_list",
         method!(Clipboard::native_set_file_list, 2),
     )?;
-    class.define_private_method("native_gvl_releases", method!(native_gvl_releases, 0))?;
 
     let native = arboard.define_module("Native")?;
+    #[cfg(feature = "test-hooks")]
+    define_test_hooks(class, native)?;
     native.define_singleton_method("error_debug", function!(error_debug, 2))?;
     native.define_singleton_method("image_data_debug", function!(image_data_debug, 3))?;
     #[cfg(all(

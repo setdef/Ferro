@@ -8,7 +8,9 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
-use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
+#[cfg(feature = "test-hooks")]
+use std::sync::Condvar;
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use magnus::{
     function, prelude::*, typed_data::Obj, Error, RArray, RModule, RString, Ruby, Symbol, Value,
@@ -373,6 +375,7 @@ fn url_socket_addrs(
 ) -> Result<Vec<Address>, Error> {
     let url = url.snapshot();
     let outcome = gvl::in_background(ruby, move || {
+        #[cfg(feature = "test-hooks")]
         wait_while_held();
         url.socket_addrs(|| default_port)
             .map(|addresses| addresses.into_iter().map(address).collect::<Vec<_>>())
@@ -414,22 +417,27 @@ const fn io_errno(_failure: &std::io::Error) -> Option<i32> {
     None
 }
 
-/// How many waits have run with the GVL released, for the tests.
+/// How many waits have run with the GVL released, for the tests. A hook:
+/// only a build with the `test-hooks` feature has it (`Cargo.toml`).
+#[cfg(feature = "test-hooks")]
 fn gvl_releases() -> usize {
     gvl::RELEASES.load(std::sync::atomic::Ordering::Relaxed)
 }
 
-/// How many lookups have run on the calling thread, for the tests.
+/// How many lookups have run on the calling thread, for the tests. A hook.
+#[cfg(feature = "test-hooks")]
 fn gvl_fallbacks() -> usize {
     gvl::FALLBACKS.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 /// Whether lookups wait before they resolve, and the signal that they may
-/// go on, for the tests (`gvl_hold_lookups`).
+/// go on, for the tests (`gvl_hold_lookups`, a hook).
+#[cfg(feature = "test-hooks")]
 static HOLD: (Mutex<bool>, Condvar) = (Mutex::new(false), Condvar::new());
 
 /// Waits, on the lookup's own thread, while the tests hold lookups. No
 /// Ruby value is touched under the lock.
+#[cfg(feature = "test-hooks")]
 fn wait_while_held() {
     let (held, released) = &HOLD;
     let guard = held.lock().unwrap_or_else(PoisonError::into_inner);
@@ -443,7 +451,8 @@ fn wait_while_held() {
 /// Holds every lookup that starts, or lets every held one go on, so the
 /// tests decide when a `socket_addrs` of a name the system resolves
 /// without the network, such as `localhost`, finishes, with no clock.
-/// Private to the gem.
+/// A hook.
+#[cfg(feature = "test-hooks")]
 fn gvl_hold_lookups(held: bool) -> bool {
     let (lock, released) = &HOLD;
     *lock.lock().unwrap_or_else(PoisonError::into_inner) = held;
@@ -452,8 +461,8 @@ fn gvl_hold_lookups(held: bool) -> bool {
 }
 
 /// Makes the lookup thread refuse to start, or start again, so the tests
-/// reach the fallback that runs the lookup on the calling thread. Private
-/// to the gem.
+/// reach the fallback that runs the lookup on the calling thread. A hook.
+#[cfg(feature = "test-hooks")]
 fn gvl_refuse_threads(refused: bool) -> bool {
     gvl::REFUSE_THREADS.store(refused, std::sync::atomic::Ordering::Relaxed);
     refused
@@ -899,7 +908,25 @@ fn url_slice(
     .map_err(|message| Error::new(ruby.exception_range_error(), message))
 }
 
+/// The test hooks, private singleton methods of `Native` that only a build
+/// with the `test-hooks` feature has (`Cargo.toml`), so a gem built without
+/// the option has none, and `rbs:parity` needs no signature for them.
+/// `Native::TEST_HOOKS` marks such a build, so the packaging check refuses
+/// any package that has it.
+#[cfg(feature = "test-hooks")]
+fn define_test_hooks(native: RModule) -> Result<(), Error> {
+    native.const_set("TEST_HOOKS", true)?;
+    let hooks = native.singleton_class()?;
+    hooks.define_private_method("gvl_releases", function!(gvl_releases, 0))?;
+    hooks.define_private_method("gvl_fallbacks", function!(gvl_fallbacks, 0))?;
+    hooks.define_private_method("gvl_hold_lookups", function!(gvl_hold_lookups, 1))?;
+    hooks.define_private_method("gvl_refuse_threads", function!(gvl_refuse_threads, 1))?;
+    Ok(())
+}
+
 pub fn define(native: RModule) -> Result<(), Error> {
+    #[cfg(feature = "test-hooks")]
+    define_test_hooks(native)?;
     native.define_singleton_method("url_parse", function!(url_parse, 1))?;
     native.define_singleton_method("url_parse_with_params", function!(url_parse_with_params, 2))?;
     native.define_singleton_method("url_options_parse", function!(url_options_parse, 4))?;
@@ -921,10 +948,6 @@ pub fn define(native: RModule) -> Result<(), Error> {
         function!(url_socket_addrs_asks_for_port, 1),
     )?;
     native.define_singleton_method("url_socket_addrs", function!(url_socket_addrs, 2))?;
-    native.define_singleton_method("gvl_releases", function!(gvl_releases, 0))?;
-    native.define_singleton_method("gvl_fallbacks", function!(gvl_fallbacks, 0))?;
-    native.define_singleton_method("gvl_hold_lookups", function!(gvl_hold_lookups, 1))?;
-    native.define_singleton_method("gvl_refuse_threads", function!(gvl_refuse_threads, 1))?;
     native.define_singleton_method("url_set_option_str", function!(url_set_option_str, 3))?;
     native.define_singleton_method("url_set_path", function!(url_set_path, 2))?;
     native.define_singleton_method("url_set_port", function!(url_set_port, 2))?;
