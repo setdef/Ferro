@@ -13,7 +13,7 @@ Pre-1.0, zero external users. Prefer good design over backward compatibility; re
 
 ## Design precedence
 
-1. **Ruby the language.** What Ruby can and cannot express. Rust constructs with no Ruby meaning (lifetimes, moves, `Send` and `Sync` bounds, Cargo features) are translated, not ported. Every Cargo feature is simply on.
+1. **Ruby the language.** What Ruby can and cannot express. Rust constructs with no Ruby meaning (lifetimes, moves, `Send` and `Sync` bounds, Cargo features) are translated, not ported. A Cargo feature is built in, dropped, or offered at install, as ADR 002 sorts it; an offered feature keeps the crate's default.
 2. **Crate fidelity.** Names, types, error variants and their `Display` text, platform gating, and behavior MUST match the crate's source at the bound version. Do not invent "more Ruby-like" APIs.
 3. **Ruby culture.** Idioms yield to 1 and 2.
 
