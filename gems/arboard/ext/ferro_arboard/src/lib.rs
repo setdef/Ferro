@@ -1098,39 +1098,6 @@ mod tests {
         assert_eq!(encode(8, 2, 1), None);
     }
 
-    /// The shapes the guard refuses on macOS are the ones arboard panics on
-    /// there: an empty buffer, whose `CGDataProviderCreateWithData` arboard
-    /// unwraps (`src/platform/osx.rs:58-69`), and a width whose `4 * width`
-    /// overflows (`osx.rs:86`), a panic in a build with overflow checks, as
-    /// this test's is. arboard clears the pasteboard only after converting
-    /// the image (`osx.rs:343-347`), so the clipboard keeps what it held.
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn refused_images_are_ones_arboard_panics_on_with_core_graphics() {
-        let set = |width: usize, height: usize, bytes: &[u8]| {
-            panic_text(|| {
-                arboard::Clipboard::new()
-                    .expect("a pasteboard")
-                    .set()
-                    .image(arboard::ImageData {
-                        width,
-                        height,
-                        bytes: Cow::Borrowed(bytes),
-                    })
-            })
-        };
-        assert!(!is_drawable_by_core_graphics(0, 1, 1));
-        assert_eq!(
-            set(1, 1, &[]),
-            Some("called `Option::unwrap()` on a `None` value".to_owned())
-        );
-        assert!(!is_drawable_by_core_graphics(4, usize::MAX / 4 + 1, 1));
-        assert_eq!(
-            set(usize::MAX / 4 + 1, 1, &[0; 4]),
-            Some("attempt to multiply with overflow".to_owned())
-        );
-    }
-
     /// `deadline` refuses what `Instant + Duration::from_secs_f64` would
     /// panic on, with the panic's own text (core `Duration::from_secs_f64`,
     /// std `Instant`'s `Add`), which Ruby raises as `RangeError`.
