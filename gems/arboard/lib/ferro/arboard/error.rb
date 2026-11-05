@@ -133,9 +133,13 @@ module Ferro
       # The image or text could not be converted to or from the format the
       # clipboard needs.
       #
-      # ferro-arboard also raises it for an ImageData with a zero width or
-      # height, or with a byte count other than <tt>width * height * 4</tt>,
-      # before arboard sees it: arboard would panic on those.
+      # ferro-arboard also raises it, before arboard sees the image, for an
+      # ImageData arboard could panic on: on Linux and Windows, one with a
+      # zero width or height or a byte count other than
+      # <tt>width * height * 4</tt>, since the PNG encoder there asserts
+      # the count; on macOS, one with no bytes, or a size too large to
+      # count. On macOS arboard itself raises it for a zero width or height
+      # or too few bytes.
       #
       # The message keeps arboard's wording, typo included.
       #

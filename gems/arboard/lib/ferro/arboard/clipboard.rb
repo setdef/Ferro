@@ -180,8 +180,9 @@ module Ferro
       # <tt>image/png</tt> type on Linux, and as <tt>CF_DIB</tt> (then
       # <tt>CF_BITMAP</tt>) on Windows. Raises Error::ConversionFailure if
       # the image cannot be converted, including any image with a zero
-      # width or height or a byte count other than
-      # <tt>width * height * 4</tt>. The same as <tt>set.image(image)</tt>.
+      # width or height or too few bytes, and, except on macOS, too many.
+      # The same as <tt>set.image(image)</tt>, where Set#image says which
+      # shapes each platform refuses.
       #
       # Mirrors arboard's <tt>Clipboard::set_image</tt>
       # (<tt>src/lib.rs:133-148</tt>).

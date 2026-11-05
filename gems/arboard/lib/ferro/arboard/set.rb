@@ -94,10 +94,14 @@ module Ferro
       #
       # arboard stores it as an NSImage on macOS, as a PNG under the
       # <tt>image/png</tt> type on Linux, and as <tt>CF_DIB</tt> (then
-      # <tt>CF_BITMAP</tt>) on Windows. An image with a zero width or
-      # height, or a byte count other than <tt>width * height * 4</tt>,
-      # raises Error::ConversionFailure without reaching arboard, which
-      # would panic on some platforms.
+      # <tt>CF_BITMAP</tt>) on Windows. On Linux and Windows, an image with
+      # a zero width or height, or a byte count other than
+      # <tt>width * height * 4</tt>, raises Error::ConversionFailure
+      # without reaching arboard, whose PNG encoder would panic on it. On
+      # macOS only an image with no bytes, or a size too large to count,
+      # raises it before arboard sees it; arboard raises it itself for a
+      # zero width or height or too few bytes, and draws a longer buffer
+      # from its first <tt>width * height * 4</tt> bytes.
       #
       # Mirrors arboard's <tt>Set::image</tt> (<tt>src/lib.rs:248-258</tt>).
       #

@@ -161,14 +161,48 @@ fn lock_for<C>(mutex: &Mutex<C>, gvl: gvl::Gvl) -> Result<MutexGuard<'_, C>, Fai
 }
 
 /// Whether arboard can draw an RGBA buffer of `len` bytes as a `width` by
-/// `height` image: both dimensions non-zero and exactly four bytes per
-/// pixel (plan 001, decision 4).
+/// `height` image on Linux and Windows: both dimensions non-zero and
+/// exactly four bytes per pixel. There arboard encodes a PNG, and the
+/// image crate's encoder asserts the byte count (image 0.25.10
+/// `src/codecs/png.rs:740-746`), a panic (plan 001, decision 4).
 ///
 /// This function and its three tests come from Tokra's `tokra_clipboard`
 /// binding (AGPL-3.0-or-later). Their author, Kerrick Long, relicensed them
 /// to MIT OR Apache-2.0 for Ferro.
+#[cfg(any(test, not(target_os = "macos")))]
 const fn is_drawable_rgba(len: usize, width: usize, height: usize) -> bool {
     width != 0 && height != 0 && len == width.saturating_mul(height).saturating_mul(4)
+}
+
+/// Whether arboard can take an RGBA buffer of `len` bytes as a `width` by
+/// `height` image on macOS without panicking: the buffer is not empty,
+/// since arboard unwraps `CGDataProviderCreateWithData`, which fails for
+/// one (arboard `src/platform/osx.rs:58-69`), and `width * 4 * height`
+/// fits in a `usize`, since arboard computes `4 * width` unchecked
+/// (`osx.rs:86`). arboard refuses a short buffer or a zero dimension itself,
+/// with `ConversionFailure` when `CGImageCreate` fails (`osx.rs:80-95`), and
+/// draws a longer buffer from its first bytes (plan 001, decision 4).
+#[cfg(any(test, target_os = "macos"))]
+const fn is_drawable_by_core_graphics(len: usize, width: usize, height: usize) -> bool {
+    len != 0
+        && match width.checked_mul(4) {
+            Some(row) => row.checked_mul(height).is_some(),
+            None => false,
+        }
+}
+
+/// Whether this platform's arboard can take an RGBA buffer of `len` bytes
+/// as a `width` by `height` image without panicking.
+#[cfg(not(target_os = "macos"))]
+const fn arboard_can_draw(len: usize, width: usize, height: usize) -> bool {
+    is_drawable_rgba(len, width, height)
+}
+
+/// Whether this platform's arboard can take an RGBA buffer of `len` bytes
+/// as a `width` by `height` image without panicking.
+#[cfg(target_os = "macos")]
+const fn arboard_can_draw(len: usize, width: usize, height: usize) -> bool {
+    is_drawable_by_core_graphics(len, width, height)
 }
 
 /// The settings of a Ruby `Set`, as `Set#options` lists them: the Linux
@@ -646,7 +680,8 @@ impl Clipboard {
     }
 
     /// `Set#image`: arboard's `Set::image` (`src/lib.rs:248-258`), after
-    /// refusing a shape arboard would panic on (plan 001, decision 4).
+    /// refusing a shape this platform's arboard would panic on (plan 001,
+    /// decision 4).
     fn native_set_image(
         ruby: &Ruby,
         rb_self: &Self,
@@ -657,7 +692,7 @@ impl Clipboard {
     ) -> Result<(), Error> {
         let options = platform::set_options(ruby, args)?;
         let bytes = bytes.to_bytes();
-        if !is_drawable_rgba(bytes.len(), width, height) {
+        if !arboard_can_draw(bytes.len(), width, height) {
             return Err(raise(
                 ruby,
                 &Failure::Arboard(arboard::Error::ConversionFailure),
@@ -753,8 +788,8 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::{
-        capture, class_and_message, deadline, gvl::Gvl, is_drawable_rgba, lock_for, try_lock,
-        Failure,
+        capture, class_and_message, deadline, gvl::Gvl, is_drawable_by_core_graphics,
+        is_drawable_rgba, lock_for, try_lock, Failure,
     };
     use std::sync::Mutex;
     use std::time::{Duration, Instant};
@@ -783,6 +818,25 @@ mod tests {
         assert!(!is_drawable_rgba(7, 2, 1));
         assert!(!is_drawable_rgba(9, 2, 1));
         assert!(!is_drawable_rgba(4, usize::MAX, 2));
+    }
+
+    #[test]
+    fn core_graphics_takes_any_non_empty_buffer_whose_size_fits() {
+        assert!(is_drawable_by_core_graphics(8, 2, 1));
+        assert!(is_drawable_by_core_graphics(12, 2, 1));
+        assert!(is_drawable_by_core_graphics(5, 1, 1));
+        assert!(is_drawable_by_core_graphics(4, 2, 1));
+        assert!(is_drawable_by_core_graphics(4, 0, 1));
+        assert!(is_drawable_by_core_graphics(4, 1, 0));
+    }
+
+    #[test]
+    fn core_graphics_rejects_empty_bytes_and_overflowing_sizes() {
+        assert!(!is_drawable_by_core_graphics(0, 0, 0));
+        assert!(!is_drawable_by_core_graphics(0, 1, 1));
+        assert!(!is_drawable_by_core_graphics(4, usize::MAX / 4 + 1, 1));
+        assert!(!is_drawable_by_core_graphics(4, usize::MAX / 4, 2));
+        assert!(is_drawable_by_core_graphics(4, usize::MAX / 4, 1));
     }
 
     #[test]

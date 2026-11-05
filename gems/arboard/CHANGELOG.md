@@ -12,6 +12,10 @@ own API. Releases are tagged `ferro-arboard/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Changed
+
+- On macOS, `set_image` hands arboard a buffer longer than `width * height * 4`, which arboard draws from its first bytes, instead of raising `ConversionFailure`; it still refuses an empty buffer or a size that overflows.
+
 ## [0.1.0.pre.2] - 2026-10-25
 
 ### Added

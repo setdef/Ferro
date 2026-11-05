@@ -69,6 +69,62 @@ class TestLinux < Minitest::Test
     Process.wait(watchdog) if watchdog
   end
 
+  #--
+  # SPDX-SnippetEnd
+  #++
+
+  # A write that waits once returns after another program reads it
+  # (src/platform/linux/x11.rs:293-296). On X11 a read from this process is
+  # served without a request (x11.rs:307-308), so a subprocess reads. On
+  # Wayland arboard copies in the background unless it waits forever
+  # (src/platform/linux/wayland.rs:63-68), and wl-clipboard-rs serves the
+  # one request from a thread of its own (wl-clipboard-rs 0.9.4
+  # src/copy.rs:1043-1050), so the write returns at once there.
+  #
+  # The order is proven without a clock. A second Clipboard polls until it
+  # reads the text; the setter must still be waiting then. The probe owns
+  # the selection first, so each of its reads is served in process
+  # (x11.rs:307-308), never as another program's request: a read made
+  # while ownership changes hands would be served over X and end the wait.
+  # Only the subprocess's read may end the wait. A watchdog process
+  # replaces the text after 30 seconds, so a wait that nothing ended cannot
+  # hang the suite; it prints a mark first, so the mark is there by the
+  # time its write could wake the setter, and the test fails on it. A
+  # narrow window inside arboard (x11.rs:258-286) remains between the text
+  # becoming readable and the setter starting to wait; the subprocess's
+  # startup covers it.
+  def test_wait_once_returns_after_another_program_reads_the_text
+    skip "X11 only: on Wayland, wait_once returns before the read" if ENV["WAYLAND_DISPLAY"]
+    lib = File.expand_path("../lib", __dir__)
+    fired, marker = IO.pipe
+    watchdog_script = %(sleep 30; puts "fired"; $stdout.flush; require "ferro/arboard"; Ferro::Arboard::Clipboard.new.set_text("watchdog"))
+    watchdog = spawn(RbConfig.ruby, "-I", lib, "-e", watchdog_script, out: marker)
+    marker.close
+    probe = Ferro::Arboard::Clipboard.new
+    probe.set_text("probe owns the selection")
+    setter = Thread.new { clipboard.set.wait_once.text("served once") }
+    Thread.pass until (probe.get_text rescue nil) == "served once" # rubocop:disable Style/RescueModifier
+
+    assert_predicate setter, :alive?, "wait_once returned before anything else read the text"
+    reader = %(require "ferro/arboard"; print Ferro::Arboard::Clipboard.new.get_text)
+    assert_equal "served once", IO.popen([RbConfig.ruby, "-I", lib, "-e", reader], &:read)
+    setter.join
+    Process.kill(:KILL, watchdog)
+    Process.wait(watchdog)
+
+    assert_empty fired.read, "only the watchdog ended the wait"
+  ensure
+    if watchdog
+      begin
+        Process.kill(:KILL, watchdog)
+        Process.wait(watchdog)
+      rescue Errno::ESRCH, Errno::ECHILD
+        nil
+      end
+    end
+    fired&.close
+  end
+
   def test_a_past_deadline_returns_at_once
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
@@ -97,6 +153,45 @@ class TestLinux < Minitest::Test
     assert_raises(Ferro::Arboard::Error::ContentNotAvailable) { clipboard.get.clipboard(kinds::Primary).text }
   end
 
+  # Wayland has no Secondary selection, so arboard refuses it
+  # (src/platform/linux/wayland.rs:30-54). With DISPLAY set, arboard could
+  # fall back to X11 (src/platform/linux/mod.rs:133-150), so the test runs
+  # only where CI's sway pass runs it: Wayland with DISPLAY unset.
+  def test_secondary_is_not_supported_on_wayland
+    skip "Wayland with DISPLAY unset only" unless ENV["WAYLAND_DISPLAY"] && ENV["DISPLAY"].nil?
+    calls = {
+      get: -> { clipboard.get.clipboard(kinds::Secondary).text },
+      set: -> { clipboard.set.clipboard(kinds::Secondary).text("x") },
+      clear: -> { clipboard.clear_with.clipboard(kinds::Secondary) },
+    }
+
+    calls.each do |name, call|
+      error = assert_raises(Ferro::Arboard::Error::ClipboardNotSupported, name.to_s, &call)
+      assert_equal NOT_SUPPORTED, error.message
+    end
+  end
+
+  # With no display server, arboard's X11 connection fails with an Unknown
+  # error (src/platform/linux/x11.rs:139-145). A subprocess without
+  # WAYLAND_DISPLAY or DISPLAY opens the clipboard, so the suite's own keeps
+  # its display.
+  def test_no_display_server_raises_unknown
+    lib = File.expand_path("../lib", __dir__)
+    script = <<~RUBY
+      require "ferro/arboard"
+      begin
+        Ferro::Arboard::Clipboard.new
+      rescue Ferro::Arboard::Error::Unknown => e
+        puts e.description, e.message
+      end
+    RUBY
+    output = IO.popen({ "WAYLAND_DISPLAY" => nil, "DISPLAY" => nil }, [RbConfig.ruby, "-I", lib, "-e", script], &:read)
+
+    description = "X11 server connection timed out because it was unreachable"
+    assert_equal [description, "Unknown error while interacting with the clipboard: #{description}"],
+      output.lines(chomp: true)
+  end
+
   def test_the_kinds_are_three_frozen_values
     assert_equal %w[Clipboard Primary Secondary].map { |name| "Ferro::Arboard::LinuxClipboardKind::#{name}" },
       [kinds::Clipboard, kinds::Primary, kinds::Secondary].map(&:inspect)
@@ -111,7 +206,3 @@ class TestLinux < Minitest::Test
     assert_equal "wrong argument type Symbol (expected Ferro::Arboard::LinuxClipboardKind)", error.message
   end
 end
-
-#--
-# SPDX-SnippetEnd
-#++

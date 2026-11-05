@@ -29,11 +29,16 @@ class TestImageData < Minitest::Test
     assert_equal RED_THEN_GREEN, clipboard.get_image.bytes
   end
 
-  # arboard would panic on these (a zero dimension on macOS, a wrong byte
-  # count on Linux and Windows) or, for an oversized buffer on macOS,
-  # silently draw part of it. The clipboard keeps its text, which shows the
-  # image never reached arboard: arboard clears the clipboard before it
-  # writes an image it could convert.
+  # Each shape raises ConversionFailure. On Linux and Windows ferro-arboard
+  # refuses them all, since the PNG encoder there asserts the byte count
+  # (image 0.25.10 src/codecs/png.rs:740-746). On macOS it refuses only the
+  # empty buffer, which arboard would panic on (src/platform/osx.rs:58-69),
+  # and arboard itself refuses the rest, when CGImageCreate fails
+  # (osx.rs:80-95); the two shapes arboard accepts there are skipped. The
+  # clipboard keeps its text, which shows no image reached it: arboard
+  # clears the clipboard only after it converts the image (osx.rs:345-347).
+  MACOS_DRAWS = ["too many bytes", "a byte count that is not a pixel"].freeze
+
   {
     "zero width" => [0, 1, "\x00" * 4],
     "zero height" => [1, 0, "\x00" * 4],
@@ -44,6 +49,7 @@ class TestImageData < Minitest::Test
     "a byte count that is not a pixel" => [1, 1, "\x00" * 5],
   }.each do |shape, (width, height, bytes)|
     define_method("test_#{shape.tr(' ', '_')}_raises_conversion_failure") do
+      skip "arboard draws this on macOS; see test_an_oversized_buffer_draws_its_first_pixels_on_macos" if PLATFORM == :macos && MACOS_DRAWS.include?(shape)
       clipboard.set_text("keep me")
       image = Ferro::Arboard::ImageData.new(width:, height:, bytes: bytes.b)
 
@@ -52,6 +58,18 @@ class TestImageData < Minitest::Test
       assert_equal CONVERSION_FAILURE, error.message
       assert_equal "keep me", clipboard.get_text
     end
+  end
+
+  # macOS's arboard builds the image with 4 * width bytes a row from however
+  # many bytes it gets (osx.rs:80-95), so a longer buffer draws from its
+  # first width * height * 4 bytes.
+  def test_an_oversized_buffer_draws_its_first_pixels_on_macos
+    skip_unless_platform(:macos)
+
+    clipboard.set_image(Ferro::Arboard::ImageData.new(width: 2, height: 1, bytes: RED_THEN_GREEN + ("\x00" * 4).b))
+
+    image = clipboard.get_image
+    assert_equal [2, 1, RED_THEN_GREEN], [image.width, image.height, image.bytes]
   end
 
   def test_a_huge_width_that_overflows_raises_conversion_failure

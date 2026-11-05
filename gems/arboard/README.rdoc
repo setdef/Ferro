@@ -126,9 +126,11 @@ The API is arboard's, translated where Rust has no Ruby meaning:
 
 Three things differ from calling arboard from Rust:
 
-* An ImageData with a zero width or height, or a byte count other than
-  <tt>width * height * 4</tt>, raises Error::ConversionFailure before it
-  reaches arboard, on every platform. arboard would panic on some of them.
+* On Linux and Windows, an ImageData with a zero width or height, or a byte
+  count other than <tt>width * height * 4</tt>, raises
+  Error::ConversionFailure before it reaches arboard, whose PNG encoder
+  would panic on some of them. On macOS only one with no bytes, or a size
+  too large to count, does; arboard takes the rest itself.
 * A panic inside arboard raises Ferro::Arboard::Error with the message
   <tt>arboard panicked: ...</tt> instead of ending the Ruby process. Rust
   still prints its usual <tt>thread ... panicked at ...</tt> message to
