@@ -486,7 +486,12 @@ module Ferro
       # so other threads run meanwhile. Nothing can cancel the lookup, but
       # an interrupt (Ctrl-C, <tt>Thread#raise</tt>, +Timeout+) ends the
       # wait at once, and the lookup finishes alone, as Ruby's own
-      # <tt>Addrinfo.getaddrinfo</tt> leaves its resolver thread.
+      # <tt>Addrinfo.getaddrinfo</tt> leaves its resolver thread. An
+      # interrupt that arrives just as the lookup answers raises all the
+      # same, and the addresses are lost, as what Ruby's own IO has read is
+      # lost to an interrupt that arrives as the read returns. If no thread
+      # can start, the lookup runs on this thread instead, still with the
+      # lock released, and an interrupt takes effect once it ends.
       #
       # The URL is read once, before the block runs, as url reads it under
       # one borrow, so the lookup uses the URL as it was when this was

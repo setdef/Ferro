@@ -142,9 +142,15 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     // src/origin.rs:65-69). The wrapped types are a `Mutex` over a `Url`,
     // which is `Send` and `Sync`, and an `OpaqueOrigin`, a number no method
     // changes, so sharing either frozen is sound. The iterators sit behind a
-    // `Mutex` too and are never frozen, so Ruby never shares them. Every other value a
-    // function touches is an argument, which Ruby guarantees is the calling
-    // Ractor's own or shareable (extension.rdoc:2260-2261).
+    // `Mutex` too and are never frozen, so Ruby never shares them. The
+    // crate's own statics, `gvl.rs`'s counter and switch and the tests' hold
+    // on lookups in `native_url.rs`, are atomics and a `Mutex` with a
+    // `Condvar` over a `bool`, and hold no Ruby value. The unblocking
+    // function `gvl.rs` gives Ruby may run on another Ractor's thread, and
+    // only sends a message on a channel of Rust values; the lookup thread
+    // touches nothing of Ruby's. Every other value a function touches is an
+    // argument, which Ruby guarantees is the calling Ractor's own or
+    // shareable (extension.rdoc:2260-2261).
     // `rb_ext_ractor_safe` takes a plain flag, called from `Init_` as
     // extension.rdoc:2218-2220 asks.
     #[allow(unsafe_code)]

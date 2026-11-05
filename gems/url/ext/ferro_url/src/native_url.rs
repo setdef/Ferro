@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
 
 use magnus::{
     function, prelude::*, typed_data::Obj, Error, RArray, RModule, RString, Ruby, Symbol, Value,
@@ -373,6 +373,7 @@ fn url_socket_addrs(
 ) -> Result<Vec<Address>, Error> {
     let url = url.snapshot();
     let outcome = gvl::in_background(ruby, move || {
+        wait_while_held();
         url.socket_addrs(|| default_port)
             .map(|addresses| addresses.into_iter().map(address).collect::<Vec<_>>())
             .map_err(|failure| (io_errno(&failure), failure.to_string()))
@@ -418,15 +419,44 @@ fn gvl_releases() -> usize {
     gvl::RELEASES.load(std::sync::atomic::Ordering::Relaxed)
 }
 
-/// Sleeps `seconds` on a background thread through the same wait as
-/// `socket_addrs`, so the tests can interrupt a wait that a real lookup
-/// would make depend on the network. Private to the gem.
-fn gvl_sleep(ruby: &Ruby, seconds: f64) -> Result<f64, Error> {
-    let duration = std::time::Duration::try_from_secs_f64(seconds)
-        .map_err(|failure| Error::new(ruby.exception_arg_error(), failure.to_string()))?;
-    gvl::in_background(ruby, move || std::thread::sleep(duration))?
-        .map_err(|payload| error(ruby, panicked(&crate::panic_of(&payload))))?;
-    Ok(seconds)
+/// How many lookups have run on the calling thread, for the tests.
+fn gvl_fallbacks() -> usize {
+    gvl::FALLBACKS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Whether lookups wait before they resolve, and the signal that they may
+/// go on, for the tests (`gvl_hold_lookups`).
+static HOLD: (Mutex<bool>, Condvar) = (Mutex::new(false), Condvar::new());
+
+/// Waits, on the lookup's own thread, while the tests hold lookups. No
+/// Ruby value is touched under the lock.
+fn wait_while_held() {
+    let (held, released) = &HOLD;
+    let guard = held.lock().unwrap_or_else(PoisonError::into_inner);
+    drop(
+        released
+            .wait_while(guard, |held| *held)
+            .unwrap_or_else(PoisonError::into_inner),
+    );
+}
+
+/// Holds every lookup that starts, or lets every held one go on, so the
+/// tests decide when a `socket_addrs` of a name the system resolves
+/// without the network, such as `localhost`, finishes, with no clock.
+/// Private to the gem.
+fn gvl_hold_lookups(held: bool) -> bool {
+    let (lock, released) = &HOLD;
+    *lock.lock().unwrap_or_else(PoisonError::into_inner) = held;
+    released.notify_all();
+    held
+}
+
+/// Makes the lookup thread refuse to start, or start again, so the tests
+/// reach the fallback that runs the lookup on the calling thread. Private
+/// to the gem.
+fn gvl_refuse_threads(refused: bool) -> bool {
+    gvl::REFUSE_THREADS.store(refused, std::sync::atomic::Ordering::Relaxed);
+    refused
 }
 
 /// `set_fragment`, `set_query` (`src/lib.rs:1559-1667`).
@@ -892,7 +922,9 @@ pub fn define(native: RModule) -> Result<(), Error> {
     )?;
     native.define_singleton_method("url_socket_addrs", function!(url_socket_addrs, 2))?;
     native.define_singleton_method("gvl_releases", function!(gvl_releases, 0))?;
-    native.define_singleton_method("gvl_sleep", function!(gvl_sleep, 1))?;
+    native.define_singleton_method("gvl_fallbacks", function!(gvl_fallbacks, 0))?;
+    native.define_singleton_method("gvl_hold_lookups", function!(gvl_hold_lookups, 1))?;
+    native.define_singleton_method("gvl_refuse_threads", function!(gvl_refuse_threads, 1))?;
     native.define_singleton_method("url_set_option_str", function!(url_set_option_str, 3))?;
     native.define_singleton_method("url_set_path", function!(url_set_path, 2))?;
     native.define_singleton_method("url_set_port", function!(url_set_port, 2))?;

@@ -35,6 +35,7 @@ own API. Releases are tagged `ferro-url/vX.Y.Z`.
 
 ### Fixed
 
+- `Url#socket_addrs` no longer hangs, spinning with the GVL held and stalling every Ruby thread, when called with an interrupt pending that Ruby holds back (as inside a custom `Exception#backtrace`): it never waits for the lookup, or runs it, with the GVL held.
 - `Url#socket_addrs` applies the block's port to the URL as it was when called, even if the block changes the URL.
 - `Url#[]` refuses an inclusive beginless range (`..Position::X`) with `TypeError`, as url implements no `RangeToInclusive` index.
 - A frozen `Url`'s native value refuses every change, so private methods can no longer change a frozen or Ractor-shared `Url` through another `Url`.
