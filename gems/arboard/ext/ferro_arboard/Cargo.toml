@@ -16,7 +16,7 @@ crate-type = ["cdylib"]
 # core-graphics, image, and windows-sys; wayland-data-control implies
 # wl-clipboard-rs.
 arboard = { version = "=3.7.0", features = ["image-data", "wayland-data-control"] }
-magnus = { version = "0.9.3", features = ["bytes"] }
+magnus = { version = "0.9.3", features = ["bytes", "rb-sys"] }
 rb-sys = "0.9.130"
 
 # Each crate states its lints itself instead of inheriting them with

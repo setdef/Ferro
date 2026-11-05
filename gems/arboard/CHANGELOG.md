@@ -16,6 +16,11 @@ own API. Releases are tagged `ferro-arboard/vX.Y.Z`.
 
 - On macOS, `set_image` hands arboard a buffer longer than `width * height * 4`, which arboard draws from its first bytes, instead of raising `ConversionFailure`; it still refuses an empty buffer or a size that overflows.
 
+### Fixed
+
+- A clipboard call no longer stalls every Ruby thread, the gem no longer raises `ClipboardOccupied` for its own lock, and a call waits its turn, which `Thread#raise` and `Thread#kill` can end.
+- `Thread#raise`, `Thread#kill`, and Ctrl-C end a call waiting for another thread's call on the same `Clipboard`.
+
 ## [0.1.0.pre.2] - 2026-10-25
 
 ### Added

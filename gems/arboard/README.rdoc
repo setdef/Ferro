@@ -141,11 +141,12 @@ Three things differ from calling arboard from Rust:
   SetExtLinux#wait, #wait_until, or #wait_once. Every other call keeps the
   lock, because giving it up and taking it back costs up to a time slice
   for each other thread that wants it, far longer than a short clipboard
-  call. arboard cannot cancel a call in progress, so Ctrl-C,
-  <tt>Thread#kill</tt>, and <tt>Thread#raise</tt> take effect when it
-  returns, and the process does not exit until a thread stuck in such a
-  call is done; SetExtLinux#wait returns only once another program takes
-  the clipboard.
+  call. A call that finds the same Clipboard busy on another thread waits
+  its turn with the lock released, and Ctrl-C, <tt>Thread#kill</tt>, and
+  <tt>Thread#raise</tt> end that wait. arboard cannot cancel a call in
+  progress, so once it runs they take effect when it returns, and the
+  process does not exit until a thread stuck in such a call is done;
+  SetExtLinux#wait returns only once another program takes the clipboard.
 * On Linux, dropping the last clipboard hands its contents to the desktop's
   clipboard manager, waiting up to 100 ms, and stops arboard's X11 server
   thread. That happens when the garbage collector frees the clipboard, so a

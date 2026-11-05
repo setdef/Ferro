@@ -19,12 +19,12 @@
 //!   `Ferro::Arboard::Error` instead (plan 001, decision 5).
 
 mod gvl;
+mod lock;
 
 use std::any::Any;
 use std::borrow::Cow;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::PathBuf;
-use std::sync::{Mutex, MutexGuard, PoisonError, TryLockError};
 
 use magnus::{
     function, method, prelude::*, Error, ExceptionClass, RArray, RModule, RString, Ruby, Symbol,
@@ -34,7 +34,8 @@ use magnus::{
 /// The Ruby `Ferro::Arboard::Clipboard`: one arboard clipboard.
 ///
 /// arboard's methods take `&mut self`, and a Ruby object may be reached
-/// from several threads, so the clipboard sits behind a `Mutex`.
+/// from several threads, so the clipboard sits behind a lock, one whose
+/// wait Ruby can interrupt (`lock.rs`).
 /// `arboard::Clipboard` is `Send` and `Sync` (arboard `src/lib.rs:510-516`),
 /// so a frozen instance may be shared between Ractors (plan 001,
 /// decision 13).
@@ -50,7 +51,7 @@ use magnus::{
     size,
     frozen_shareable
 )]
-struct Clipboard(Mutex<arboard::Clipboard>);
+struct Clipboard(lock::Lock<arboard::Clipboard>);
 
 /// Why a call into arboard failed.
 #[derive(Debug)]
@@ -133,31 +134,6 @@ fn settle<T>(ruby: &Ruby, outcome: std::thread::Result<Result<T, Failure>>) -> R
     outcome
         .unwrap_or_else(|payload| Err(Failure::Panic(panic_message(payload.as_ref()))))
         .map_err(|failure| raise(ruby, &failure))
-}
-
-/// The clipboard's lock if it is free, recovering a poisoned one.
-fn try_lock<C>(mutex: &Mutex<C>) -> Option<MutexGuard<'_, C>> {
-    match mutex.try_lock() {
-        Ok(guard) => Some(guard),
-        Err(TryLockError::Poisoned(poisoned)) => Some(poisoned.into_inner()),
-        Err(TryLockError::WouldBlock) => None,
-    }
-}
-
-/// The clipboard's lock, for work running under `gvl::without_gvl`. With
-/// the GVL released it waits for the lock. On the rare fallback that runs
-/// the work with the GVL held, waiting could stall every Ruby thread for
-/// as long as another thread's `wait` lasts, so a lock in use reports
-/// arboard's `ClipboardOccupied` instead: the clipboard "is held by
-/// another party", here another thread of this program, as arboard
-/// describes it (`src/common.rs:33-42`).
-fn lock_for<C>(mutex: &Mutex<C>, gvl: gvl::Gvl) -> Result<MutexGuard<'_, C>, Failure> {
-    match gvl {
-        gvl::Gvl::Released => Ok(mutex.lock().unwrap_or_else(PoisonError::into_inner)),
-        gvl::Gvl::Held => {
-            try_lock(mutex).ok_or(Failure::Arboard(arboard::Error::ClipboardOccupied))
-        }
-    }
 }
 
 /// Whether arboard can draw an RGBA buffer of `len` bytes as a `width` by
@@ -549,7 +525,7 @@ impl Clipboard {
     /// `Clipboard.new`: arboard's `Clipboard::new` (`src/lib.rs:75-83`).
     fn new(ruby: &Ruby) -> Result<Self, Error> {
         settle(ruby, Ok(capture(arboard::Clipboard::new)))
-            .map(|clipboard| Self(Mutex::new(clipboard)))
+            .map(|clipboard| Self(lock::Lock::new(clipboard)))
     }
 
     /// Runs `operation` on the clipboard, under its lock and `capture`.
@@ -561,6 +537,9 @@ impl Clipboard {
     /// and retaking it costs a time slice per competing thread (gvl.rs), but
     /// only if the lock is free: when another thread holds it, perhaps
     /// through a long wait, this one waits for it with the GVL released.
+    /// Either wait ends early for `Thread#raise`, `Thread#kill`, or a
+    /// signal, through the lock's `Waiter`; the operation never runs with
+    /// the GVL held while another thread has the lock.
     ///
     /// The panic is caught inside the lock, so it never poisons it. A lock
     /// poisoned anyway is still used: arboard's clipboard holds no
@@ -574,7 +553,7 @@ impl Clipboard {
         operation: impl FnOnce(&mut arboard::Clipboard) -> Result<T, arboard::Error>,
     ) -> Result<T, Error> {
         if !blocking {
-            if let Some(mut clipboard) = try_lock(&self.0) {
+            if let Some(mut clipboard) = self.0.try_lock() {
                 // Settle only once the lock is released: nothing of Ruby's
                 // happens under it.
                 let outcome = capture(|| operation(&mut clipboard));
@@ -582,10 +561,13 @@ impl Clipboard {
                 return settle(ruby, Ok(outcome));
             }
         }
-        let outcome = gvl::without_gvl(ruby, |gvl| {
-            let mut clipboard = lock_for(&self.0, gvl)?;
-            capture(|| operation(&mut clipboard))
-        })?;
+        let waiter = self.0.waiter();
+        let outcome = gvl::without_gvl(
+            ruby,
+            &waiter,
+            || waiter.lock(),
+            |mut clipboard| capture(|| operation(&mut clipboard)),
+        )?;
         settle(ruby, outcome)
     }
 
@@ -738,17 +720,19 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     // it calls (doc/extension.rdoc:2207-2286 at Ruby v4.0.1). This crate
     // keeps no Ruby value in a static except magnus's class lookups, and
     // classes are shareable (extension.rdoc:2239-2240). Its one wrapped
-    // type is `Mutex<arboard::Clipboard>`, and arboard asserts its
-    // `Clipboard` is `Send + Sync` (arboard src/lib.rs:510-516).
-    // extension.rdoc:2278-2280 says a frozen-shareable object's wrapped data
-    // must not be mutated. This crate reads that rule as a guard against
-    // unsynchronized mutation and deliberately mutates a frozen clipboard
-    // under its Mutex, which `Send + Sync` makes sound; that is a reading of
-    // the rule, not what it literally says. Every other value a method
-    // touches is an argument or the
-    // receiver, which Ruby guarantees are the calling Ractor's own or
-    // shareable (extension.rdoc:2260-2261). `rb_ext_ractor_safe` takes a
-    // plain flag, called from `Init_` as extension.rdoc:2218-2220 asks.
+    // type is `lock::Lock<arboard::Clipboard>`, built of std's `Mutex` and
+    // `Condvar`, and arboard asserts its `Clipboard` is `Send + Sync`
+    // (arboard src/lib.rs:510-516). extension.rdoc:2278-2280 says a
+    // frozen-shareable object's wrapped data must not be mutated. This
+    // crate reads that rule as a guard against unsynchronized mutation and
+    // deliberately mutates a frozen clipboard under its lock, which
+    // `Send + Sync` makes sound; that is a reading of the rule, not what it
+    // literally says. The unblocking function `gvl.rs` gives Ruby may run
+    // on another Ractor's thread, and touches only that lock. Every other
+    // value a method touches is an argument or the receiver, which Ruby
+    // guarantees are the calling Ractor's own or shareable
+    // (extension.rdoc:2260-2261). `rb_ext_ractor_safe` takes a plain flag,
+    // called from `Init_` as extension.rdoc:2218-2220 asks.
     #[allow(unsafe_code)]
     unsafe {
         rb_sys::rb_ext_ractor_safe(true);
@@ -788,10 +772,9 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::{
-        capture, class_and_message, deadline, gvl::Gvl, is_drawable_by_core_graphics,
-        is_drawable_rgba, lock_for, try_lock, Failure,
+        capture, class_and_message, deadline, is_drawable_by_core_graphics, is_drawable_rgba,
+        Failure,
     };
-    use std::sync::Mutex;
     use std::time::{Duration, Instant};
 
     // The three is_drawable_rgba tests come from Tokra, relicensed with the
@@ -903,41 +886,6 @@ mod tests {
         assert_eq!(
             class_and_message(&Failure::Panic("boom".to_owned())),
             (None, "arboard panicked: boom".to_owned())
-        );
-    }
-
-    #[test]
-    fn a_lock_in_use_reports_clipboard_occupied_only_with_the_gvl_held() {
-        let mutex = Mutex::new(5);
-        let held = mutex.lock().expect("free");
-        assert!(try_lock(&mutex).is_none());
-        assert!(matches!(
-            lock_for(&mutex, Gvl::Held),
-            Err(Failure::Arboard(arboard::Error::ClipboardOccupied))
-        ));
-        drop(held);
-        assert_eq!(
-            lock_for(&mutex, Gvl::Held).map(|guard| *guard).ok(),
-            Some(5)
-        );
-        assert_eq!(
-            lock_for(&mutex, Gvl::Released).map(|guard| *guard).ok(),
-            Some(5)
-        );
-    }
-
-    #[test]
-    fn a_poisoned_lock_is_recovered() {
-        let mutex = Mutex::new(5);
-        let _ = std::panic::catch_unwind(|| {
-            let _guard = mutex.lock().expect("free");
-            panic!("poison it");
-        });
-        assert!(mutex.is_poisoned());
-        assert_eq!(try_lock(&mutex).map(|guard| *guard), Some(5));
-        assert_eq!(
-            lock_for(&mutex, Gvl::Released).map(|guard| *guard).ok(),
-            Some(5)
         );
     }
 

@@ -43,11 +43,12 @@ module Ferro
     # a write that waits) releases Ruby's global VM lock while arboard works,
     # so other Ruby threads run meanwhile; a short call keeps it, since
     # giving it up and taking it back costs up to a time slice per waiting
-    # thread. arboard cannot cancel a call in progress, so Ctrl-C and
-    # <tt>Thread#kill</tt> take effect when it returns, and the process does
-    # not exit until a thread stuck in one finishes. A short call that finds
-    # the clipboard busy with another thread's waiting write waits for it
-    # with the lock released.
+    # thread. A call that finds this Clipboard busy with another thread's
+    # call, such as a write that waits, waits its turn with the lock
+    # released, and never fails for that; Ctrl-C, <tt>Thread#raise</tt>, and
+    # <tt>Thread#kill</tt> end that wait. arboard cannot cancel a call
+    # already running, though, so they take effect when it returns, and the
+    # process does not exit until a thread stuck in one finishes.
     #
     # arboard asks that every clipboard be dropped before the program
     # exits. Ruby frees each one when the garbage collector collects it,
