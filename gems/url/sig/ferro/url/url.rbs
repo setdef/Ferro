@@ -22,9 +22,7 @@ module Ferro
       def make_relative: (Url url) -> String?
       def as_str: () -> String
       def to_s: () -> String
-      def into_string: () -> String
-      def inspect: () -> String
-      def check_invariants: () -> nil
+      def debug: () -> String
       def origin: () -> Origin
       def scheme: () -> String
       def is_special: () -> bool
@@ -43,13 +41,15 @@ module Ferro
       def path: () -> String
       def path_segments: () -> Enumerator[String, Array[String]]?
       def query: () -> String?
-      def query_pairs: () -> Enumerator[[String, String], Array[[String, String]]]
+      def query_pairs: () -> FormUrlencoded::Parse
       def fragment: () -> String?
       def set_fragment: (String? fragment) -> nil
       def set_query: (String? query) -> nil
       def query_pairs_mut: () -> FormUrlencoded::Serializer
+                         | [T] () { (FormUrlencoded::Serializer serializer) -> T } -> T
       def set_path: (String path) -> nil
       def path_segments_mut: () -> PathSegmentsMut
+                           | [T] () { (PathSegmentsMut segments) -> T } -> T
       def set_port: (Integer? port) -> nil
       def set_host: (String? host) -> nil
       def set_ip_host: (IPAddr address) -> nil

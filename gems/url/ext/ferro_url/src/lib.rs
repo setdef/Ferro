@@ -6,8 +6,9 @@
 //!
 //! Ruby owns the public API (`lib/ferro/url`). The functions here live on
 //! `Ferro::Url::Native`, a private module, beside `Native::Url`, which owns
-//! a `url::Url`, and `Native::OpaqueOrigin`. A host crosses as
-//! `[variant, value]` and an origin as `[variant, ...]` (`values.rs`).
+//! a `url::Url`, `Native::OpaqueOrigin`, and `form_urlencoded`'s iterators
+//! `Native::Parse` and `Native::ByteSerialize` (`iter.rs`). A host crosses
+//! as `[variant, value]` and an origin as `[variant, ...]` (`values.rs`).
 //!
 //! Three rules hold for every function:
 //!
@@ -26,8 +27,8 @@
 
 mod form;
 mod gvl;
+mod iter;
 mod native_url;
-mod quirks;
 mod values;
 
 use std::any::Any;
@@ -140,7 +141,8 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     // the atomic counter behind `Origin::new_opaque` (url 2.5.8
     // src/origin.rs:65-69). The wrapped types are a `Mutex` over a `Url`,
     // which is `Send` and `Sync`, and an `OpaqueOrigin`, a number no method
-    // changes, so sharing either frozen is sound. Every other value a
+    // changes, so sharing either frozen is sound. The iterators sit behind a
+    // `Mutex` too and are never frozen, so Ruby never shares them. Every other value a
     // function touches is an argument, which Ruby guarantees is the calling
     // Ractor's own or shareable (extension.rdoc:2260-2261).
     // `rb_ext_ractor_safe` takes a plain flag, called from `Init_` as
@@ -160,11 +162,17 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     native
         .define_class("OpaqueOrigin", ruby.class_object())?
         .undef_default_alloc_func();
+    native
+        .define_class("Parse", ruby.class_object())?
+        .undef_default_alloc_func();
+    native
+        .define_class("ByteSerialize", ruby.class_object())?
+        .undef_default_alloc_func();
 
     native_url::define(native)?;
     values::define(native)?;
     form::define(native)?;
-    quirks::define(native)?;
+    iter::define(native)?;
     Ok(())
 }
 

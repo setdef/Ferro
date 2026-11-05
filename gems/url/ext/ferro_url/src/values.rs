@@ -17,6 +17,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use magnus::{function, prelude::*, Error, IntoValue, RArray, RModule, Ruby, Symbol, Value};
 use url::{Host, OpaqueOrigin, Origin, ParseError, SyntaxViolation};
 
+use crate::native_url::position;
 use crate::{guarded, raise};
 
 /// The Ruby `Ferro::Url::Native::OpaqueOrigin`, which
@@ -117,6 +118,41 @@ pub const fn parse_error_path(error: ParseError) -> &'static str {
     }
 }
 
+/// url's `ParseError` variant named `name`, the last part of its Ruby
+/// class's name (`src/parser.rs:50-99`).
+fn parse_error_named(name: &str) -> Option<ParseError> {
+    Some(match name {
+        "EmptyHost" => ParseError::EmptyHost,
+        "IdnaError" => ParseError::IdnaError,
+        "InvalidPort" => ParseError::InvalidPort,
+        "InvalidIpv4Address" => ParseError::InvalidIpv4Address,
+        "InvalidIpv6Address" => ParseError::InvalidIpv6Address,
+        "InvalidDomainCharacter" => ParseError::InvalidDomainCharacter,
+        "RelativeUrlWithoutBase" => ParseError::RelativeUrlWithoutBase,
+        "RelativeUrlWithCannotBeABaseBase" => ParseError::RelativeUrlWithCannotBeABaseBase,
+        "SetHostOnCannotBeABaseUrl" => ParseError::SetHostOnCannotBeABaseUrl,
+        "Overflow" => ParseError::Overflow,
+        _ => return None,
+    })
+}
+
+/// `ArgumentError` for a variant name the Ruby side never sends.
+fn no_variant(ruby: &Ruby, what: &str, name: &str) -> Error {
+    Error::new(
+        ruby.exception_arg_error(),
+        format!("no {what} variant {name}"),
+    )
+}
+
+/// `ParseError`'s derived `Debug` (`src/parser.rs:56`) for the variant
+/// named `name`, formatted by Rust.
+fn parse_error_debug(ruby: &Ruby, name: Symbol) -> Result<String, Error> {
+    let name = name.name()?;
+    parse_error_named(&name)
+        .map(|error| format!("{error:?}"))
+        .ok_or_else(|| no_variant(ruby, "ParseError", &name))
+}
+
 /// url's `ParseError` as a Ruby exception, with its `Display` text.
 pub fn parse_error(ruby: &Ruby, error: ParseError) -> Error {
     raise(ruby, parse_error_path(error), error.to_string())
@@ -152,12 +188,22 @@ fn syntax_violation_description(ruby: &Ruby, name: Symbol) -> Result<String, Err
     let name = name.name()?;
     syntax_violation(&name)
         .map(|violation| violation.description().to_owned())
-        .ok_or_else(|| {
-            Error::new(
-                ruby.exception_arg_error(),
-                format!("no SyntaxViolation variant {name}"),
-            )
-        })
+        .ok_or_else(|| no_variant(ruby, "SyntaxViolation", &name))
+}
+
+/// `SyntaxViolation`'s derived `Debug` (`src/parser.rs:113`) for the
+/// variant named `name`, formatted by Rust.
+fn syntax_violation_debug(ruby: &Ruby, name: Symbol) -> Result<String, Error> {
+    let name = name.name()?;
+    syntax_violation(&name)
+        .map(syntax_violation_name)
+        .ok_or_else(|| no_variant(ruby, "SyntaxViolation", &name))
+}
+
+/// `Position`'s derived `Debug` (`src/slicing.rs:104`) for the variant
+/// named `name`, formatted by Rust.
+fn position_debug(ruby: &Ruby, name: Symbol) -> Result<String, Error> {
+    position(ruby, name).map(|position| format!("{position:?}"))
 }
 
 /// `Host::parse(input)` (`src/host.rs:78-83`).
@@ -184,6 +230,13 @@ fn host_to_s(ruby: &Ruby, parts: RArray) -> Result<String, Error> {
     guarded(ruby, move || Ok(host.to_string()))
 }
 
+/// `Host`'s derived `Debug` (`src/host.rs:45`), formatted by Rust:
+/// `Domain("example.com")`, `Ipv4(1.2.3.4)`, `Ipv6(::1)`.
+fn host_debug(ruby: &Ruby, parts: RArray) -> Result<String, Error> {
+    let host = host_from_ruby(ruby, parts)?;
+    guarded(ruby, move || Ok(format!("{host:?}")))
+}
+
 /// `Host`'s derived `Ord` (`src/host.rs:44`): -1, 0, or 1.
 fn host_cmp(ruby: &Ruby, left: RArray, right: RArray) -> Result<i8, Error> {
     let left = host_from_ruby(ruby, left)?;
@@ -208,6 +261,14 @@ fn origin_ascii_serialization(ruby: &Ruby, parts: RArray) -> Result<String, Erro
     guarded(ruby, move || Ok(origin.ascii_serialization()))
 }
 
+/// `Origin`'s derived `Debug` (`src/origin.rs:55`), formatted by Rust:
+/// `Tuple("https", Domain("example.com"), 443)` or
+/// `Opaque(OpaqueOrigin(3))`.
+fn origin_debug(ruby: &Ruby, parts: RArray) -> Result<String, Error> {
+    let origin = origin_from_ruby(ruby, parts)?;
+    guarded(ruby, move || Ok(format!("{origin:?}")))
+}
+
 /// `Origin::unicode_serialization` (`src/origin.rs:91-110`).
 fn origin_unicode_serialization(ruby: &Ruby, parts: RArray) -> Result<String, Error> {
     let origin = origin_from_ruby(ruby, parts)?;
@@ -227,8 +288,9 @@ fn opaque_origin_hash(origin: &NativeOpaqueOrigin) -> u64 {
     hasher.finish()
 }
 
-/// `OpaqueOrigin`'s `Debug` (`src/origin.rs:113`): `OpaqueOrigin(3)`.
-fn opaque_origin_inspect(origin: &NativeOpaqueOrigin) -> String {
+/// `OpaqueOrigin`'s derived `Debug` (`src/origin.rs:114`), formatted by
+/// Rust: `OpaqueOrigin(3)`.
+fn opaque_origin_debug(origin: &NativeOpaqueOrigin) -> String {
     format!("{:?}", origin.0)
 }
 
@@ -237,6 +299,7 @@ pub fn define(native: RModule) -> Result<(), Error> {
     native.define_singleton_method("host_parse_opaque", function!(host_parse_opaque, 1))?;
     native.define_singleton_method("host_to_s", function!(host_to_s, 1))?;
     native.define_singleton_method("host_cmp", function!(host_cmp, 2))?;
+    native.define_singleton_method("host_debug", function!(host_debug, 1))?;
     native.define_singleton_method("origin_new_opaque", function!(origin_new_opaque, 0))?;
     native.define_singleton_method(
         "origin_ascii_serialization",
@@ -246,20 +309,28 @@ pub fn define(native: RModule) -> Result<(), Error> {
         "origin_unicode_serialization",
         function!(origin_unicode_serialization, 1),
     )?;
+    native.define_singleton_method("origin_debug", function!(origin_debug, 1))?;
     native.define_singleton_method("opaque_origin_eq", function!(opaque_origin_eq, 2))?;
     native.define_singleton_method("opaque_origin_hash", function!(opaque_origin_hash, 1))?;
-    native.define_singleton_method("opaque_origin_inspect", function!(opaque_origin_inspect, 1))?;
+    native.define_singleton_method("opaque_origin_debug", function!(opaque_origin_debug, 1))?;
     native.define_singleton_method(
         "syntax_violation_description",
         function!(syntax_violation_description, 1),
     )?;
+    native.define_singleton_method(
+        "syntax_violation_debug",
+        function!(syntax_violation_debug, 1),
+    )?;
+    native.define_singleton_method("parse_error_debug", function!(parse_error_debug, 1))?;
+    native.define_singleton_method("position_debug", function!(position_debug, 1))?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_error_path, syntax_violation, syntax_violation_name};
-    use url::{ParseError, SyntaxViolation};
+    use super::{parse_error_named, parse_error_path, syntax_violation, syntax_violation_name};
+    use std::net::{Ipv4Addr, Ipv6Addr};
+    use url::{Host, Origin, ParseError, Position, SyntaxViolation};
 
     // SPDX-SnippetBegin
     // SPDX-SnippetCopyrightText: 2013-2025 The rust-url developers
@@ -322,7 +393,9 @@ mod tests {
             assert_eq!(parse_error_path(error), format!("ParseError::{variant}"));
             assert_eq!(error.to_string(), text);
             assert_eq!(format!("{error:?}"), variant);
+            assert_eq!(parse_error_named(variant), Some(error));
         }
+        assert_eq!(parse_error_named("ParseError"), None);
     }
 
     #[test]
@@ -365,6 +438,34 @@ mod tests {
             assert_eq!(violation.to_string(), description);
         }
         assert_eq!(syntax_violation("Nope"), None);
+    }
+
+    #[test]
+    fn the_values_debug_as_url_derives() {
+        assert_eq!(
+            format!("{:?}", Host::Domain("example.com".to_owned())),
+            "Domain(\"example.com\")"
+        );
+        assert_eq!(
+            format!("{:?}", Host::<String>::Ipv4(Ipv4Addr::new(1, 2, 3, 4))),
+            "Ipv4(1.2.3.4)"
+        );
+        assert_eq!(
+            format!("{:?}", Host::<String>::Ipv6(Ipv6Addr::LOCALHOST)),
+            "Ipv6(::1)"
+        );
+        let tuple = Origin::Tuple(
+            "https".to_owned(),
+            Host::Domain("example.com".to_owned()),
+            8443,
+        );
+        assert_eq!(
+            format!("{tuple:?}"),
+            "Tuple(\"https\", Domain(\"example.com\"), 8443)"
+        );
+        let opaque = format!("{:?}", Origin::new_opaque());
+        assert!(opaque.starts_with("Opaque(OpaqueOrigin("), "{opaque}");
+        assert_eq!(format!("{:?}", Position::BeforePath), "BeforePath");
     }
 
     // SPDX-SnippetEnd

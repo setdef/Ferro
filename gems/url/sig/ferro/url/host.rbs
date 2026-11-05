@@ -11,6 +11,7 @@ module Ferro
 
       def to_s: () -> String
       def <=>: (Object other) -> Integer?
+      def debug: () -> String
 
       class Domain < Data
         include Host

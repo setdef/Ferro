@@ -27,7 +27,7 @@ module Ferro
       private def self.new: (Symbol name, Integer index) -> instance
 
       def initialize: (Symbol name, Integer index) -> void
-      def inspect: () -> String
+      def debug: () -> String
       def <=>: (Object other) -> Integer?
 
       attr_reader index: Integer

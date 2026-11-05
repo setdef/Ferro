@@ -4,8 +4,8 @@
 module Ferro
   module Url
     module FormUrlencoded
-      def self.parse: (String input) -> Enumerator[[String, String], Array[[String, String]]]
-      def self.byte_serialize: (String input) -> Enumerator[String, Array[String]]
+      def self.parse: (String input) -> Parse
+      def self.byte_serialize: (String input) -> ByteSerialize
     end
   end
 end

@@ -81,13 +81,15 @@ module Ferro
         freeze
       end
 
-      # The constant that holds this position.
+      # url's +Debug+ text for this position, formatted by Rust: the
+      # variant's name. +inspect+ stays Ruby's. Mirrors url's
+      # <tt>#[derive(Debug)]</tt> on +Position+ (<tt>src/slicing.rs:104</tt>).
       #
       # === Example
       #
-      #   Ferro::Url::Position::BeforePath.inspect # => "Ferro::Url::Position::BeforePath"
-      def inspect
-        "Ferro::Url::Position::#{@name}"
+      #   Ferro::Url::Position::BeforePath.debug # => "BeforePath"
+      def debug
+        Native.position_debug(@name)
       end
 
       # Orders positions as url declares them, which is the order they

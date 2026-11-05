@@ -5,6 +5,9 @@ module Ferro
   module Url
     class PathSegmentsMut
       @url: Url
+      @start: Native::Url
+      @operations: Array[operation]
+      @dropped: bool
 
       private def self.new: (Url url) -> instance
 
@@ -14,10 +17,14 @@ module Ferro
       def pop: () -> self
       def push: (String segment) -> self
       def extend: (Enumerable[String] segments) -> self
+      def debug: () -> String
 
       private
 
       def run: (operation operation) -> self
+      def record: (operation operation) -> operation
+      def drop: () -> void
+      def open!: () -> void
     end
   end
 end

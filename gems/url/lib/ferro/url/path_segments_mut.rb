@@ -26,9 +26,11 @@ module Ferro
     # The path always starts with a <tt>/</tt> slash, and is made of
     # slash-separated segments. There is always at least one segment
     # (which may be the empty string). Url#path_segments_mut returns one of
-    # these, and each method changes the URL at once and returns +self+,
-    # so calls chain. In Rust the value borrows the URL until it is
-    # dropped; here the URL stays valid between calls.
+    # these, or yields it to a block, and each method changes the URL at
+    # once and returns +self+, so calls chain. In Rust the value borrows the
+    # URL until it is dropped; here the URL stays valid between calls. One
+    # given to a block is dropped when the block ends, and every method
+    # then raises +IOError+, as a closed IO does.
     #
     # Mirrors url's +PathSegmentsMut+ (<tt>src/path_segments.rs:14-267</tt>).
     #
@@ -40,12 +42,15 @@ module Ferro
     class PathSegmentsMut
       private_class_method :new
 
-      # Holds +url+, the Url whose path it changes.
+      # Holds +url+, the Url whose path it changes, a copy of it as it is
+      # now, and no operations yet, for #debug.
       #
       # [url] Url.
       def initialize(url)
         @url = url
-        freeze
+        @start = Native.url_clone(Arguments.native(url))
+        @operations = []
+        @dropped = false
       end
 
       # Removes all segments in the path, leaving the minimal
@@ -143,11 +148,71 @@ module Ferro
         run([:extend, segments.to_a])
       end
 
-      # Runs one operation on the URL's path and returns +self+.
+      # url's +Debug+ text for this value, formatted by Rust: the URL as the
+      # Rust value holds it, with what follows the path cut away, and the
+      # offsets it keeps. +inspect+ stays Ruby's. The text is that of a real
+      # PathSegmentsMut made when this one was, with this one's calls run
+      # on it, so it is what the long-lived Rust value would show. Each
+      # call is recorded with a frozen copy of its segments, so changing a
+      # String or Array after passing it does not change this text.
+      #
+      # url's +Debug+ for one over a URL with a query or a fragment reads
+      # offsets the value has cut away: the cut keeps where the query and
+      # fragment started, and +Url+'s +Debug+ slices the shorter text there
+      # for the path, the query, and the fragment, in that order. Where a
+      # slice falls outside the text, url panics, so this raises
+      # ArgumentError first with the panic's text, Rust's own for that
+      # slice, such as <tt>start byte index 22 is out of bounds for string
+      # of length 21</tt>. Where every slice falls inside, as after a call
+      # that lengthens the path, url shows bytes from the wrong place, and
+      # so does this. Mirrors url's <tt>#[derive(Debug)]</tt> on
+      # +PathSegmentsMut+ (<tt>src/path_segments.rs:41-47</tt>) and
+      # +Url+'s +Debug+ (<tt>src/lib.rs:2809-2826</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Url::Url.parse("https://example.com/a").path_segments_mut { |path| path.push("b").debug }
+      #   # => "PathSegmentsMut { url: Url { scheme: \"https\", cannot_be_a_base: false, username: \"\", password: None, host: Some(Domain(\"example.com\")), port: None, path: \"/a/b\", query: None, fragment: None }, after_first_slash: 20, after_path: \"\", old_after_path_position: 21 }"
+      #
+      #   Ferro::Url::Url.parse("https://example.com/a?b").path_segments_mut(&:debug)
+      #   # raises ArgumentError, "start byte index 22 is out of bounds for string of length 21"
+      def debug
+        open!
+        Native.path_segments_mut_debug(@start, @operations)
+      end
+
+      # Runs one operation on the URL's path, records a frozen copy of it
+      # for #debug, and returns +self+.
       private def run(operation)
+        open!
         @url.__send__(:writable!)
         Native.url_path_segments_mut(Arguments.native(@url), operation)
+        @operations << record(operation)
         self
+      end
+
+      # A frozen copy of +operation+, which url has just taken, so a caller
+      # who changes a segment String or Array afterwards cannot change
+      # #debug.
+      private def record(operation)
+        operation.map do |part|
+          case part
+          when Symbol then part
+          when String then part.dup.freeze
+          else part.map { |segment| String(segment).dup.freeze }.freeze
+          end
+        end.freeze
+      end
+
+      # Ends this value's scope, as Rust's +Drop+ does at the end of
+      # Url#path_segments_mut's block.
+      private def drop
+        @dropped = true
+      end
+
+      # Refuses a call once this value is dropped.
+      private def open!
+        raise IOError, "PathSegmentsMut dropped at the end of Url#path_segments_mut's block" if @dropped
       end
     end
 

@@ -36,7 +36,7 @@ module Ferro
     #     .syntax_violation_callback(->(violation) { violations << violation })
     #     .parse("https:////example.com")
     #   url.as_str # => "https://example.com/"
-    #   violations # => [Ferro::Url::SyntaxViolation::ExpectedDoubleSlash]
+    #   violations.map(&:debug) # => ["ExpectedDoubleSlash"]
     class SyntaxViolation
       private_class_method :new
 
@@ -68,13 +68,16 @@ module Ferro
         @description
       end
 
-      # The constant that holds this variant.
+      # url's +Debug+ text for this violation, formatted by Rust: the
+      # variant's name. +inspect+ stays Ruby's. Mirrors url's
+      # <tt>#[derive(Debug)]</tt> on +SyntaxViolation+
+      # (<tt>src/parser.rs:113</tt>).
       #
       # === Example
       #
-      #   Ferro::Url::SyntaxViolation::Backslash.inspect # => "Ferro::Url::SyntaxViolation::Backslash"
-      def inspect
-        "Ferro::Url::SyntaxViolation::#{@name}"
+      #   Ferro::Url::SyntaxViolation::Backslash.debug # => "Backslash"
+      def debug
+        Native.syntax_violation_debug(@name)
       end
 
       # backslash

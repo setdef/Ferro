@@ -111,15 +111,6 @@ class TestUnit < Minitest::Test
     assert_equal "moz://foo@servo/baz", base.as_str
   end
 
-  def test_set_empty_hostname
-    refute no_error { U::Quirks.set_hostname(url("moz://foo@servo/baz"), "") }, "a URL with a username"
-    refute no_error { U::Quirks.set_hostname(url("moz://:pass@servo/baz"), "") }, "a URL with a password"
-    base = url("moz://servo/baz")
-    U::Quirks.set_hostname(base, "")
-
-    assert_equal "moz:///baz", base.as_str
-  end
-
   def test_set_empty_query
     base = url("moz://example.com/path?query")
     base.set_query("")
@@ -300,7 +291,6 @@ class TestUnit < Minitest::Test
 
     assert_nil secure.port
     assert_equal 443, secure.port_or_known_default
-    assert_nil secure.check_invariants
   end
 
   # https://github.com/servo/rust-url/issues/197
@@ -309,7 +299,6 @@ class TestUnit < Minitest::Test
 
     root = Url.from_file_path("/")
 
-    assert_nil root.check_invariants
     assert_equal url("file:///"), root
     root.path_segments_mut.pop_if_empty
   end
@@ -323,7 +312,6 @@ class TestUnit < Minitest::Test
     local = url("http://localhost:6767/foo/bar?a=b")
     local.path_segments_mut.push("")
 
-    assert_nil local.check_invariants
     assert_equal "http://localhost:6767/foo/bar/?a=b", local.to_s
   end
 
@@ -332,11 +320,9 @@ class TestUnit < Minitest::Test
     local = url("http://localhost:6767/foo/bar")
     local.query_pairs_mut.extend_pairs([%w[auth my-token]])
 
-    assert_nil local.check_invariants
     assert_equal "http://localhost:6767/foo/bar?auth=my-token", local.to_s
     local.path_segments_mut.push("some_other_path")
 
-    assert_nil local.check_invariants
     assert_equal "http://localhost:6767/foo/bar/some_other_path?auth=my-token", local.to_s
   end
 
@@ -344,7 +330,6 @@ class TestUnit < Minitest::Test
     local = url("http://localhost:6767/foo/bar?a=b")
     local.path_segments_mut.push("").pop
 
-    assert_nil local.check_invariants
     assert_equal "http://localhost:6767/foo/bar?a=b", local.to_s
   end
 
@@ -515,35 +500,6 @@ class TestUnit < Minitest::Test
     assert_equal "[::1]", example.host_str
   end
 
-  def test_set_href
-    existing = url("https://existing.url")
-
-    assert_raises(U::ParseError) { U::Quirks.set_href(existing, "mal//formed") }
-    full = "https://user:pass@domain.com:9742/path/file.ext?key=val&key2=val2#fragment"
-    U::Quirks.set_href(existing, full)
-
-    assert_equal url(full), existing
-  end
-
-  def test_domain_encoding_quirks
-    [
-      ["http://example.com", "", ""],
-      ["😅.🙂", "xn--j28h.xn--938h", "😅.🙂"],
-      ["example.com", "example.com", "example.com"],
-      ["mailto:test@example.net", "", ""],
-].each do |input, ascii, unicode|
-      assert_equal ascii, U::Quirks.domain_to_ascii(input)
-      assert_equal unicode, U::Quirks.domain_to_unicode(input)
-    end
-  end
-
-  def test_expose_internals
-    parts = U::Quirks.internal_components(url("https://example.com/path/file.ext?key=val&key2=val2#fragment"))
-
-    assert_equal U::Quirks::InternalComponents.new(scheme_end: 5, username_end: 8, host_start: 8, host_end: 19,
-      port: nil, path_start: 19, query_start: 33, fragment_start: 51), parts
-  end
-
   def test_windows_unc_path
     skip "Windows only" unless WINDOWS
 
@@ -676,11 +632,6 @@ class TestUnit < Minitest::Test
 
     assert_raises(U::Error) { local.set_scheme("") }
     assert_equal "http://localhost:6767/foo/bar", local.to_s
-  end
-
-  def test_no_panic
-    odd = url("arhttpsps:/.//eom/dae.com/\\\\t\\:")
-    U::Quirks.set_hostname(odd, "//eom/datcom/\\\\t\\://eom/data.cs")
   end
 
   def test_null_host_with_leading_empty_path_segment
@@ -820,20 +771,14 @@ path: "/path/file.ext",
 
   def test_issue_864
     empty = url("file://")
+
+    assert_equal 'Url { scheme: "file", cannot_be_a_base: false, username: "", password: None, host: None, ' \
+      'port: None, path: "/", query: None, fragment: None }', empty.debug
     empty.set_path("x")
 
-    assert_nil empty.check_invariants
-  end
-
-  def test_issue_974
-    port = url("http://example.com:8000")
-    begin
-      U::Quirks.set_port(port, "\u00009000")
-    rescue U::Error
-      nil
-    end
-
-    assert_equal 8000, port.port
+    assert_equal 'Url { scheme: "file", cannot_be_a_base: false, username: "", password: None, host: None, ' \
+      'port: None, path: "/x", query: None, fragment: None }', empty.debug
+    assert_equal "file:///x", empty.as_str
   end
 
   def test_parse_url_with_single_byte_control_host

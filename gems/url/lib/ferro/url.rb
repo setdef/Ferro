@@ -20,7 +20,6 @@ require_relative "url/url"
 require_relative "url/path_segments_mut"
 require_relative "url/url_query"
 require_relative "url/form_urlencoded"
-require_relative "url/quirks"
 
 # Gems that bind Rust crates to Ruby one to one.
 #

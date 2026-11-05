@@ -22,10 +22,13 @@ module Ferro
     # <tt>url::Url::set_port returned Err(())</tt>. ParseError, url's own
     # error, is not a subclass: rescue it separately.
     #
-    # The gem raises this class too where Rust would panic: a
-    # FormUrlencoded::Serializer used after +finish+, or a slice of a URL
-    # that runs backward. A panic inside url, which would otherwise end the
-    # Ruby process, raises it with the message <tt>url panicked: ...</tt>.
+    # A panic inside url, which would otherwise end the Ruby process, raises
+    # this class too, with the message <tt>url panicked: ...</tt>. The
+    # panics the gem knows of are refused first with Ruby's own classes and
+    # Rust's message: +RangeError+ for a slice of a URL that runs backward,
+    # +ArgumentError+ for a FormUrlencoded::Serializer start position
+    # form_urlencoded cannot use, and +IOError+ for a serializer used after
+    # +finish+, as for a closed IO.
     #
     # === Examples
     #

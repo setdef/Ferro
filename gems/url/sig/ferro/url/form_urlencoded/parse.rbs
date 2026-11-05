@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    module FormUrlencoded
+      class Parse
+        include Enumerable[[String, String]]
+
+        @native: Native::Parse
+
+        private def self.new: (Native::Parse native) -> instance
+
+        def initialize: (Native::Parse native) -> void
+        def next: () -> [String, String]?
+        def each: () { ([String, String] pair) -> void } -> self
+                | () -> Enumerator[[String, String], self]
+
+        private
+
+        def initialize_copy: (Parse source) -> void
+        attr_reader native: Native::Parse
+      end
+    end
+  end
+end

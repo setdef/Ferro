@@ -12,16 +12,32 @@ own API. Releases are tagged `ferro-url/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `debug` on `Url`, `Host`, `Origin`, `OpaqueOrigin`, `Position`, `SyntaxViolation`, each `ParseError` variant, `PathSegmentsMut`, and `FormUrlencoded::ByteSerialize`, answering url's `Debug` text as Rust formats it.
+- `Url#path_segments_mut` and `Url#query_pairs_mut` take a block, the Rust value's scope: they yield the value, return the block's value, and drop the value when the block ends, after which any call on it raises `IOError`.
+- `FormUrlencoded::Parse` and `FormUrlencoded::ByteSerialize`, form_urlencoded's iterators, with `next` (`nil` at the end), `each`, and `Enumerable`; `Parse#dup` copies its place, and `ByteSerialize#size_hint` is form_urlencoded's.
+
+### Changed
+
+- **Breaking:** `inspect` on `Url`, `OpaqueOrigin`, `Position`, and `SyntaxViolation` is Ruby's default, naming the class; url's `Debug` text moved to `debug`.
+- **Breaking:** `Url#query_pairs` and `FormUrlencoded.parse` return a `FormUrlencoded::Parse`, and `FormUrlencoded.byte_serialize` a `FormUrlencoded::ByteSerialize`, instead of an Enumerator; each reads one item per `next`, and `each` consumes what remains.
+- **Breaking:** A `FormUrlencoded::Serializer` used after `finish` raises `IOError`, not `Error`, with form_urlencoded's message.
+- **Breaking:** A backward slice, `url[Position::AfterPath...Position::BeforePath]`, raises `RangeError` with Rust's message, `byte range starts at 21 but ends at 19`, instead of `Error` with the gem's own.
+- **Breaking:** A `Serializer` start position inside a character is refused only by `clear`, where form_urlencoded panics, with `ArgumentError` and std's message, `assertion failed: self.is_char_boundary(new_len)`; `for_suffix` and the appends accept it, as form_urlencoded does.
+- `Url#socket_addrs` runs the lookup on the calling thread, with the GVL still released, when no lookup thread can start, instead of raising `Error`.
+
 ### Removed
 
+- Built without url's `expose_internals` feature, which only adds to the unbound `quirks` module.
 - `Position` no longer includes `Comparable`; only `<=>`, which Range needs, remains.
+- **Breaking:** `Url#into_string`, which url deprecates, and `Url#check_invariants` and `Quirks` (with `Quirks::InternalComponents`), which url hides with `#[doc(hidden)]`.
 
 ### Fixed
 
 - `Url#socket_addrs` applies the block's port to the URL as it was when called, even if the block changes the URL.
 - `Url#[]` refuses an inclusive beginless range (`..Position::X`) with `TypeError`, as url implements no `RangeToInclusive` index.
 - A frozen `Url`'s native value refuses every change, so private methods can no longer change a frozen or Ractor-shared `Url` through another `Url`.
-- `Quirks` setters given anything but a `Url` raise `TypeError` instead of `NoMethodError`.
 
 ## [0.1.0.pre.1] - 2026-10-27
 

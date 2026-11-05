@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Url
+    module FormUrlencoded
+      class ByteSerialize
+        include Enumerable[String]
+
+        @native: Native::ByteSerialize
+
+        private def self.new: (Native::ByteSerialize native) -> instance
+
+        def initialize: (Native::ByteSerialize native) -> void
+        def next: () -> String?
+        def each: () { (String slice) -> void } -> self
+                | () -> Enumerator[String, self]
+        def size_hint: () -> [Integer, Integer?]
+        def debug: () -> String
+
+        private
+
+        def initialize_copy: (ByteSerialize source) -> void
+      end
+    end
+  end
+end

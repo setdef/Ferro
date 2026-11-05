@@ -9,33 +9,43 @@ module Ferro
       def initialize: (?String? message) -> void
 
       class EmptyHost < ParseError
+        def debug: () -> String
       end
 
       class IdnaError < ParseError
+        def debug: () -> String
       end
 
       class InvalidPort < ParseError
+        def debug: () -> String
       end
 
       class InvalidIpv4Address < ParseError
+        def debug: () -> String
       end
 
       class InvalidIpv6Address < ParseError
+        def debug: () -> String
       end
 
       class InvalidDomainCharacter < ParseError
+        def debug: () -> String
       end
 
       class RelativeUrlWithoutBase < ParseError
+        def debug: () -> String
       end
 
       class RelativeUrlWithCannotBeABaseBase < ParseError
+        def debug: () -> String
       end
 
       class SetHostOnCannotBeABaseUrl < ParseError
+        def debug: () -> String
       end
 
       class Overflow < ParseError
+        def debug: () -> String
       end
     end
   end

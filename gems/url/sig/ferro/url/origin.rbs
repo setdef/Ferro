@@ -9,6 +9,7 @@ module Ferro
       def is_tuple: () -> bool
       def ascii_serialization: () -> String
       def unicode_serialization: () -> String
+      def debug: () -> String
 
       class Opaque < Data
         include Origin

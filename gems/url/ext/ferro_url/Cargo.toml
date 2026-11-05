@@ -12,9 +12,11 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-# Every url feature that builds is on (plan 005, decision 2): std is its
-# default, and debugger_visualizer names a file the published crate lacks.
-url = { version = "=2.5.8", features = ["serde", "expose_internals"] }
+# url's std (its default) and serde are built (plan 005, decision 2).
+# expose_internals adds only items to url's #[doc(hidden)] quirks module,
+# which the gem does not bind, and debugger_visualizer names a file the
+# published crate lacks, so both are off.
+url = { version = "=2.5.8", features = ["serde"] }
 # url's own form_urlencoded, named because the native layer writes to its
 # Serializer over a String target (plan 005, decision 19).
 form_urlencoded = "=1.2.2"

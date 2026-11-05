@@ -48,22 +48,12 @@ class TestValues < Minitest::Test
       -> { Url.from_file_path("relative") } => "url::Url::from_file_path",
       -> { Url.from_directory_path("relative") } => "url::Url::from_directory_path",
       -> { url("http://host/x").to_file_path } => "url::Url::to_file_path",
-      -> { U::Quirks.set_protocol(mailto, "https") } => "url::quirks::set_protocol",
-      -> { U::Quirks.set_username(mailto, "x") } => "url::quirks::set_username",
-      -> { U::Quirks.set_password(mailto, "x") } => "url::quirks::set_password",
-      -> { U::Quirks.set_host(mailto, "x") } => "url::quirks::set_host",
-      -> { U::Quirks.set_hostname(mailto, "x") } => "url::quirks::set_hostname",
-      -> { U::Quirks.set_port(mailto, "80") } => "url::quirks::set_port",
     }.each do |call, function|
       error = assert_raises(U::Error, function) { call.call }
 
       assert_equal "#{function} returned Err(())", error.message
     end
     assert_equal "mailto:rms@example.net", mailto.as_str
-  end
-
-  def test_check_invariants_holds_for_urls_own_values
-    assert_nil url("https://user:pass@example.com:8080/a?b#c").check_invariants
   end
 
   def test_a_url_is_comparable_and_hashes_by_its_serialization
@@ -78,22 +68,56 @@ class TestValues < Minitest::Test
     assert_equal "http://a/", a.to_s
   end
 
-  def test_inspect_is_urls_debug_text
+  def test_debug_is_urls_debug_text
     assert_equal 'Url { scheme: "https", cannot_be_a_base: false, username: "", password: None, ' \
       'host: Some(Domain("example.net")), port: None, path: "/", query: None, fragment: None }',
-      url("https://example.net/").inspect
+      url("https://example.net/").debug
+    assert_equal 'Url { scheme: "https", cannot_be_a_base: false, username: "u", password: Some("p"), ' \
+      'host: Some(Ipv6(::1)), port: Some(8080), path: "/a", query: Some("b"), fragment: Some("c") }',
+      url("https://u:p@[::1]:8080/a?b#c").debug
+    assert_equal 'Domain("example.com")', U::Host.parse("example.com").debug
+    assert_equal "Ipv4(1.2.3.4)", U::Host.parse("1.2.3.4").debug
+    assert_equal "Ipv6(::1)", U::Host.parse("[::1]").debug
+    assert_equal 'Tuple("https", Domain("example.com"), 8443)', url("https://example.com:8443/").origin.debug
+    opaque = U::Origin.new_opaque
+
+    assert_match(/\AOpaqueOrigin\(\d+\)\z/, opaque.value.debug)
+    assert_equal "Opaque(#{opaque.value.debug})", opaque.debug
+    assert_equal "BeforePath", Position::BeforePath.debug
+    assert_equal "AfterFragment", Position::AfterFragment.debug
+    assert_equal "Backslash", U::SyntaxViolation::Backslash.debug
+    assert_equal "UnencodedAtSign", U::SyntaxViolation::UnencodedAtSign.debug
+    %i[
+      EmptyHost
+      IdnaError
+      InvalidPort
+      InvalidIpv4Address
+      InvalidIpv6Address
+      InvalidDomainCharacter
+      RelativeUrlWithoutBase
+      RelativeUrlWithCannotBeABaseBase
+      SetHostOnCannotBeABaseUrl
+      Overflow
+].each do |variant|
+      assert_equal variant.to_s, U::ParseError.const_get(variant).new.debug
+    end
+    assert_equal "RelativeUrlWithoutBase", assert_raises(U::ParseError) { url("x") }.debug
   end
 
-  def test_into_string_is_deprecated
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = true
-    value = nil
-    _, warnings = capture_io { value = url("https://example.net/").into_string }
+  def test_inspect_is_rubys
+    assert_match(/\A#<Ferro::Url::Url:0x\h+ /, url("https://example.net/").inspect)
+    assert_equal '#<data Ferro::Url::Host::Domain domain="example.com">', U::Host.parse("example.com").inspect
+    assert_match(/\A#<Ferro::Url::OpaqueOrigin:0x\h+ /, U::Origin.new_opaque.value.inspect)
+    assert_match(/\A#<Ferro::Url::Position:0x\h+ /, Position::BeforePath.inspect)
+    assert_match(/\A#<Ferro::Url::SyntaxViolation:0x\h+ /, U::SyntaxViolation::Backslash.inspect)
+  end
 
-    assert_equal "https://example.net/", value
-    assert_match "Ferro::Url::Url#into_string is deprecated since url 2.3.0; use #to_s", warnings
-  ensure
-    Warning[:deprecated] = deprecated
+  def test_hidden_and_deprecated_items_are_not_bound
+    target = url("https://example.net/")
+
+    refute_respond_to target, :into_string
+    refute_respond_to target, :check_invariants
+    refute U.const_defined?(:Quirks, false)
   end
 
   def test_dup_copies_the_url
@@ -120,7 +144,8 @@ class TestValues < Minitest::Test
       -> { frozen.set_scheme("https") },
       -> { frozen.query_pairs_mut },
       -> { frozen.path_segments_mut },
-      -> { U::Quirks.set_hash(frozen, "g") },
+      -> { frozen.query_pairs_mut { flunk "the block runs" } },
+      -> { frozen.path_segments_mut { flunk "the block runs" } },
     ].each { |change| assert_raises(FrozenError) { change.call } }
     assert_equal "http://x/?q#f", frozen.as_str
 
@@ -155,7 +180,6 @@ class TestValues < Minitest::Test
         -> { thief.set_scheme("https") },
         -> { thief.query_pairs_mut },
         -> { thief.path_segments_mut },
-        -> { U::Quirks.set_hash(thief, "g") },
       ].each do |change|
         error = assert_raises(FrozenError) { change.call }
 
@@ -263,7 +287,6 @@ class TestValues < Minitest::Test
     refute_equal opaque, U::Origin.new_opaque
     refute opaque.is_tuple
     assert_equal "null", opaque.ascii_serialization
-    assert_match(/\AOpaqueOrigin\(\d+\)\z/, opaque.value.inspect)
     assert_raises(NoMethodError) { U::OpaqueOrigin.new(nil) }
     assert_raises(TypeError) { U::Origin::Opaque.new(:fake).ascii_serialization }
   end
@@ -272,7 +295,6 @@ class TestValues < Minitest::Test
     assert_equal Position.constants.min_by { |name| Position.const_get(name) }, :BeforeScheme
     assert_equal(-1, Position::AfterPath <=> Position::BeforeQuery)
     refute_respond_to Position::AfterPath, :<
-    assert_equal "Ferro::Url::Position::BeforePath", Position::BeforePath.inspect
     assert_nil Position::BeforePath <=> 1
   end
 
@@ -291,16 +313,14 @@ class TestValues < Minitest::Test
     assert_equal "https://example.com/a?b#c", target[nil..nil]
     assert_raises(TypeError) { target[0...3] }
     assert_raises(TypeError) { target[Position::BeforePath] }
-    error = assert_raises(U::Error) { target[Position::AfterPath...Position::BeforePath] }
+    error = assert_raises(RangeError) { target[Position::AfterPath...Position::BeforePath] }
 
-    assert_equal "the slice starts at Position::AfterPath (byte 21) but ends at Position::BeforePath (byte 19)",
-      error.message
+    assert_equal "byte range starts at 21 but ends at 19", error.message
     assert_equal "", target[Position::AfterPassword...Position::BeforePassword]
   end
 
   def test_syntax_violations_are_frozen_constants_with_urls_text
     assert_equal "expected //", U::SyntaxViolation::ExpectedDoubleSlash.to_s
-    assert_equal "Ferro::Url::SyntaxViolation::Backslash", U::SyntaxViolation::Backslash.inspect
     assert_predicate U::SyntaxViolation::Backslash, :frozen?
     assert_raises(NoMethodError) { U::SyntaxViolation.new(:Backslash) }
   end
@@ -312,10 +332,17 @@ class TestValues < Minitest::Test
 
     assert_equal "a=1&b=2", target
     assert_same target, serializer.finish
-    error = assert_raises(U::Error) { serializer.append_pair("c", "3") }
-    assert_equal "url::form_urlencoded::Serializer finished", error.message
-    error = assert_raises(U::Error) { serializer.finish }
+    %i[clear append_pair append_key_only extend_pairs extend_keys_only].each do |method|
+      arguments = { append_pair: %w[c 3], append_key_only: ["c"], extend_pairs: [[%w[c 3]]], extend_keys_only: [["c"]] }
+      error = assert_raises(IOError, method.to_s) { serializer.public_send(method, *arguments.fetch(method, [])) }
+
+      assert_equal "url::form_urlencoded::Serializer finished", error.message
+    end
+    error = assert_raises(IOError) { serializer.finish }
+
     assert_equal "url::form_urlencoded::Serializer double finish", error.message
+    assert_same serializer, serializer.encoding_override(nil)
+    assert_equal "a=1&b=2", target
     assert_raises(FrozenError) { U::FormUrlencoded::Serializer.new("frozen").append_pair("a", "b") }
   end
 
@@ -366,14 +393,185 @@ class TestValues < Minitest::Test
     assert_equal "", target.query
   end
 
-  def test_a_suffix_cannot_start_inside_a_character
-    error = assert_raises(ArgumentError) { U::FormUrlencoded::Serializer.for_suffix(+"é", 1) }
+  def test_a_suffix_inside_a_character_is_refused_only_where_clear_would_panic
+    target = +"é"
+    serializer = U::FormUrlencoded::Serializer.for_suffix(target, 1).append_pair("q", "1")
 
-    assert_equal "start position 1 is inside a character of the target", error.message
+    assert_equal "é&q=1", target
+    error = assert_raises(ArgumentError) { serializer.clear }
+
+    assert_equal "assertion failed: self.is_char_boundary(new_len)", error.message
+    assert_equal "é&q=1", target
     target = +"é"
     serializer = U::FormUrlencoded::Serializer.for_suffix(target, 2)
     target.replace("aé")
     assert_raises(ArgumentError) { serializer.clear }
+  end
+
+  def test_path_segments_mut_with_a_block_drops_the_guard_when_the_block_ends
+    target = url("https://github.com/servo/rust-url/")
+    kept = nil
+    result = target.path_segments_mut do |segments|
+      kept = segments
+      segments.pop_if_empty.push("pulls")
+      :done
+    end
+
+    assert_equal :done, result
+    assert_equal "https://github.com/servo/rust-url/pulls", target.as_str
+    [
+      -> { kept.clear },
+      -> { kept.pop_if_empty },
+      -> { kept.pop },
+      -> { kept.push("x") },
+      -> { kept.extend(["x"]) },
+      -> { kept.debug },
+].each do |call|
+      error = assert_raises(IOError) { call.call }
+
+      assert_equal "PathSegmentsMut dropped at the end of Url#path_segments_mut's block", error.message
+    end
+    assert_equal "https://github.com/servo/rust-url/pulls", target.as_str
+    assert_raises(RuntimeError) do
+      target.path_segments_mut do |segments|
+        kept = segments
+        raise "boom"
+      end
+    end
+    assert_raises(IOError) { kept.pop }
+    assert_raises(U::Error) { url("mailto:a@b").path_segments_mut { flunk "the block runs" } }
+  end
+
+  def test_path_segments_mut_with_a_block_drops_the_guard_on_break_and_throw
+    target = url("https://example.com/a")
+    kept = nil
+    result = target.path_segments_mut do |segments|
+      kept = segments
+      segments.push("b")
+      break :broken
+    end
+
+    assert_equal :broken, result
+    assert_raises(IOError) { kept.push("c") }
+    caught = catch(:out) do
+      target.path_segments_mut do |segments|
+        kept = segments
+        segments.push("c")
+        throw :out, :thrown
+      end
+    end
+
+    assert_equal :thrown, caught
+    assert_raises(IOError) { kept.debug }
+    assert_equal "https://example.com/a/b/c", target.as_str
+  end
+
+  def test_query_pairs_mut_with_a_block_drops_the_serializer_on_break_and_throw
+    target = url("https://example.net/#nav")
+    kept = nil
+    result = target.query_pairs_mut do |query|
+      kept = query
+      query.append_pair("a", "1")
+      break :broken
+    end
+
+    assert_equal :broken, result
+    assert_raises(IOError) { kept.append_pair("x", "y") }
+    caught = catch(:out) do
+      target.query_pairs_mut do |query|
+        kept = query
+        query.append_pair("b", "2")
+        throw :out, :thrown
+      end
+    end
+
+    assert_equal :thrown, caught
+    assert_raises(IOError) { kept.finish }
+    assert_equal "https://example.net/?a=1&b=2#nav", target.as_str
+  end
+
+  def test_query_pairs_mut_with_a_block_drops_the_serializer_when_the_block_ends
+    target = url("https://example.net/?lang=fr#nav")
+    kept = nil
+    result = target.query_pairs_mut do |query|
+      kept = query
+      query.append_pair("foo", "bar")
+      :done
+    end
+
+    assert_equal :done, result
+    assert_equal "https://example.net/?lang=fr&foo=bar#nav", target.as_str
+    [-> { kept.append_pair("a", "b") }, -> { kept.clear }, -> { kept.finish }, -> { kept.encoding_override(nil) }]
+      .each do |call|
+        error = assert_raises(IOError) { call.call }
+
+        assert_equal "url::form_urlencoded::Serializer dropped at the end of Url#query_pairs_mut's block", error.message
+    end
+    assert_same target, target.query_pairs_mut(&:finish)
+    assert_equal "https://example.net/?lang=fr&foo=bar#nav", target.as_str
+  end
+
+  def test_path_segments_mut_debug_is_the_guards_debug_text
+    fresh = 'PathSegmentsMut { url: Url { scheme: "https", cannot_be_a_base: false, username: "", password: None, ' \
+      'host: Some(Domain("example.com")), port: None, path: "/a", query: None, fragment: None }, ' \
+      'after_first_slash: 20, after_path: "", old_after_path_position: 21 }'
+    pushed = fresh.sub('path: "/a"', 'path: "/a/d"')
+    target = url("https://example.com/a")
+    target.path_segments_mut do |segments|
+      assert_equal fresh, segments.debug
+      segments.push("d")
+
+      assert_equal pushed, segments.debug
+    end
+    segments = url("https://example.com/a").path_segments_mut
+
+    assert_equal fresh, segments.debug
+    assert_equal pushed, segments.push("d").debug
+  end
+
+  def test_path_segments_mut_debug_refuses_where_urls_debug_would_panic_with_its_text
+    [
+      ["https://example.com/a?b", [], "start byte index 22 is out of bounds for string of length 21"],
+      ["https://example.com/abc?q", [:pop], "end byte index 23 is out of bounds for string of length 20"],
+      ["https://example.com/abc#f", [:clear], "end byte index 23 is out of bounds for string of length 20"],
+      ["https://example.com/a#c", [], "start byte index 22 is out of bounds for string of length 21"],
+      ["https://example.com/a?b#c", [[:push, "x"]], "start byte index 24 is out of bounds for string of length 23"],
+      ["https://example.com/a?bcd#e", [[:push, "x"]], "end byte index 25 is out of bounds for string of length 23"],
+    ].each do |input, calls, message|
+      segments = url(input).path_segments_mut
+      calls.each { |call| segments.public_send(*call) }
+      error = nil
+      _, err = capture_subprocess_io { error = assert_raises(ArgumentError) { segments.debug } }
+
+      assert_equal message, error.message, input
+      assert_empty err, "#{input}: no panic reaches Rust's panic hook"
+    end
+  end
+
+  def test_path_segments_mut_debug_answers_urls_wrong_bytes_where_it_would_not_panic
+    segments = url("https://example.com/a?b").path_segments_mut.push("xyz")
+    text = nil
+    _, err = capture_subprocess_io { text = segments.debug }
+
+    assert_equal 'PathSegmentsMut { url: Url { scheme: "https", cannot_be_a_base: false, username: "", password: None, ' \
+      'host: Some(Domain("example.com")), port: None, path: "/a", query: Some("xyz"), fragment: None }, ' \
+      'after_first_slash: 20, after_path: "?b", old_after_path_position: 21 }', text
+    assert_empty err
+  end
+
+  def test_path_segments_mut_debug_keeps_copies_of_the_segments_it_was_given
+    target = url("https://example.com/a")
+    segment = +"b"
+    segments = [+"c", +"d"]
+    guard = target.path_segments_mut.push(segment).extend(segments)
+    expected = guard.debug
+    segment << "changed"
+    segments[0] << "changed"
+    segments << "e"
+
+    assert_equal "https://example.com/a/b/c/d", target.as_str
+    assert_equal expected, guard.debug
+    assert_includes expected, 'path: "/a/b/c/d"'
   end
 
   def test_path_segments_mut_returns_itself
@@ -395,7 +593,40 @@ class TestValues < Minitest::Test
     target.set_query(nil)
 
     assert_equal %w[a b], segments.to_a
+    assert_instance_of U::FormUrlencoded::Parse, pairs
     assert_equal [%w[x 1]], pairs.to_a
+  end
+
+  def test_parse_is_an_iterator_whose_copies_keep_their_place
+    pairs = U::FormUrlencoded.parse("a=1&&b=2&c")
+
+    assert_kind_of Enumerable, pairs
+    assert_equal %w[a 1], pairs.next
+    copy = pairs.dup
+
+    assert_equal [%w[b 2], ["c", ""]], pairs.to_a
+    assert_nil pairs.next
+    assert_empty pairs.to_a
+    assert_equal %w[b 2], copy.next
+    assert_equal [%w[c]], copy.map { |name, _value| [name] }
+    assert_instance_of Enumerator, U::FormUrlencoded.parse("a").each
+  end
+
+  def test_byte_serialize_is_an_iterator_with_urls_debug_and_size_hint
+    chunks = U::FormUrlencoded.byte_serialize("a b")
+
+    assert_kind_of Enumerable, chunks
+    assert_equal "ByteSerialize { bytes: [97, 32, 98] }", chunks.debug
+    assert_equal [1, 3], chunks.size_hint
+    assert_equal "a", chunks.next
+    assert_equal "ByteSerialize { bytes: [32, 98] }", chunks.debug
+    assert_equal [1, 2], chunks.size_hint
+    assert_equal %w[+ b], chunks.to_a
+    assert_nil chunks.next
+    assert_equal "ByteSerialize { bytes: [] }", chunks.debug
+    assert_equal [0, 0], chunks.size_hint
+    assert_raises(TypeError) { chunks.dup }
+    assert_raises(TypeError) { chunks.clone }
   end
 
   def test_form_urlencoded_parse_and_byte_serialize_take_bytes
@@ -449,44 +680,5 @@ class TestValues < Minitest::Test
     error = assert_raises(IOError) { url("custom://127.0.0.1/").socket_addrs }
     assert_equal "No port number in the URL", error.message
     assert_raises(IOError) { url("http://does-not-exist.invalid/").socket_addrs }
-  end
-
-  def test_the_quirks_getters
-    target = url("https://user:pass@example.com:8080/a?b#c")
-    q = U::Quirks
-
-    assert_equal [
-      "https://user:pass@example.com:8080/a?b#c",
-      "https://example.com:8080",
-      "https:",
-      "user",
-      "pass",
-      "example.com:8080",
-      "example.com",
-      "8080",
-      "/a",
-      "?b",
-      "#c",
-],
-      %i[href origin protocol username password host hostname port pathname search hash].map { |name| q.public_send(name, target) }
-  end
-
-  def test_the_quirks_setters_take_only_a_url
-    %i[
-      set_href
-      set_protocol
-      set_username
-      set_password
-      set_host
-      set_hostname
-      set_port
-      set_pathname
-      set_search
-      set_hash
-].each do |name|
-      error = assert_raises(TypeError, name.to_s) { U::Quirks.public_send(name, "http://x/", "y") }
-
-      assert_equal "wrong argument type String (expected Ferro::Url::Url)", error.message, name.to_s
-    end
   end
 end

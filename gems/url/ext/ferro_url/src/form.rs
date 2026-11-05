@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! `form_urlencoded` 1.2.2, which url re-exports as `url::form_urlencoded`
-//! (url 2.5.8 `src/lib.rs:152`): `parse`, `byte_serialize`, and
-//! `Serializer` over a String target (plan 005, decisions 8 and 9).
+//! (url 2.5.8 `src/lib.rs:152`): `Serializer` over a String target (plan
+//! 005, decision 8). Its iterators, `parse` and `byte_serialize`, are in
+//! `iter.rs`.
 //!
 //! A `Serializer` operation crosses as `[name, args...]`, and runs on a
 //! fresh `form_urlencoded` `Serializer` each time, as the Ruby `Serializer`
@@ -164,22 +165,31 @@ pub fn suffix_refusal(target_len: usize, start_position: usize) -> Option<String
 
 // SPDX-SnippetEnd
 
-/// Why `start_position` cannot start a suffix of `target`: past its end,
-/// as `for_suffix` panics on, or inside a character, where `clear`'s
-/// `String::truncate` panics (`src/lib.rs:241-244`). The second is the
-/// gem's own text, since the panic is std's.
-pub fn start_refusal(target: &str, start_position: usize) -> Option<String> {
-    suffix_refusal(target.len(), start_position).or_else(|| {
-        (!target.is_char_boundary(start_position))
-            .then(|| format!("start position {start_position} is inside a character of the target"))
+/// What `Serializer::clear` panics with for a start position inside a
+/// character of its target: std's `String::truncate` asserts a character
+/// boundary (`form_urlencoded` `src/lib.rs:241-244`), or `None`. Only
+/// `clear` truncates, so only `clear` panics on such a start; `for_suffix`
+/// and the appends accept it.
+pub fn clear_refusal(target: &str, start_position: usize) -> Option<String> {
+    (!target.is_char_boundary(start_position))
+        .then(|| "assertion failed: self.is_char_boundary(new_len)".to_owned())
+}
+
+/// Why `operation` would panic on `target` from `start_position`, or
+/// `None`: a start past the end panics in `for_suffix`, which each
+/// operation runs, and a start inside a character panics in `clear`.
+fn refusal(target: &str, start_position: usize, operation: &Operation) -> Option<String> {
+    suffix_refusal(target.len(), start_position).or_else(|| match operation {
+        Operation::Clear => clear_refusal(target, start_position),
+        _ => None,
     })
 }
 
 /// Refuses a start position `Serializer::for_suffix` would panic on, with
 /// `ArgumentError` and its message (plan 005, decision 8).
 fn form_check_suffix(ruby: &Ruby, target: RString, start_position: usize) -> Result<(), Error> {
-    let target = target.to_string()?;
-    start_refusal(&target, start_position).map_or(Ok(()), |message| {
+    let length = target.len();
+    suffix_refusal(length, start_position).map_or(Ok(()), |message| {
         Err(Error::new(ruby.exception_arg_error(), message))
     })
 }
@@ -193,10 +203,10 @@ fn form_serialize(
     operation: RArray,
     encodings: Option<RArray>,
 ) -> Result<String, Error> {
-    if let Some(message) = start_refusal(&target, start_position) {
+    let operation = Operation::from_ruby(ruby, operation)?;
+    if let Some(message) = refusal(&target, start_position, &operation) {
         return Err(Error::new(ruby.exception_arg_error(), message));
     }
-    let operation = Operation::from_ruby(ruby, operation)?;
     let encodings = Encodings::from_ruby(encodings)?;
     guarded(ruby, move || {
         let mut target = target;
@@ -213,38 +223,15 @@ fn form_serialize(
     })
 }
 
-/// `form_urlencoded::parse(input)` (`src/lib.rs:31-115`), collected.
-fn form_parse(ruby: &Ruby, input: RString) -> Result<Vec<(String, String)>, Error> {
-    let input = input.to_bytes().to_vec();
-    guarded(ruby, move || {
-        Ok(form_urlencoded::parse(&input)
-            .into_owned()
-            .collect::<Vec<_>>())
-    })
-}
-
-/// `form_urlencoded::byte_serialize(input)` (`src/lib.rs:117-172`),
-/// collected.
-fn form_byte_serialize(ruby: &Ruby, input: RString) -> Result<Vec<String>, Error> {
-    let input = input.to_bytes().to_vec();
-    guarded(ruby, move || {
-        Ok(form_urlencoded::byte_serialize(&input)
-            .map(str::to_owned)
-            .collect::<Vec<_>>())
-    })
-}
-
 pub fn define(native: RModule) -> Result<(), Error> {
     native.define_singleton_method("form_check_suffix", function!(form_check_suffix, 2))?;
     native.define_singleton_method("form_serialize", function!(form_serialize, 4))?;
-    native.define_singleton_method("form_parse", function!(form_parse, 1))?;
-    native.define_singleton_method("form_byte_serialize", function!(form_byte_serialize, 1))?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{start_refusal, suffix_refusal, Encodings, Operation};
+    use super::{clear_refusal, refusal, suffix_refusal, Encodings, Operation};
     use form_urlencoded::Serializer;
     use std::cell::RefCell;
 
@@ -310,24 +297,33 @@ mod tests {
     }
 
     #[test]
-    fn a_start_inside_a_character_is_refused_before_clear_panics() {
-        assert_eq!(start_refusal("é", 0), None);
-        assert_eq!(start_refusal("é", 2), None);
-        assert_eq!(
-            start_refusal("é", 1).as_deref(),
-            Some("start position 1 is inside a character of the target")
-        );
-        assert_eq!(
-            start_refusal("é", 3).as_deref(),
-            Some("invalid length 3 for target of length 2")
-        );
-        let panicked = std::panic::catch_unwind(|| {
+    fn a_start_inside_a_character_is_refused_only_for_clear_with_its_panic() {
+        assert_eq!(clear_refusal("é", 0), None);
+        assert_eq!(clear_refusal("é", 2), None);
+        let message = clear_refusal("é", 1).expect("refused");
+        let payload = std::panic::catch_unwind(|| {
             let mut target = "é".to_owned();
             Serializer::for_suffix(&mut target, 1).clear();
+        })
+        .expect_err("form_urlencoded panics in clear");
+        assert_eq!(crate::panic_of(&payload).0, message);
+        let appended = std::panic::catch_unwind(|| {
+            let mut target = "é".to_owned();
+            Serializer::for_suffix(&mut target, 1).append_pair("q", "1");
+            target
         });
-        assert!(
-            panicked.is_err(),
-            "form_urlencoded panics where the gem refuses"
+        assert_eq!(appended.ok().as_deref(), Some("é&q=1"));
+        assert_eq!(
+            refusal("é", 1, &Operation::Clear).as_deref(),
+            Some(message.as_str())
+        );
+        assert_eq!(
+            refusal("é", 1, &Operation::AppendKeyOnly("q".to_owned())),
+            None
+        );
+        assert_eq!(
+            refusal("é", 3, &Operation::AppendKeyOnly("q".to_owned())).as_deref(),
+            Some("invalid length 3 for target of length 2")
         );
     }
 

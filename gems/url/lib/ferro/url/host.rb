@@ -96,6 +96,18 @@ module Ferro
         Native.host_cmp(Arguments.host_parts(self), Arguments.host_parts(other)) if other.is_a?(Host)
       end
 
+      # url's +Debug+ text for this host, formatted by Rust: the variant and
+      # its value, as url derives it. +inspect+ stays Ruby's. Mirrors url's
+      # <tt>#[derive(Debug)]</tt> on +Host+ (<tt>src/host.rs:45</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Url::Host.parse("example.com").debug # => "Domain(\"example.com\")"
+      #   Ferro::Url::Host.parse("[::1]").debug # => "Ipv6(::1)"
+      def debug
+        Native.host_debug(Arguments.host_parts(self))
+      end
+
       # A DNS domain name, as <tt>.</tt> dot-separated labels. Non-ASCII
       # labels are encoded in Punycode per IDNA if this is the host of a
       # special URL, or percent encoded for non-special URLs. Hosts for

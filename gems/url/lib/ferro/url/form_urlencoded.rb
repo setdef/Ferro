@@ -40,15 +40,14 @@ module Ferro
     #     .finish # => "foo=bar+%26+baz&saison=%C3%89t%C3%A9%2Bhiver"
     module FormUrlencoded
       # Converts a byte string in the
-      # <tt>application/x-www-form-urlencoded</tt> syntax into an Enumerator
-      # of <tt>[name, value]</tt> pairs.
+      # <tt>application/x-www-form-urlencoded</tt> syntax into a Parse, an
+      # iterator of <tt>[name, value]</tt> pairs.
       #
       # The names and values are percent-decoded, with <tt>+</tt> as a
       # space, and bytes that are not UTF-8 become U+FFFD. For instance,
       # <tt>%23first=%25try%25</tt> will be converted to
-      # <tt>[["#first", "%try%"]]</tt>. Rust's +into_owned+ has no Ruby
-      # meaning: the Strings are already the caller's. Mirrors
-      # form_urlencoded's +parse+ (<tt>src/lib.rs:31-115</tt>).
+      # <tt>[["#first", "%try%"]]</tt>. Mirrors form_urlencoded's +parse+
+      # (<tt>src/lib.rs:31-41</tt>).
       #
       # [input] String, taken as bytes whatever its encoding.
       #
@@ -56,14 +55,14 @@ module Ferro
       #
       #   Ferro::Url::FormUrlencoded.parse("a=1&b=two+words").to_a # => [["a", "1"], ["b", "two words"]]
       def self.parse(input)
-        Native.form_parse(input).each
+        Parse.__send__(:new, Native.form_parse(input))
       end
 
       # The <tt>application/x-www-form-urlencoded</tt> byte serializer
       # (https://url.spec.whatwg.org/#concept-urlencoded-byte-serializer):
-      # an Enumerator of String slices, which join into the encoding.
-      # Mirrors form_urlencoded's +byte_serialize+
-      # (<tt>src/lib.rs:117-172</tt>).
+      # a ByteSerialize, an iterator of String slices, which join into the
+      # encoding. Mirrors form_urlencoded's +byte_serialize+
+      # (<tt>src/lib.rs:117-124</tt>).
       #
       # [input] String, taken as bytes whatever its encoding.
       #
@@ -71,7 +70,7 @@ module Ferro
       #
       #   Ferro::Url::FormUrlencoded.byte_serialize("bar & baz").to_a.join # => "bar+%26+baz"
       def self.byte_serialize(input)
-        Native.form_byte_serialize(input).each
+        ByteSerialize.__send__(:new, Native.form_byte_serialize(input))
       end
     end
 
@@ -81,4 +80,6 @@ module Ferro
   end
 end
 
+require_relative "form_urlencoded/parse"
+require_relative "form_urlencoded/byte_serialize"
 require_relative "form_urlencoded/serializer"

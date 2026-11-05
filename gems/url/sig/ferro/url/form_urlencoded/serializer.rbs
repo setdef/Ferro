@@ -9,6 +9,7 @@ module Ferro
         @start_position: Integer?
         @encoding: Object?
         @finished: bool
+        @dropped: bool
 
         def self.new: (String target) -> Serializer
         def self.for_suffix: (String target, Integer start_position) -> Serializer
@@ -26,6 +27,8 @@ module Ferro
 
         private
 
+        def drop: () -> void
+        def open!: () -> void
         def run: (operation operation, Array[String] texts) -> self
         def encode: (Array[String] texts) -> encodings?
       end

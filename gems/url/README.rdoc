@@ -87,12 +87,10 @@ The API is url's, translated where Rust has no Ruby meaning:
 * <tt>url::Url</tt> is Ferro::Url::Url, beside url's other root items:
   Host, Origin, OpaqueOrigin, ParseError, SyntaxViolation, Position,
   ParseOptions, PathSegmentsMut, UrlQuery. url re-exports the
-  form_urlencoded crate, which is Ferro::Url::FormUrlencoded, and its
-  hidden +quirks+ module, the WHATWG URL API's getters and setters, is
-  Ferro::Url::Quirks.
+  form_urlencoded crate, which is Ferro::Url::FormUrlencoded.
 * A Url changes in place, as in Rust. +dup+ copies it, a frozen Url
   refuses every setter, and URLs compare and hash by their serialization.
-  +inspect+ is url's +Debug+ text.
+  +debug+ is url's +Debug+ text, and +inspect+ is Ruby's.
 * Host's and Origin's variants are Data classes; addresses are IPAddr, and
   socket_addrs returns Addrinfo.
 * <tt>url[Position::BeforePath..]</tt> slices as url's +Index+ impls do,
@@ -103,16 +101,18 @@ The API is url's, translated where Rust has no Ruby meaning:
 * +path_segments_mut+ and +query_pairs_mut+ return objects that change the
   URL with each call, where Rust's borrow the URL until dropped;
   +query_pairs_mut+ gives the URL its <tt>?</tt> at once, as url's does.
-* +path_segments+, +query_pairs+, and FormUrlencoded's +parse+ and
-  +byte_serialize+ return Enumerators.
+* +path_segments+ returns an Enumerator. +query_pairs+ and
+  FormUrlencoded's +parse+ and +byte_serialize+ return form_urlencoded's
+  iterators, with +next+, +each+, and Enumerable.
 
 What differs from calling url from Rust:
 
 * A <tt>Result<_, ()></tt> raises Ferro::Url::Error, which url does not
   have, with a message naming the function.
-* Where Rust would panic, the gem raises instead: Error for a Serializer
-  used after +finish+ and for a slice that runs backward, +ArgumentError+
-  for a +for_suffix+ start past the end of its target. Any other panic
+* Where Rust would panic, the gem raises instead, with Rust's message:
+  +IOError+ for a Serializer used after +finish+, +RangeError+ for a slice
+  that runs backward, +ArgumentError+ for a start position form_urlencoded
+  cannot use. Any other panic
   inside url raises Error with <tt>url panicked: ...</tt> rather than
   ending your Ruby process, and a Url keeps its value from before the call.
 * +socket_addrs+ resolves the host on a thread of its own and waits with
@@ -128,7 +128,7 @@ What differs from calling url from Rust:
 * Not bound: +serialize_internal+ and +deserialize_internal+, which exist
   for serde.
 
-url's +std+, +serde+, and +expose_internals+ features are built; +serde+
+url's +std+ and +serde+ features are built; +serde+
 adds no Ruby API, since the string serde writes is Url#as_str. Its
 +debugger_visualizer+ feature names a file the published crate does not
 include, so it cannot build and is left off; it would add no Ruby API.

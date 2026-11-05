@@ -27,9 +27,11 @@ module Ferro
       # The target is a String, which the serializer changes in place, as
       # Rust's <tt>&mut String</tt> target is changed, or the UrlQuery that
       # Url#query_pairs_mut makes. Each method returns +self+ until #finish
-      # returns the target: the String, or the Url. After #finish any call
-      # raises Error with form_urlencoded's panic message, as Rust would
-      # panic.
+      # returns the target: the String, or the Url. #finish takes the target
+      # out, so the serializer is spent: any later call raises +IOError+, as
+      # a closed IO does, with form_urlencoded's panic message, where Rust
+      # would panic. One that Url#query_pairs_mut gave a block is dropped
+      # when the block ends, and raises +IOError+ the same way.
       #
       # Mirrors form_urlencoded's +Serializer+ (<tt>src/lib.rs:174-350</tt>).
       #
@@ -94,8 +96,8 @@ module Ferro
         end
 
         # Holds the target, the start of its suffix (+nil+ for a UrlQuery,
-        # whose start is the URL's query), no encoding override, and not
-        # finished.
+        # whose start is the URL's query), no encoding override, and neither
+        # finished nor dropped.
         #
         # [target] String or UrlQuery.
         # [start_position] Integer, or +nil+ for a UrlQuery.
@@ -104,10 +106,14 @@ module Ferro
           @start_position = start_position
           @encoding = nil
           @finished = false
+          @dropped = false
         end
 
-        # Removes any existing name/value pair. Raises Error if called after
-        # #finish. Mirrors form_urlencoded's <tt>Serializer::clear</tt>
+        # Removes any existing name/value pair. Raises +IOError+ if called
+        # after #finish. A start position inside a character of a String
+        # target, which form_urlencoded accepts until +clear+ truncates
+        # there and std panics, raises +ArgumentError+ with std's message.
+        # Mirrors form_urlencoded's <tt>Serializer::clear</tt>
         # (<tt>src/lib.rs:238-244</tt>).
         #
         # === Example
@@ -124,7 +130,8 @@ module Ferro
         # value as a String and returns the String whose bytes are encoded.
         # The serializer calls it for every name and value of an operation,
         # in form_urlencoded's order, before form_urlencoded runs; an
-        # exception it raises stops the operation with nothing written.
+        # exception it raises stops the operation with nothing written. It
+        # does not touch the target, so it works after #finish, as in Rust.
         # Mirrors form_urlencoded's <tt>Serializer::encoding_override</tt>
         # (<tt>src/lib.rs:246-250</tt>).
         #
@@ -136,14 +143,15 @@ module Ferro
         #   Ferro::Url::FormUrlencoded::Serializer.new(+"").encoding_override(latin1)
         #     .append_pair("q", "é").finish # => "q=%E9"
         def encoding_override(new)
+          open!
           raise TypeError, "#{new.class} does not respond to call" unless new.nil? || new.respond_to?(:call)
 
           @encoding = new
           self
         end
 
-        # Serializes and appends a name/value pair. Raises Error if called
-        # after #finish. Mirrors form_urlencoded's
+        # Serializes and appends a name/value pair. Raises +IOError+ if
+        # called after #finish. Mirrors form_urlencoded's
         # <tt>Serializer::append_pair</tt> (<tt>src/lib.rs:252-264</tt>).
         #
         # [name] String.
@@ -157,7 +165,7 @@ module Ferro
         end
 
         # Serializes and appends a name of parameter without any value.
-        # Raises Error if called after #finish. Mirrors form_urlencoded's
+        # Raises +IOError+ if called after #finish. Mirrors form_urlencoded's
         # <tt>Serializer::append_key_only</tt> (<tt>src/lib.rs:266-277</tt>).
         #
         # [name] String.
@@ -170,7 +178,7 @@ module Ferro
         end
 
         # Serializes and appends a number of name/value pairs. This simply
-        # calls #append_pair repeatedly. Raises Error if called after
+        # calls #append_pair repeatedly. Raises +IOError+ if called after
         # #finish. Mirrors form_urlencoded's
         # <tt>Serializer::extend_pairs</tt> (<tt>src/lib.rs:279-307</tt>).
         #
@@ -185,8 +193,8 @@ module Ferro
         end
 
         # Serializes and appends a number of names without values. This
-        # simply calls #append_key_only repeatedly. Raises Error if called
-        # after #finish. Mirrors form_urlencoded's
+        # simply calls #append_key_only repeatedly. Raises +IOError+ if
+        # called after #finish. Mirrors form_urlencoded's
         # <tt>Serializer::extend_keys_only</tt> (<tt>src/lib.rs:309-330</tt>).
         #
         # [iter] Enumerable of Strings.
@@ -200,25 +208,38 @@ module Ferro
         end
 
         # Returns the target: the String, or the Url for a serializer from
-        # Url#query_pairs_mut. Raises Error if called more than once, where
-        # form_urlencoded panics. Mirrors form_urlencoded's
+        # Url#query_pairs_mut. Raises +IOError+ if called more than once,
+        # where form_urlencoded panics. Mirrors form_urlencoded's
         # <tt>Serializer::finish</tt> (<tt>src/lib.rs:332-350</tt>).
         #
         # === Example
         #
         #   Ferro::Url::FormUrlencoded::Serializer.new(+"").append_pair("a", "1").finish # => "a=1"
         def finish
-          raise Error, "url::form_urlencoded::Serializer double finish" if @finished
+          open!
+          raise IOError, "url::form_urlencoded::Serializer double finish" if @finished
 
           @finished = true
           target = @target
           target.is_a?(UrlQuery) ? target.__send__(:url) : target
         end
 
+        # Ends this serializer's scope, as Rust's +Drop+ does at the end of
+        # Url#query_pairs_mut's block.
+        private def drop
+          @dropped = true
+        end
+
+        # Refuses a call once this serializer is dropped.
+        private def open!
+          raise IOError, "url::form_urlencoded::Serializer dropped at the end of Url#query_pairs_mut's block" if @dropped
+        end
+
         # Runs one operation on the target, with the encodings of +texts+
         # computed first, and returns +self+.
         private def run(operation, texts)
-          raise Error, "url::form_urlencoded::Serializer finished" if @finished
+          open!
+          raise IOError, "url::form_urlencoded::Serializer finished" if @finished
 
           encodings = encode(texts)
           target = @target

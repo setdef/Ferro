@@ -68,13 +68,16 @@ module Ferro
         [OpaqueOrigin, Native.opaque_origin_hash(@native)].hash
       end
 
-      # url's +Debug+ text, such as <tt>OpaqueOrigin(3)</tt>.
+      # url's +Debug+ text, formatted by Rust, such as
+      # <tt>OpaqueOrigin(3)</tt>. +inspect+ stays Ruby's. Mirrors url's
+      # <tt>#[derive(Debug)]</tt> on +OpaqueOrigin+
+      # (<tt>src/origin.rs:114</tt>).
       #
       # === Example
       #
-      #   Ferro::Url::Origin.new_opaque.value.inspect # => "OpaqueOrigin(0)"
-      def inspect
-        Native.opaque_origin_inspect(@native)
+      #   Ferro::Url::Origin.new_opaque.value.debug # => "OpaqueOrigin(0)"
+      def debug
+        Native.opaque_origin_debug(@native)
       end
 
       # The native opaque origin, for the native layer.

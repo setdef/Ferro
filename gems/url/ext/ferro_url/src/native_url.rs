@@ -17,6 +17,7 @@ use url::{Position, Url};
 
 use crate::form::{self, Encodings};
 use crate::gvl;
+use crate::iter::{self, NativeParse};
 use crate::values::{host_to_ruby, origin_to_ruby, parse_error, syntax_violation_name};
 use crate::{capture, error, guarded, panicked, Failure};
 
@@ -244,16 +245,9 @@ fn url_as_str(ruby: &Ruby, url: &NativeUrl) -> Result<String, Error> {
         .map_err(|failure| failure.into_error(ruby))
 }
 
-/// `Debug` (`src/lib.rs:2809-2826`).
-fn url_inspect(ruby: &Ruby, url: &NativeUrl) -> Result<String, Error> {
+/// `Debug` (`src/lib.rs:2809-2826`), formatted by Rust.
+fn url_debug(ruby: &Ruby, url: &NativeUrl) -> Result<String, Error> {
     url.read(|url| format!("{url:?}"))
-        .map_err(|failure| failure.into_error(ruby))
-}
-
-/// `check_invariants` (`src/lib.rs:681-809`): `None` when they hold, or
-/// url's description of the first that does not.
-fn url_check_invariants(ruby: &Ruby, url: &NativeUrl) -> Result<Option<String>, Error> {
-    url.read(|url| url.check_invariants().err())
         .map_err(|failure| failure.into_error(ruby))
 }
 
@@ -344,14 +338,10 @@ fn url_path_segments(ruby: &Ruby, url: &NativeUrl) -> Result<Option<Vec<String>>
     .map_err(|failure| failure.into_error(ruby))
 }
 
-/// `query_pairs` (`src/lib.rs:1485-1511`), collected.
-fn url_query_pairs(ruby: &Ruby, url: &NativeUrl) -> Result<Vec<(String, String)>, Error> {
-    url.read(|url| {
-        url.query_pairs()
-            .map(|(name, value)| (name.into_owned(), value.into_owned()))
-            .collect()
-    })
-    .map_err(|failure| failure.into_error(ruby))
+/// `query_pairs` (`src/lib.rs:1485-1511`): url's `Parse` over a copy of
+/// the `Url`, taken under the lock.
+fn url_query_pairs(url: &NativeUrl) -> NativeParse {
+    iter::query_pairs(url.snapshot())
 }
 
 /// Whether url's `socket_addrs` would call its `default_port_number`: the
@@ -544,56 +534,194 @@ fn url_set_str(ruby: &Ruby, url: Obj<NativeUrl>, name: Symbol, value: String) ->
     .map_err(|failure| failure.into_error(ruby))
 }
 
+/// One `PathSegmentsMut` method (`src/path_segments.rs:77-267`), or
+/// `None` for `path_segments_mut()` alone.
+pub enum PathOperation {
+    None,
+    Clear,
+    PopIfEmpty,
+    Pop,
+    Push(String),
+    Extend(Vec<String>),
+}
+
+impl PathOperation {
+    /// The operation a Ruby `[name, args...]` names.
+    pub fn from_ruby(ruby: &Ruby, operation: RArray) -> Result<Self, Error> {
+        let name: Symbol = operation.entry(0)?;
+        Ok(match name.name()?.as_ref() {
+            "none" => Self::None,
+            "clear" => Self::Clear,
+            "pop_if_empty" => Self::PopIfEmpty,
+            "pop" => Self::Pop,
+            "push" => Self::Push(operation.entry(1)?),
+            "extend" => Self::Extend(operation.entry(1)?),
+            other => return Err(unknown(ruby, "PathSegmentsMut method", other)),
+        })
+    }
+
+    /// Runs the operation on `path`, through url's own method.
+    pub fn apply(&self, path: &mut url::PathSegmentsMut<'_>) {
+        match self {
+            Self::None => {}
+            Self::Clear => {
+                path.clear();
+            }
+            Self::PopIfEmpty => {
+                path.pop_if_empty();
+            }
+            Self::Pop => {
+                path.pop();
+            }
+            Self::Push(segment) => {
+                path.push(segment);
+            }
+            Self::Extend(segments) => {
+                path.extend(segments);
+            }
+        }
+    }
+}
+
 /// `path_segments_mut` (`src/lib.rs:1792-1802`) and one
 /// `PathSegmentsMut` operation (`src/path_segments.rs:77-267`), dropped
 /// at once, which puts back the rest of the URL (plan 005, decision 8).
 /// `[:none]` only asks for it, raising `Error` for a cannot-be-a-base URL.
 fn url_path_segments_mut(ruby: &Ruby, url: Obj<NativeUrl>, operation: RArray) -> Result<(), Error> {
     let url = writable(&url)?;
-    let name: Symbol = operation.entry(0)?;
-    let name = name.name()?.into_owned();
-    let segment: Option<String> = if name == "push" {
-        Some(operation.entry(1)?)
-    } else {
-        None
-    };
-    let segments: Option<Vec<String>> = if name == "extend" {
-        Some(operation.entry(1)?)
-    } else {
-        None
-    };
-    if !matches!(
-        name.as_str(),
-        "none" | "clear" | "pop_if_empty" | "pop" | "push" | "extend"
-    ) {
-        return Err(unknown(ruby, "PathSegmentsMut method", &name));
-    }
+    let operation = PathOperation::from_ruby(ruby, operation)?;
     url.mutate(|url| {
         let Ok(mut path) = url.path_segments_mut() else {
             return Err(Failure::Unit("url::Url::path_segments_mut"));
         };
-        match name.as_str() {
-            "clear" => {
-                path.clear();
-            }
-            "pop_if_empty" => {
-                path.pop_if_empty();
-            }
-            "pop" => {
-                path.pop();
-            }
-            "push" => {
-                path.push(segment.as_deref().unwrap_or_default());
-            }
-            "extend" => {
-                path.extend(segments.iter().flatten());
-            }
-            _ => {}
-        }
+        operation.apply(&mut path);
         Ok(())
     })
     .map_err(|failure| failure.into_error(ruby))
 }
+
+/// `PathSegmentsMut`'s derived `Debug` (`src/path_segments.rs:41`) for the
+/// guard a Ruby `PathSegmentsMut` stands for: a real guard made on a copy
+/// of `start`, the URL as it was when the Ruby one was made, with the
+/// Ruby one's `operations` run on it, so the fields a long-lived guard
+/// keeps (`old_after_path_position` among them) are Rust's own.
+///
+/// url's `Debug` for a guard over a URL with a query or a fragment reads
+/// offsets the guard has cut away, and panics or reads the wrong bytes.
+/// Where it would panic, `guard_debug_panic` says so first and this raises
+/// `ArgumentError` with std's text; where it reads the wrong bytes, this
+/// answers them, as url does (plan 005, decisions 17 and 21).
+fn path_segments_mut_debug(
+    ruby: &Ruby,
+    start: &NativeUrl,
+    operations: RArray,
+) -> Result<String, Error> {
+    let operations = operations
+        .into_iter()
+        .map(|operation| PathOperation::from_ruby(ruby, RArray::try_convert(operation)?))
+        .collect::<Result<Vec<_>, Error>>()?;
+    let mut url = start.snapshot();
+    let debug = capture(move || {
+        if let Some(panic) = guard_debug_panic(&url, &operations) {
+            return Some(Err(panic));
+        }
+        let mut path = url.path_segments_mut().ok()?;
+        for operation in &operations {
+            operation.apply(&mut path);
+        }
+        Some(Ok(format!("{path:?}")))
+    });
+    match debug {
+        Ok(Some(Ok(text))) => Ok(text),
+        Ok(Some(Err(panic))) => Err(Error::new(ruby.exception_arg_error(), panic)),
+        Ok(None) => Err(Failure::Unit("url::Url::path_segments_mut").into_error(ruby)),
+        Err(panic) => Err(error(ruby, panicked(&panic))),
+    }
+}
+
+/// What url's `Debug` panics with for a `PathSegmentsMut` made on `start`
+/// with `operations` run on it, or `None` where it formats, rightly or
+/// not, or where `start` is cannot-be-a-base.
+///
+/// `path_segments::new` cuts the query and fragment from the serialization
+/// with `take_after_path`, which keeps `query_start` and `fragment_start`
+/// (`src/lib.rs:1721-1730`), and no `PathSegmentsMut` method moves them
+/// (`src/path_segments.rs:77-267`). The guard's derived `Debug`
+/// (`src/path_segments.rs:41`) formats `Url`'s `Debug`, whose fields
+/// (`src/lib.rs:2810-2825`) slice the serialization, in this order, at
+/// `path` (`path_start..` the query or fragment start, `:1391-1398`),
+/// `query` (`query_start + 1..` the fragment start or the end,
+/// `:1471-1483`), and `fragment` (`fragment_start + 1..`, `:1545-1550`).
+/// The fields before `path` read only offsets before the path, which the
+/// guard keeps. The offsets come from `start` through `Position`, which
+/// reads them on a whole URL (`src/slicing.rs:185-205`), and the
+/// serialization the guard holds from a copy of `start` without its query
+/// and fragment, the bytes `take_after_path` leaves, with `operations` run
+/// on it. The first slice std refuses is url's panic in a release build;
+/// a debug build trips url's `debug_assert!`s on `query` and `fragment`
+/// first, but the gem is built in release.
+pub fn guard_debug_panic(start: &Url, operations: &[PathOperation]) -> Option<String> {
+    let query_start = start.query().map(|_| offset(start, Position::AfterPath));
+    let fragment_start = start
+        .fragment()
+        .map(|_| offset(start, Position::AfterQuery));
+    let cut = query_start.or(fragment_start)?;
+    let mut guarded = start.clone();
+    guarded.set_query(None);
+    guarded.set_fragment(None);
+    {
+        let mut path = guarded.path_segments_mut().ok()?;
+        for operation in operations {
+            operation.apply(&mut path);
+        }
+    }
+    let text = guarded.as_str();
+    let len = text.len();
+    slice_panic(text, offset(start, Position::BeforePath), cut)
+        .or_else(|| {
+            query_start
+                .and_then(|query| slice_panic(text, query + 1, fragment_start.unwrap_or(len)))
+        })
+        .or_else(|| fragment_start.and_then(|fragment| slice_panic(text, fragment + 1, len)))
+}
+
+// SPDX-SnippetBegin
+// SPDX-SnippetCopyrightText: The Rust Project Developers
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-SnippetComment: the panic text of std's str slicing,
+//   slice_error_fail_rt in library/core/src/str/mod.rs
+
+/// What std panics with for `&text[begin..end]`, or `None` where the slice
+/// is valid. `text[begin..]` panics as `text[begin..text.len()]` does.
+/// The text and the order of its checks are std's `slice_error_fail_rt`
+/// (`library/core/src/str/mod.rs`), which a test drives against the
+/// toolchain's own panic.
+pub fn slice_panic(text: &str, begin: usize, end: usize) -> Option<String> {
+    if text.get(begin..end).is_some() {
+        return None;
+    }
+    let len = text.len();
+    Some(if begin > len {
+        format!("start byte index {begin} is out of bounds for string of length {len}")
+    } else if end > len {
+        format!("end byte index {end} is out of bounds for string of length {len}")
+    } else if begin > end {
+        format!("byte range starts at {begin} but ends at {end}")
+    } else {
+        let (side, index) = if text.is_char_boundary(begin) {
+            ("end", end)
+        } else {
+            ("start", begin)
+        };
+        let range = text.floor_char_boundary(index)..text.ceil_char_boundary(index);
+        let inside = text[range.clone()].chars().next().unwrap_or_default();
+        format!(
+            "{side} byte index {index} is not a char boundary; it is inside {inside:?} (bytes {range:?} of string)"
+        )
+    })
+}
+
+// SPDX-SnippetEnd
 
 /// `query_pairs_mut` (`src/lib.rs:1669-1719`) and one `Serializer`
 /// operation over its `UrlQuery`, dropped at once, which puts the
@@ -677,7 +805,7 @@ fn url_to_file_path(ruby: &Ruby, url: &NativeUrl) -> Result<RString, Error> {
 }
 
 /// The `Position` named `name` (`src/slicing.rs:104-122`).
-fn position(ruby: &Ruby, name: Symbol) -> Result<Position, Error> {
+pub fn position(ruby: &Ruby, name: Symbol) -> Result<Position, Error> {
     Ok(match name.name()?.as_ref() {
         "BeforeScheme" => Position::BeforeScheme,
         "AfterScheme" => Position::AfterScheme,
@@ -710,13 +838,13 @@ fn offset(url: &Url, position: Position) -> usize {
     url[..position].len()
 }
 
-/// Why slicing `url` from `start` to `end` would panic in Rust's string
-/// slicing, or `None` (plan 005, decision 15).
+/// What Rust's string slicing panics with when `url[start..end]` runs
+/// backward, as url's `Index<Range<Position>>` slices its serialization
+/// (`src/slicing.rs:34-39`), or `None` (plan 005, decision 15). The text
+/// is std's, which a test drives.
 pub fn backward(url: &Url, start: Position, end: Position) -> Option<String> {
     let (from, to) = (offset(url, start), offset(url, end));
-    (from > to).then(|| {
-        format!("the slice starts at Position::{start:?} (byte {from}) but ends at Position::{end:?} (byte {to})")
-    })
+    (from > to).then(|| format!("byte range starts at {from} but ends at {to}"))
 }
 
 /// `url[start..end]` through url's four `Index` impls
@@ -738,7 +866,7 @@ fn url_slice(
         }
     })
     .map_err(|failure| failure.into_error(ruby))?
-    .map_err(|message| error(ruby, message))
+    .map_err(|message| Error::new(ruby.exception_range_error(), message))
 }
 
 pub fn define(native: RModule) -> Result<(), Error> {
@@ -749,8 +877,7 @@ pub fn define(native: RModule) -> Result<(), Error> {
     native.define_singleton_method("url_make_relative", function!(url_make_relative, 2))?;
     native.define_singleton_method("url_clone", function!(url_clone, 1))?;
     native.define_singleton_method("url_as_str", function!(url_as_str, 1))?;
-    native.define_singleton_method("url_inspect", function!(url_inspect, 1))?;
-    native.define_singleton_method("url_check_invariants", function!(url_check_invariants, 1))?;
+    native.define_singleton_method("url_debug", function!(url_debug, 1))?;
     native.define_singleton_method("url_origin", function!(url_origin, 1))?;
     native.define_singleton_method("url_str", function!(url_str, 2))?;
     native.define_singleton_method("url_option_str", function!(url_option_str, 2))?;
@@ -774,6 +901,10 @@ pub fn define(native: RModule) -> Result<(), Error> {
     native.define_singleton_method("url_set_password", function!(url_set_password, 2))?;
     native.define_singleton_method("url_set_str", function!(url_set_str, 3))?;
     native.define_singleton_method("url_path_segments_mut", function!(url_path_segments_mut, 2))?;
+    native.define_singleton_method(
+        "path_segments_mut_debug",
+        function!(path_segments_mut_debug, 2),
+    )?;
     native.define_singleton_method("url_query_pairs_mut", function!(url_query_pairs_mut, 3))?;
     native.define_singleton_method("url_from_path", function!(url_from_path, 2))?;
     native.define_singleton_method("url_to_file_path", function!(url_to_file_path, 1))?;
@@ -783,26 +914,181 @@ pub fn define(native: RModule) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::{backward, change_or_restore};
+    use super::{backward, change_or_restore, guard_debug_panic, slice_panic, PathOperation};
     use url::{Position, Url};
 
     #[test]
-    fn a_backward_slice_is_refused_only_when_its_bytes_run_backward() {
+    fn a_backward_slice_is_refused_with_the_panic_rusts_slicing_raises() {
         let url = Url::parse("https://example.com/a?b#c").expect("a URL");
         assert!(backward(&url, Position::BeforePath, Position::AfterQuery).is_none());
         // Without a password, both positions are the same byte.
         assert!(backward(&url, Position::AfterPassword, Position::BeforePassword).is_none());
-        assert_eq!(
-            backward(&url, Position::AfterPath, Position::BeforePath).as_deref(),
-            Some("the slice starts at Position::AfterPath (byte 21) but ends at Position::BeforePath (byte 19)")
-        );
-        let panicked =
-            std::panic::catch_unwind(|| url[Position::AfterPath..Position::BeforePath].len());
-        assert!(
-            panicked.is_err(),
-            "Rust's slicing panics where the gem refuses"
-        );
+        let message = backward(&url, Position::AfterPath, Position::BeforePath).expect("refused");
+        assert_eq!(message, "byte range starts at 21 but ends at 19");
+        let payload =
+            std::panic::catch_unwind(|| url[Position::AfterPath..Position::BeforePath].len())
+                .expect_err("Rust's slicing panics where the gem refuses");
+        assert_eq!(crate::panic_of(&payload).0, message);
     }
+
+    // SPDX-SnippetBegin
+    // SPDX-SnippetCopyrightText: 2013-2025 The rust-url developers
+    // SPDX-License-Identifier: MIT OR Apache-2.0
+    // SPDX-SnippetComment: the Debug text of url 2.5.8's PathSegmentsMut
+    //   (src/path_segments.rs:41-47), which this test pins
+
+    #[test]
+    fn a_replayed_guard_debugs_as_the_long_lived_one() {
+        let mut url = Url::parse("https://example.com/a").expect("a URL");
+        let mut live = url.path_segments_mut().expect("a base");
+        live.push("d");
+        let expected = format!("{live:?}");
+        drop(live);
+        assert_eq!(
+            expected,
+            "PathSegmentsMut { url: Url { scheme: \"https\", cannot_be_a_base: false, username: \"\", \
+             password: None, host: Some(Domain(\"example.com\")), port: None, path: \"/a/d\", query: None, \
+             fragment: None }, after_first_slash: 20, after_path: \"\", old_after_path_position: 21 }"
+        );
+        let mut start = Url::parse("https://example.com/a").expect("a URL");
+        let mut replayed = start.path_segments_mut().expect("a base");
+        PathOperation::Push("d".to_owned()).apply(&mut replayed);
+        assert_eq!(format!("{replayed:?}"), expected);
+    }
+
+    // SPDX-SnippetEnd
+
+    /// The message `catch_unwind` takes from `operation`'s panic, or `None`.
+    fn panic_text<T>(operation: impl FnOnce() -> T) -> Option<String> {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(operation))
+            .err()
+            .map(|payload| crate::panic_of(&payload).0)
+    }
+
+    #[test]
+    fn slice_panic_words_stds_own_panic() {
+        let cases: [(&str, usize, usize); 9] = [
+            ("abcdef", 1, 4),
+            ("abcdef", 6, 6),
+            ("abcdef", 7, 9),
+            ("abcdef", 2, 9),
+            ("abcdef", 5, 3),
+            ("a\u{e9}b", 2, 3),
+            ("a\u{e9}b", 0, 2),
+            ("a\u{1f600}", 3, 5),
+            ("a\u{e9}", 9, 1),
+        ];
+        for (text, begin, end) in cases {
+            assert_eq!(
+                slice_panic(text, begin, end),
+                panic_text(|| text[begin..end].len()),
+                "{text:?}[{begin}..{end}]"
+            );
+            assert_eq!(
+                slice_panic(text, begin, text.len()),
+                panic_text(|| text[begin..].len()),
+                "{text:?}[{begin}..]"
+            );
+        }
+    }
+
+    // SPDX-SnippetBegin
+    // SPDX-SnippetCopyrightText: 2013-2025 The rust-url developers
+    // SPDX-License-Identifier: MIT OR Apache-2.0
+    // SPDX-SnippetComment: the Debug text of url 2.5.8's PathSegmentsMut
+    //   (src/path_segments.rs:41-47) over a URL with a query or fragment,
+    //   which this test pins
+
+    /// Where url's `Debug` reads a field, so which `debug_assert!` a debug
+    /// build trips before the release build's slice.
+    #[derive(PartialEq, Eq)]
+    enum Field {
+        Path,
+        QueryOrFragment,
+        None,
+    }
+
+    #[test]
+    fn guard_debug_panic_predicts_urls_own_debug() {
+        let cases = [
+            (
+                "https://example.com/a?b",
+                vec![],
+                Field::QueryOrFragment,
+                Some("start byte index 22 is out of bounds for string of length 21"),
+            ),
+            (
+                "https://example.com/abc?q",
+                vec![PathOperation::Pop],
+                Field::Path,
+                Some("end byte index 23 is out of bounds for string of length 20"),
+            ),
+            (
+                "https://example.com/abc#f",
+                vec![PathOperation::Clear],
+                Field::Path,
+                Some("end byte index 23 is out of bounds for string of length 20"),
+            ),
+            (
+                "https://example.com/a#c",
+                vec![],
+                Field::QueryOrFragment,
+                Some("start byte index 22 is out of bounds for string of length 21"),
+            ),
+            (
+                "https://example.com/a?b#c",
+                vec![PathOperation::Push("x".to_owned())],
+                Field::QueryOrFragment,
+                Some("start byte index 24 is out of bounds for string of length 23"),
+            ),
+            (
+                "https://example.com/a?bcd#e",
+                vec![PathOperation::Push("x".to_owned())],
+                Field::QueryOrFragment,
+                Some("end byte index 25 is out of bounds for string of length 23"),
+            ),
+            (
+                "https://example.com/a?b",
+                vec![PathOperation::Push("xyz".to_owned())],
+                Field::QueryOrFragment,
+                None,
+            ),
+            (
+                "https://example.com/a",
+                vec![PathOperation::Push("d".to_owned())],
+                Field::None,
+                None,
+            ),
+        ];
+        for (input, operations, field, expected) in cases {
+            let start = Url::parse(input).expect("a URL");
+            let predicted = guard_debug_panic(&start, &operations);
+            assert_eq!(predicted.as_deref(), expected, "{input}");
+            let mut url = start.clone();
+            let real = panic_text(|| {
+                let mut path = url.path_segments_mut().expect("a base");
+                for operation in &operations {
+                    operation.apply(&mut path);
+                }
+                format!("{path:?}")
+            });
+            // url's `debug_assert!(self.byte_at(..) == ..)` in `query` and
+            // `fragment` (src/lib.rs:1475-1479, :1547) panics before their
+            // slice in a debug build, as `cargo test` builds; `path` has
+            // none. So the release build's panic is compared wherever a
+            // debug build reaches it, and everywhere under `--release`.
+            if cfg!(debug_assertions) && field == Field::QueryOrFragment {
+                assert!(
+                    real.is_some(),
+                    "{input}: a debug build trips url's debug_assert!"
+                );
+            } else {
+                assert_eq!(real, predicted, "{input}");
+            }
+        }
+    }
+
+    // SPDX-SnippetEnd
 
     #[test]
     fn a_panic_mid_mutation_puts_the_url_back() {

@@ -25,7 +25,7 @@ module Ferro
 
       def initialize: (Symbol name) -> void
       def to_s: () -> String
-      def inspect: () -> String
+      def debug: () -> String
     end
   end
 end

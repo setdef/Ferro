@@ -37,6 +37,7 @@ module Ferro
     # A Url changes in place. +dup+ copies it, as Rust's +Clone+ does. A
     # frozen Url refuses every setter with +FrozenError+;
     # <tt>Ractor.make_shareable</tt> freezes one and lets it cross Ractors.
+    # #debug is url's +Debug+ text; +inspect+ is Ruby's.
     # A Rust panic inside url, which would end the Ruby process, raises
     # Error instead, and the Url keeps its value from before the call.
     #
@@ -248,49 +249,16 @@ module Ferro
         as_str
       end
 
-      # Returns the serialization of this URL.
-      #
-      # Deprecated since url 2.3.0, which says to use <tt>Into<String></tt>
-      # instead; in Ruby that is #to_s. It warns in Ruby's
-      # <tt>:deprecated</tt> category. Mirrors url's
-      # <tt>Url::into_string</tt> (<tt>src/lib.rs:657-679</tt>).
+      # url's +Debug+ text: the URL's components by name, formatted by
+      # Rust. +inspect+ stays Ruby's. Mirrors url's <tt>Debug for Url</tt>
+      # (<tt>src/lib.rs:2809-2826</tt>).
       #
       # === Example
       #
-      #   Ferro::Url::Url.parse("https://example.net/").into_string # => "https://example.net/"
-      def into_string
-        warn("Ferro::Url::Url#into_string is deprecated since url 2.3.0; use #to_s", category: :deprecated,
-          uplevel: 1)
-        as_str
-      end
-
-      # url's +Debug+ text: the URL's components by name. Mirrors url's
-      # <tt>Debug for Url</tt> (<tt>src/lib.rs:2809-2826</tt>).
-      #
-      # === Example
-      #
-      #   Ferro::Url::Url.parse("https://example.net/").inspect
+      #   Ferro::Url::Url.parse("https://example.net/").debug
       #   # => "Url { scheme: \"https\", cannot_be_a_base: false, username: \"\", password: None, host: Some(Domain(\"example.net\")), port: None, path: \"/\", query: None, fragment: None }"
-      def inspect
-        Native.url_inspect(@native)
-      end
-
-      # Checks the invariants url's own methods assume, returning +nil+, or
-      # raising Error with url's description of the first one that does not
-      # hold.
-      #
-      # url marks it hidden: it exists for testing rust-url itself, and a
-      # Url from url's own methods always passes. Mirrors url's
-      # <tt>Url::check_invariants</tt> (<tt>src/lib.rs:681-809</tt>).
-      #
-      # === Example
-      #
-      #   Ferro::Url::Url.parse("https://example.net/").check_invariants # => nil
-      def check_invariants
-        failure = Native.url_check_invariants(@native)
-        raise Error, failure if failure
-
-        nil
+      def debug
+        Native.url_debug(@native)
       end
 
       # Returns the origin of this URL (https://url.spec.whatwg.org/#origin).
@@ -591,17 +559,17 @@ module Ferro
       end
 
       # Parses the URL's query string, if any, as
-      # <tt>application/x-www-form-urlencoded</tt> and returns an Enumerator
-      # of <tt>[key, value]</tt> pairs, percent-decoded. It holds the pairs
-      # as they were when you called this. Mirrors url's
-      # <tt>Url::query_pairs</tt> (<tt>src/lib.rs:1485-1511</tt>).
+      # <tt>application/x-www-form-urlencoded</tt> and returns a
+      # FormUrlencoded::Parse of <tt>[key, value]</tt> pairs,
+      # percent-decoded. It reads the query as it was when you called this.
+      # Mirrors url's <tt>Url::query_pairs</tt> (<tt>src/lib.rs:1485-1511</tt>).
       #
       # === Example
       #
       #   Ferro::Url::Url.parse("https://example.com/products?page=2&sort=desc").query_pairs.to_a
       #   # => [["page", "2"], ["sort", "desc"]]
       def query_pairs
-        Native.url_query_pairs(@native).each
+        FormUrlencoded::Parse.__send__(:new, Native.url_query_pairs(@native))
       end
 
       # Returns this URL's fragment identifier, if any, or +nil+.
@@ -661,7 +629,7 @@ module Ferro
 
       # Manipulates this URL's query string, viewed as a sequence of
       # name/value pairs in <tt>application/x-www-form-urlencoded</tt>
-      # syntax. The return value, a FormUrlencoded::Serializer over a
+      # syntax. The serializer, a FormUrlencoded::Serializer over a
       # UrlQuery, has a method-chaining API.
       #
       # Calling it gives the URL a query, empty if it had none, as url's
@@ -669,24 +637,39 @@ module Ferro
       # <tt>url.query_pairs_mut.clear</tt> is equivalent to
       # <tt>url.set_query("")</tt>, not <tt>url.set_query(nil)</tt>.
       #
-      # In Rust the serializer borrows the URL until it is dropped. Here
-      # each call on it changes the URL at once, and the URL stays valid
-      # between calls. Mirrors url's <tt>Url::query_pairs_mut</tt>
+      # In Rust the serializer borrows the URL until the end of its scope,
+      # where dropping it finishes the change. With a block, the block is
+      # that scope: it gets the serializer, its value is returned, and when
+      # it ends, however it ends, the serializer is dropped, so any later
+      # call on it raises +IOError+, as a closed IO does. Without a block
+      # the serializer is returned, as Rust's temporary in
+      # <tt>url.query_pairs_mut().append_pair(...)</tt> is. Either way each
+      # call changes the URL at once, and the URL stays valid between calls.
+      # Mirrors url's <tt>Url::query_pairs_mut</tt>
       # (<tt>src/lib.rs:1669-1719</tt>).
       #
-      # === Example
+      # === Examples
       #
       #   url = Ferro::Url::Url.parse("https://example.net?lang=fr#nav")
       #   url.query_pairs_mut.append_pair("foo", "bar")
       #   url.query # => "lang=fr&foo=bar"
       #   url.as_str # => "https://example.net/?lang=fr&foo=bar#nav"
       #
-      #   url.query_pairs_mut.clear.append_pair("foo", "bar & baz").append_pair("saisons", "Été+hiver")
+      #   url.query_pairs_mut do |query|
+      #     query.clear.append_pair("foo", "bar & baz").append_pair("saisons", "Été+hiver")
+      #   end
       #   url.query # => "foo=bar+%26+baz&saisons=%C3%89t%C3%A9%2Bhiver"
       def query_pairs_mut
         writable!
         Native.url_query_pairs_mut(@native, [:none], nil)
-        FormUrlencoded::Serializer.__send__(:over_url_query, UrlQuery.__send__(:new, self))
+        serializer = FormUrlencoded::Serializer.__send__(:over_url_query, UrlQuery.__send__(:new, self))
+        return serializer unless block_given?
+
+        begin
+          yield serializer
+        ensure
+          serializer.__send__(:drop)
+        end
       end
 
       # Changes this URL's path. It percent-encodes the given string if it's
@@ -706,20 +689,40 @@ module Ferro
       end
 
       # Returns a PathSegmentsMut with methods to manipulate this URL's path
-      # segments, or raises Error if this URL is cannot-be-a-base. Mirrors
-      # url's <tt>Url::path_segments_mut</tt> (<tt>src/lib.rs:1792-1802</tt>).
+      # segments, or raises Error if this URL is cannot-be-a-base.
       #
-      # === Example
+      # In Rust the PathSegmentsMut borrows the URL until the end of its
+      # scope, where dropping it finishes the change. With a block, the
+      # block is that scope: it gets the PathSegmentsMut, its value is
+      # returned, and when it ends, however it ends, the PathSegmentsMut is
+      # dropped, so any later call on it raises +IOError+, as a closed IO
+      # does. Without a block the PathSegmentsMut is returned, as Rust's
+      # temporary in <tt>url.path_segments_mut()?.pop()</tt> is. Either way
+      # each call changes the URL at once, and the URL stays valid between
+      # calls. Mirrors url's <tt>Url::path_segments_mut</tt>
+      # (<tt>src/lib.rs:1792-1802</tt>).
+      #
+      # === Examples
       #
       #   url = Ferro::Url::Url.parse("http://example.net/foo/index.html")
       #   url.path_segments_mut.pop.push("img").push("2/100%.png")
       #   url.as_str # => "http://example.net/foo/img/2%2F100%25.png"
       #
+      #   url.path_segments_mut { |path| path.clear.push("logout") }
+      #   url.as_str # => "http://example.net/logout"
+      #
       #   Ferro::Url::Url.parse("mailto:me@example.com").path_segments_mut # raises Ferro::Url::Error
       def path_segments_mut
         writable!
         Native.url_path_segments_mut(@native, [:none])
-        PathSegmentsMut.__send__(:new, self)
+        segments = PathSegmentsMut.__send__(:new, self)
+        return segments unless block_given?
+
+        begin
+          yield segments
+        ensure
+          segments.__send__(:drop)
+        end
       end
 
       # Changes this URL's port number, or removes it for +nil+.
@@ -880,7 +883,8 @@ module Ferro
       # url implements no inclusive range, so a bounded or beginless
       # <tt>..</tt> range raises +TypeError+. A range whose start falls
       # after its end in the serialization, where Rust's slicing would
-      # panic, raises Error.
+      # panic, raises +RangeError+ with Rust's message, such as
+      # <tt>byte range starts at 21 but ends at 19</tt>.
       #
       # [range] Range of Position values, either end +nil+.
       #

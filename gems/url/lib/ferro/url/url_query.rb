@@ -24,6 +24,12 @@ module Ferro
     # public constructor, as url gives none. FormUrlencoded::Serializer#finish
     # returns the Url.
     #
+    # url derives +Debug+ for it, but no caller outside url can reach one to
+    # format: the serializer keeps its target private
+    # (form_urlencoded <tt>src/lib.rs:176-180</tt>; url
+    # <tt>src/lib.rs:3201-3209</tt> says so). The same holds here, so it has
+    # no +debug+.
+    #
     # Mirrors url's +UrlQuery+ (<tt>src/lib.rs:3194-3231</tt>).
     #
     # === Example

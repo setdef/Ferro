@@ -94,11 +94,23 @@ module Ferro
         Native.origin_unicode_serialization(Arguments.origin_parts(self))
       end
 
+      # url's +Debug+ text for this origin, formatted by Rust: the variant
+      # and its values, as url derives it. +inspect+ stays Ruby's. Mirrors
+      # url's <tt>#[derive(Debug)]</tt> on +Origin+
+      # (<tt>src/origin.rs:55</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::Url::Url.parse("https://example.com/").origin.debug # => "Tuple(\"https\", Domain(\"example.com\"), 443)"
+      def debug
+        Native.origin_debug(Arguments.origin_parts(self))
+      end
+
       # A globally unique identifier.
       #
       # === Example
       #
-      #   Ferro::Url::Url.parse("data:text/plain,hi").origin # => #<data Ferro::Url::Origin::Opaque value=OpaqueOrigin(0)>
+      #   Ferro::Url::Url.parse("data:text/plain,hi").origin.debug # => "Opaque(OpaqueOrigin(0))"
       class Opaque < Data.define(:value)
         include Origin
 

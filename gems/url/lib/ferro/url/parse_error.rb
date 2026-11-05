@@ -23,9 +23,9 @@ module Ferro
     # leave you guessing which.
     #
     # Each of url's variants is a subclass with url's message, the text a
-    # Tauri app shows for a bad argument. url may add variants in the
-    # future; one this gem does not know yet raises this class itself, with
-    # url's message.
+    # Tauri app shows for a bad argument, and url's +Debug+ text as
+    # +debug+. url may add variants in the future; one this gem does not
+    # know yet raises this class itself, with url's message.
     #
     # Mirrors url's +ParseError+ (<tt>src/parser.rs:50-99</tt>).
     #
@@ -76,6 +76,16 @@ module Ferro
       #
       #   Ferro::Url::Url.parse("http://") # raises Ferro::Url::ParseError::EmptyHost
       class EmptyHost < ParseError
+        # url's +Debug+ text for this variant, formatted by Rust:
+        # <tt>EmptyHost</tt>. +inspect+ stays Ruby's. Mirrors url's
+        # <tt>#[derive(Debug)]</tt> on +ParseError+ (<tt>src/parser.rs:56</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::Url::ParseError::EmptyHost.new.debug # => "EmptyHost"
+        def debug
+          Native.parse_error_debug(:EmptyHost)
+        end
       end
 
       # The domain failed IDNA processing (UTS #46): "invalid international
@@ -85,6 +95,16 @@ module Ferro
       #
       #   Ferro::Url::Url.parse("http://xn--a/") # raises Ferro::Url::ParseError::IdnaError
       class IdnaError < ParseError
+        # url's +Debug+ text for this variant, formatted by Rust:
+        # <tt>IdnaError</tt>. +inspect+ stays Ruby's. Mirrors url's
+        # <tt>#[derive(Debug)]</tt> on +ParseError+ (<tt>src/parser.rs:56</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::Url::ParseError::IdnaError.new.debug # => "IdnaError"
+        def debug
+          Native.parse_error_debug(:IdnaError)
+        end
       end
 
       # The port is not a number from 0 to 65535: "invalid port number".
@@ -93,6 +113,16 @@ module Ferro
       #
       #   Ferro::Url::Url.parse("http://example.com:99999/") # raises Ferro::Url::ParseError::InvalidPort
       class InvalidPort < ParseError
+        # url's +Debug+ text for this variant, formatted by Rust:
+        # <tt>InvalidPort</tt>. +inspect+ stays Ruby's. Mirrors url's
+        # <tt>#[derive(Debug)]</tt> on +ParseError+ (<tt>src/parser.rs:56</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::Url::ParseError::InvalidPort.new.debug # => "InvalidPort"
+        def debug
+          Native.parse_error_debug(:InvalidPort)
+        end
       end
 
       # A host that ends in a number is not a valid IPv4 address.
@@ -101,6 +131,16 @@ module Ferro
       #
       #   Ferro::Url::Url.parse("http://1.2.3.4.5/") # raises Ferro::Url::ParseError::InvalidIpv4Address
       class InvalidIpv4Address < ParseError
+        # url's +Debug+ text for this variant, formatted by Rust:
+        # <tt>InvalidIpv4Address</tt>. +inspect+ stays Ruby's. Mirrors url's
+        # <tt>#[derive(Debug)]</tt> on +ParseError+ (<tt>src/parser.rs:56</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::Url::ParseError::InvalidIpv4Address.new.debug # => "InvalidIpv4Address"
+        def debug
+          Native.parse_error_debug(:InvalidIpv4Address)
+        end
       end
 
       # A bracketed host is not a valid IPv6 address.
@@ -109,6 +149,16 @@ module Ferro
       #
       #   Ferro::Url::Url.parse("http://[:::1]") # raises Ferro::Url::ParseError::InvalidIpv6Address
       class InvalidIpv6Address < ParseError
+        # url's +Debug+ text for this variant, formatted by Rust:
+        # <tt>InvalidIpv6Address</tt>. +inspect+ stays Ruby's. Mirrors url's
+        # <tt>#[derive(Debug)]</tt> on +ParseError+ (<tt>src/parser.rs:56</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::Url::ParseError::InvalidIpv6Address.new.debug # => "InvalidIpv6Address"
+        def debug
+          Native.parse_error_debug(:InvalidIpv6Address)
+        end
       end
 
       # The host holds a character no host may: "invalid domain character".
@@ -117,6 +167,16 @@ module Ferro
       #
       #   Ferro::Url::Url.parse("foo://exa mple/") # raises Ferro::Url::ParseError::InvalidDomainCharacter
       class InvalidDomainCharacter < ParseError
+        # url's +Debug+ text for this variant, formatted by Rust:
+        # <tt>InvalidDomainCharacter</tt>. +inspect+ stays Ruby's. Mirrors url's
+        # <tt>#[derive(Debug)]</tt> on +ParseError+ (<tt>src/parser.rs:56</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::Url::ParseError::InvalidDomainCharacter.new.debug # => "InvalidDomainCharacter"
+        def debug
+          Native.parse_error_debug(:InvalidDomainCharacter)
+        end
       end
 
       # A relative reference with no base URL to resolve it against.
@@ -125,6 +185,16 @@ module Ferro
       #
       #   Ferro::Url::Url.parse("../main.css") # raises Ferro::Url::ParseError::RelativeUrlWithoutBase
       class RelativeUrlWithoutBase < ParseError
+        # url's +Debug+ text for this variant, formatted by Rust:
+        # <tt>RelativeUrlWithoutBase</tt>. +inspect+ stays Ruby's. Mirrors url's
+        # <tt>#[derive(Debug)]</tt> on +ParseError+ (<tt>src/parser.rs:56</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::Url::ParseError::RelativeUrlWithoutBase.new.debug # => "RelativeUrlWithoutBase"
+        def debug
+          Native.parse_error_debug(:RelativeUrlWithoutBase)
+        end
       end
 
       # A relative reference whose base is a cannot-be-a-base URL, such as a
@@ -134,6 +204,16 @@ module Ferro
       #
       #   Ferro::Url::Url.parse("data:text/plain,Stuff").join("other") # raises Ferro::Url::ParseError::RelativeUrlWithCannotBeABaseBase
       class RelativeUrlWithCannotBeABaseBase < ParseError
+        # url's +Debug+ text for this variant, formatted by Rust:
+        # <tt>RelativeUrlWithCannotBeABaseBase</tt>. +inspect+ stays Ruby's. Mirrors url's
+        # <tt>#[derive(Debug)]</tt> on +ParseError+ (<tt>src/parser.rs:56</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::Url::ParseError::RelativeUrlWithCannotBeABaseBase.new.debug # => "RelativeUrlWithCannotBeABaseBase"
+        def debug
+          Native.parse_error_debug(:RelativeUrlWithCannotBeABaseBase)
+        end
       end
 
       # Url#set_host on a cannot-be-a-base URL, which has no host to set.
@@ -143,6 +223,16 @@ module Ferro
       #   Ferro::Url::Url.parse("mailto:rms@example.net").set_host("example.com")
       #   # raises Ferro::Url::ParseError::SetHostOnCannotBeABaseUrl
       class SetHostOnCannotBeABaseUrl < ParseError
+        # url's +Debug+ text for this variant, formatted by Rust:
+        # <tt>SetHostOnCannotBeABaseUrl</tt>. +inspect+ stays Ruby's. Mirrors url's
+        # <tt>#[derive(Debug)]</tt> on +ParseError+ (<tt>src/parser.rs:56</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::Url::ParseError::SetHostOnCannotBeABaseUrl.new.debug # => "SetHostOnCannotBeABaseUrl"
+        def debug
+          Native.parse_error_debug(:SetHostOnCannotBeABaseUrl)
+        end
       end
 
       # The URL would be longer than 4 GB, which url does not support.
@@ -151,6 +241,16 @@ module Ferro
       #
       #   Ferro::Url::ParseError::Overflow.new.message # => "URLs more than 4 GB are not supported"
       class Overflow < ParseError
+        # url's +Debug+ text for this variant, formatted by Rust:
+        # <tt>Overflow</tt>. +inspect+ stays Ruby's. Mirrors url's
+        # <tt>#[derive(Debug)]</tt> on +ParseError+ (<tt>src/parser.rs:56</tt>).
+        #
+        # === Example
+        #
+        #   Ferro::Url::ParseError::Overflow.new.debug # => "Overflow"
+        def debug
+          Native.parse_error_debug(:Overflow)
+        end
       end
     end
 

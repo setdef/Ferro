@@ -285,7 +285,7 @@ FERRO_GEMS = [
       begin
         url[Ferro::Url::Position::AfterPath...Ferro::Url::Position::BeforePath]
         abort "a backward slice reached Rust"
-      rescue Ferro::Url::Error
+      rescue RangeError
       end
       puts "ferro-url \#{Ferro::Url::VERSION} loads its extension (\#{url})"
     RUBY

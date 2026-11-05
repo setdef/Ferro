@@ -12,7 +12,7 @@ module Ferro
       def ==: (Object other) -> bool
       alias eql? ==
       def hash: () -> Integer
-      def inspect: () -> String
+      def debug: () -> String
 
       private
 

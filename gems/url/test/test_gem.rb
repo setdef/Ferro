@@ -22,13 +22,14 @@ class TestGem < Minitest::Test
     assert_equal locked("url"), SPEC.metadata.fetch("url_version")
   end
 
-  # Every feature that builds is on (plan 005, decision 2).
+  # serde is built; expose_internals, which adds only items to url's hidden
+  # quirks module, is dropped with it (plan 005, decision 2).
   def test_the_manifest_pins_that_url_and_form_urlencoded
     manifest = File.read(File.join(ROOT, "ext/ferro_url/Cargo.toml"))
     url = manifest[/^url = .*$/]
 
     assert_includes url, %(version = "=#{locked('url')}")
-    assert_includes url, %(features = ["serde", "expose_internals"])
+    assert_includes url, %(features = ["serde"])
     assert_includes manifest, %(form_urlencoded = "=#{locked('form_urlencoded')}")
   end
 
