@@ -27,8 +27,8 @@ module Ferro
     # SPDX-SnippetCopyrightText: 2017 Hendrik Sollich
     # SPDX-SnippetComment: the XDG API and its documentation from
     #   notify-rust 4.18.2 src/xdg/mod.rs, src/image.rs, src/hints.rs:53-55,
-    #   and src/notification.rs:127-139, 166-171, 202-211, 275-318, 386-390,
-    #   515-533
+    #   src/notification.rs:127-139, 166-171, 202-211, 275-318, 386-390,
+    #   515-533, src/lib.rs:226-233, and src/miniver.rs:4-45
     #++
 
     class Error
@@ -565,6 +565,58 @@ module Ferro
         nil
       end
     end
+
+    # A notification specification version, such as SPEC_VERSION.
+    #
+    # The XDG notification specification renamed some hints between
+    # versions: raw image data is +icon_data+ in 1.0, +image_data+ in 1.1,
+    # and +image-data+ from 1.2, and notify-rust picks the name by the
+    # server's version (<tt>src/image.rs:179-185</tt>). Code that sends
+    # hints may need to know which version the server speaks, and compare
+    # it with another.
+    #
+    # A Version holds the two numbers and orders by +major+, then +minor+.
+    # notify-rust's type sits in a private module, so code outside the
+    # crate cannot name it or call a constructor, only copy SPEC_VERSION;
+    # here too +new+ and <tt>[]</tt> are private. Defined only on Linux.
+    #
+    # Mirrors notify-rust's <tt>miniver::Version</tt>
+    # (<tt>src/miniver.rs:4-45</tt>).
+    #
+    # === Example
+    #
+    #   Ferro::NotifyRust::SPEC_VERSION.major # => 1
+    class Version < Data.define(:major, :minor)
+      include Comparable
+
+      private_class_method :new, :[]
+
+      ##
+      # :attr_reader: major
+      # The major version, an Integer.
+
+      ##
+      # :attr_reader: minor
+      # The minor version, an Integer.
+
+      # Orders by +major+, then +minor+, as notify-rust's +Ord+ does;
+      # +nil+ for anything but a Version.
+      #
+      # [other] Object, the value to compare with.
+      #
+      # === Example
+      #
+      #   Ferro::NotifyRust::SPEC_VERSION <=> Ferro::NotifyRust::SPEC_VERSION # => 0
+      def <=>(other)
+        return unless other.is_a?(Version)
+
+        [major, minor] <=> [other.major, other.minor]
+      end
+    end
+
+    # SPEC_VERSION asks the server the first time it is named, so it
+    # loads then, as notify-rust's lazy static does.
+    autoload :SPEC_VERSION, "ferro/notify_rust/spec_version"
 
     # The capabilities of the running notification server, such as
     # <tt>"actions"</tt>, <tt>"body"</tt>, <tt>"body-markup"</tt>, and

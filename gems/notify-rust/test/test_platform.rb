@@ -25,7 +25,9 @@ class TestPlatform < Minitest::Test
     %i[get_capabilities get_server_information handle_action dbus_stack].each do |name|
       assert_equal linux, NotifyRust.respond_to?(name), name
     end
-    %i[Image DbusStack Future].each { |name| assert_equal linux, NotifyRust.const_defined?(name, false), name }
+    %i[Image DbusStack Future Version SPEC_VERSION].each do |name|
+      assert_equal linux, NotifyRust.const_defined?(name, false), name
+    end
     assert_equal linux, NotifyRust::Hint.const_defined?(:ImageData, false)
     assert_equal linux, NotifyRust::Notification.respond_to?(:at_bus)
     %i[close close_async update wait_for_action_async].each do |name|

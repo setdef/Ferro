@@ -251,8 +251,10 @@ impl Handle {
     /// `#native_update`: `update` (`src/xdg/mod.rs:290-317`), which
     /// notify-rust runs only through `block_on`, so nothing can cancel it.
     /// The handle leaves the slot while it runs, so every other call
-    /// raises rather than wait for it.
-    fn update(ruby: &Ruby, rb_self: &Self) -> Result<(), Error> {
+    /// raises rather than wait for it. It takes `&mut self`, as the
+    /// setters do, so a frozen handle refuses it.
+    fn update(ruby: &Ruby, rb_self: Obj<Self>) -> Result<(), Error> {
+        rb_self.check_frozen()?;
         let mut handle = rb_self
             .take_unique()
             .map_err(|message| error::base(ruby, message))?;
@@ -456,6 +458,19 @@ fn get_server_information(ruby: &Ruby) -> Result<(String, String, String, String
     ))
 }
 
+/// `Native.spec_version`: notify-rust's `SPEC_VERSION`
+/// (`src/lib.rs:226-233`), as `[major, minor]`. The first read asks the
+/// server through `get_server_information`, which notify-rust blocks on,
+/// so it runs with the GVL released; notify-rust falls back to 1.1 when
+/// that fails.
+fn spec_version(ruby: &Ruby) -> Result<(u64, u64), Error> {
+    gvl::without_gvl(ruby, |_| {
+        let version = *notify_rust::SPEC_VERSION;
+        (version.major, version.minor)
+    })?
+    .map_err(|payload| error::panicked(ruby, &panic_of(&payload)))
+}
+
 /// What `handle_action`'s closure saw, owned, since `ActionResponse`
 /// borrows its key.
 enum Seen {
@@ -526,6 +541,7 @@ pub fn define(ruby: &Ruby, notify_rust: RModule, native: RModule) -> Result<(), 
     )?;
     native.define_singleton_method("handle_action", function!(handle_action, 1))?;
     native.define_singleton_method("dbus_stack", function!(dbus_stack, 0))?;
+    native.define_singleton_method("spec_version", function!(spec_version, 0))?;
     Ok(())
 }
 

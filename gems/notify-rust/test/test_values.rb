@@ -183,4 +183,21 @@ class TestValues < Minitest::Test
 
     assert_equal [[NotifyRust::Hint::Category.new("email"), NotifyRust::Hint::Resident.new(true)]], hints
   end
+
+  # Ports notify-rust 4.18.2's miniver tests (src/miniver.rs:47-56): a
+  # Version orders by major, then minor. Rust code outside notify-rust
+  # cannot name the type, so Ruby code cannot make one either.
+  def test_a_spec_version_orders_by_major_then_minor
+    skip_unless_platform(:linux)
+    version = -> (major, minor) { NotifyRust::Version.__send__(:new, major, minor) }
+
+    assert_operator version[1, 3], :>=, version[1, 2]
+    assert_operator version[1, 2], :>=, version[1, 2]
+    assert_equal version[1, 2], version[1, 2]
+    assert_operator version[1, 1], :<=, version[1, 2]
+    assert_operator version[2, 0], :>, version[1, 9]
+    assert_nil version[1, 2] <=> "1.2"
+    assert_raises(NoMethodError) { NotifyRust::Version.new(1, 2) }
+    assert_raises(NoMethodError) { NotifyRust::Version[1, 2] }
+  end
 end

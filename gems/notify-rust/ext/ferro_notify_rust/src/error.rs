@@ -117,11 +117,26 @@ pub fn classify(debug: &str, display: &str) -> Raise {
         .iter()
         .find(|known| **known == kind)
         .map_or_else(|| vec!["Error"], |known| vec!["Error", known]);
+    if path == ["Error", "Conversion"] {
+        // `Conversion`'s Ruby class adds the prefix its `Display` writes
+        // (`src/error.rs:68`), so it takes the reason alone. At the locked
+        // 4.18.2 that `Display` always writes the prefix, so the fallback
+        // below never runs.
+        let reason = display.strip_prefix(CONVERSION_PREFIX).unwrap_or(display);
+        return Raise {
+            path,
+            arguments: vec![reason.to_owned()],
+        };
+    }
     Raise {
         path,
         arguments: message,
     }
 }
+
+/// What `ErrorKind::Conversion`'s `Display` writes before its reason
+/// (`src/error.rs:68`).
+const CONVERSION_PREFIX: &str = "Conversion Error: ";
 
 /// mac-notification-sys's error, inside notify-rust's: a class per leaf
 /// under the variant it sits in (plan 003, decision 10).
@@ -235,14 +250,16 @@ mod tests {
             target(&Error::from(ErrorKind::SpecVersion("1".into()))),
             message(&["Error", "SpecVersion"], "1")
         );
+        // Conversion's Ruby class builds the prefix around its reason, as
+        // AlreadySet builds its text around the name.
+        let conversion = Error::from(ErrorKind::Conversion("invalid input \"x\"".into()));
         assert_eq!(
-            target(&Error::from(ErrorKind::Conversion(
-                "invalid input \"x\"".into()
-            ))),
-            message(
-                &["Error", "Conversion"],
-                "Conversion Error: invalid input \"x\""
-            )
+            conversion.to_string(),
+            "Conversion Error: invalid input \"x\""
+        );
+        assert_eq!(
+            target(&conversion),
+            message(&["Error", "Conversion"], "invalid input \"x\"")
         );
         assert_eq!(
             target(&Error::from(ErrorKind::ImplementationMissing)),
@@ -348,6 +365,10 @@ mod tests {
         assert_eq!(
             classify("Error { kind: Future(1) }", "later"),
             message(&["Error"], "later")
+        );
+        assert_eq!(
+            classify("Error { kind: Conversion(\"x\") }", "unexpected"),
+            message(&["Error", "Conversion"], "unexpected")
         );
         assert_eq!(
             mac_leaf("Other", "Thing", "text"),

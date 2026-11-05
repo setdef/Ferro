@@ -36,6 +36,13 @@ class TestErrors < Minitest::Test
       NotifyRust::Error::ImplementationMissing.new.message
   end
 
+  # ErrorKind::Conversion holds the reason, and its Display adds the
+  # prefix (src/error.rs:44, 68).
+  def test_conversion_builds_notify_rusts_message_around_its_reason
+    assert_equal 'Conversion Error: invalid input "x"', NotifyRust::Error::Conversion.new('invalid input "x"').message
+    assert_equal "Conversion Error: ", NotifyRust::Error::Conversion.new.message
+  end
+
   def test_an_error_from_notify_rust_arrives_as_its_class
     error = assert_raises(NotifyRust::Error) { urgency.try_from("") }
 

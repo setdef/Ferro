@@ -8,11 +8,27 @@ module Ferro
     def self.handle_action: (Integer id) { (ActionResponse response) -> void } -> nil
     def self.dbus_stack: () -> DbusStack
 
+    SPEC_VERSION: Version
+
+    class Version < Data
+      include Comparable
+
+      attr_reader major: Integer
+      attr_reader minor: Integer
+
+      private def self.new: (Integer major, Integer minor) -> instance
+                          | (major: Integer, minor: Integer) -> instance
+      private def self.[]: (Integer major, Integer minor) -> instance
+
+      def <=>: (Object other) -> Integer?
+    end
+
     module Native
       def self.get_capabilities: () -> Array[String]
       def self.get_server_information: () -> [String, String, String, String]
       def self.handle_action: (Integer id) -> action_response_tag?
       def self.dbus_stack: () -> (:Dbus | :Zbus)
+      def self.spec_version: () -> [Integer, Integer]
     end
 
     class Error

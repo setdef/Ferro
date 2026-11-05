@@ -12,6 +12,19 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `Notification.default`, notify-rust's `impl Default for Notification`.
+- On Linux, `SPEC_VERSION`, notify-rust's own lazily read specification version, loaded the first time it is named, as a `Version` with `major` and `minor` that compares as notify-rust's does.
+
+### Changed
+
+- `Error::Conversion.new(reason)` builds notify-rust's message, `Conversion Error: ` and the reason, as `ErrorKind::Conversion` displays it; errors notify-rust raises keep the same message.
+
+### Fixed
+
+- A frozen `Notification`, such as one shared between Ractors, could be reset to a new one by calling `initialize` again through `send`; it now raises `FrozenError`, and so does `update` on a frozen Linux `NotificationHandle`.
+
 ## [0.1.0.pre.4] - 2026-11-01
 
 ### Fixed

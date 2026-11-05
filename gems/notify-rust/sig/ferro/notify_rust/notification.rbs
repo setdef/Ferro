@@ -6,6 +6,8 @@ module Ferro
     class Notification
       include Builder
 
+      def self.default: () -> Notification
+
       def initialize: () -> void
       def inspect: () -> String
 

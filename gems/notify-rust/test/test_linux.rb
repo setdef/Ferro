@@ -65,6 +65,17 @@ class TestLinux < Minitest::Test
     assert_same NotifyRust::DbusStack::Zbus, NotifyRust.dbus_stack
   end
 
+  # SPEC_VERSION is notify-rust's own static, read from the server once
+  # (src/lib.rs:226-233), and loads only when first named.
+  def test_spec_version_is_the_servers
+    version = NotifyRust::SPEC_VERSION
+
+    assert_equal NotifyRust.get_server_information.spec_version, "#{version.major}.#{version.minor}"
+    assert_operator version, :>=, NotifyRust::Version.__send__(:new, 1, 1)
+    assert Ractor.shareable?(version)
+    assert_same version, NotifyRust::SPEC_VERSION
+  end
+
   def test_show_sends_the_notification_and_answers_its_id
     handle = notification("burst").appname("These should each").body("come in their own pop up.")
       .icon("media-floppy").show
@@ -204,6 +215,16 @@ class TestLinux < Minitest::Test
     assert_equal "Latest News (Correction)", handle.summary
   end
 
+  # update takes &mut self, as the setters do, so a frozen handle refuses
+  # it before anything reaches the server.
+  def test_a_frozen_handle_refuses_update
+    handle = notification("frozen").show.freeze
+
+    assert_raises(FrozenError) { handle.update }
+    assert_raises(FrozenError) { handle.summary("changed") }
+    assert_equal "frozen", handle.summary
+  end
+
   def test_an_id_set_ahead_replaces_that_notification
     first = notification("Volume 40%").show
     notification("Volume 50%").id(first.id).show
@@ -306,5 +327,26 @@ class TestLinux < Minitest::Test
     assert_equal "Ferro::NotifyRust::Error::Zbus", outcome.first
     assert_equal "Ferro::NotifyRust::Error", outcome.last.first
     assert_match(/\Anotify-rust panicked: /, outcome.last.last)
+  end
+end
+
+# The Linux API that needs no notification server.
+class TestLinuxWithoutServer < Minitest::Test
+  include NotifySuite
+
+  def setup
+    skip_unless_platform(:linux)
+  end
+
+  # Without a server notify-rust's static falls back to 1.1. The child
+  # names it first from another Ractor, which Ruby loads on the main one.
+  def test_spec_version_falls_back_to_one_one_and_loads_from_any_ractor
+    outcome, = in_child(<<~RUBY, "DBUS_SESSION_BUS_ADDRESS" => "unix:path=/nonexistent/bus")
+      pending = Ferro::NotifyRust.autoload?(:SPEC_VERSION)
+      version = Ractor.new { Ferro::NotifyRust::SPEC_VERSION }.value
+      [pending.nil?, version.major, version.minor, Ferro::NotifyRust.autoload?(:SPEC_VERSION)]
+    RUBY
+
+    assert_equal [false, 1, 1, nil], outcome
   end
 end

@@ -32,6 +32,15 @@ class TestNotification < Minitest::Test
     assert_same NotifyRust::Timeout::Default, fresh.timeout
   end
 
+  # impl Default for Notification is what Notification::new returns
+  # (src/notification.rs:123-125, 572-625).
+  def test_default_is_a_new_notification
+    default = NotifyRust::Notification.default
+
+    assert_instance_of NotifyRust::Notification, default
+    assert_equal notification.inspect, default.inspect
+  end
+
   # Ruby's allocator makes the notification empty; notify-rust builds it in
   # initialize, where a panic can raise instead of aborting the process.
   def test_an_allocated_but_uninitialized_notification_raises_instead_of_crashing
@@ -122,6 +131,19 @@ class TestNotification < Minitest::Test
     assert_raises(FrozenError) { frozen.body = "changed" }
     assert_equal "shared", frozen.summary
     assert Ractor.shareable?(Ractor.make_shareable(frozen))
+  end
+
+  # initialize is a native method too: run again on a frozen notification,
+  # it would replace the notification with a new one.
+  def test_a_frozen_notification_refuses_to_be_initialized_again
+    frozen = notification.summary("x").freeze
+
+    assert_raises(FrozenError) { frozen.__send__(:initialize) }
+    assert_equal "x", frozen.summary
+    thawed = notification.summary("x")
+    thawed.__send__(:initialize)
+
+    assert_equal "", thawed.summary, "an unfrozen notification may still be initialized again"
   end
 
   def test_inspect_is_notify_rusts_debug_text

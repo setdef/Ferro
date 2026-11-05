@@ -94,6 +94,19 @@ module Ferro
       #   Ferro::NotifyRust::Urgency.try_from("urgent")
       #   # raises Ferro::NotifyRust::Error::Conversion, "Conversion Error: invalid input \"urgent\""
       class Conversion < Error
+        # Creates the error, with notify-rust's message around +conversion+,
+        # as <tt>ErrorKind::Conversion</tt> holds the reason and its
+        # +Display+ adds the prefix.
+        #
+        # [conversion] String, why the value could not be converted.
+        #
+        # === Example
+        #
+        #   Ferro::NotifyRust::Error::Conversion.new("invalid input \"x\"").message
+        #   # => "Conversion Error: invalid input \"x\""
+        def initialize(conversion = "")
+          super("Conversion Error: #{conversion}")
+        end
       end
 
       # No D-Bus implementation was compiled in. ferro-notify-rust always

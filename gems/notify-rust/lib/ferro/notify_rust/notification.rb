@@ -65,6 +65,17 @@ module Ferro
       #
       #   notification = Ferro::NotifyRust::Notification.new
 
+      # The same empty notification as Notification.new, which notify-rust
+      # builds through +Default+. Mirrors <tt>impl Default for
+      # Notification</tt> (<tt>src/notification.rs:572-625</tt>).
+      #
+      # === Example
+      #
+      #   Ferro::NotifyRust::Notification.default.summary # => ""
+      def self.default
+        new
+      end
+
       # notify-rust's +Debug+ text for the notification.
       #
       # === Example

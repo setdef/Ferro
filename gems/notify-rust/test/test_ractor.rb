@@ -49,6 +49,23 @@ class TestRactor < Minitest::Test
     assert_equal ["Ferro::NotifyRust::Timeout::Never", 42], built
   end
 
+  # A shared notification is frozen, so no Ractor can reset it by running
+  # initialize again, which would change it under every other Ractor.
+  def test_another_ractor_cannot_reinitialize_a_shared_notification
+    outcome = run_script(<<~RUBY)
+      shared = Ractor.make_shareable(Ferro::NotifyRust::Notification.new.summary("x").freeze)
+      refused = Ractor.new(shared) do |notification|
+        notification.__send__(:initialize)
+        :reset
+      rescue FrozenError => e
+        e.class.name
+      end.value
+      [refused, shared.summary]
+    RUBY
+
+    assert_equal %w[FrozenError x], outcome
+  end
+
   # Ractors reading one shared notification contend for its lock. Ruby
   # values are made only after the lock is released: an allocation under
   # it could start a garbage collection that waits for a Ractor blocked in

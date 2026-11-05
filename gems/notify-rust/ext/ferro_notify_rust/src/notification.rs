@@ -93,7 +93,10 @@ impl Notification {
     }
 
     /// `initialize`: `Notification::new` (`src/notification.rs:117-125`).
-    fn initialize(ruby: &Ruby, rb_self: &Self) -> Result<(), Error> {
+    /// Ruby code can call it again, through `send`, on a notification it
+    /// already built; a frozen one, which Ractors may share, refuses.
+    fn initialize(ruby: &Ruby, rb_self: Obj<Self>) -> Result<(), Error> {
+        rb_self.check_frozen()?;
         settle(
             ruby,
             initialize_with(&rb_self.0, notify_rust::Notification::new),
