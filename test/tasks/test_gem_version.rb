@@ -44,7 +44,7 @@ class TestGemVersion < Minitest::Test
   def test_a_hyphenated_prerelease_cannot_follow_a_dotted_one_of_the_same_release
     error = assert_raises(ArgumentError) { bump("0.1.0.pre.4", :patch, "pre") }
 
-    assert_equal "0.1.0-pre.5 would come before 0.1.0.pre.4, and no label changes that: RubyGems sorts every hyphenated 0.1.0 prerelease below the dotted 0.1.0.pre.4. Stay dotted with exact[0.1.0.pre.5], or move to a later release in SemVer form, like exact[0.1.1-pre.1], or a minor or major bump with a label", error.message
+    assert_equal "0.1.0-pre.5 would come before 0.1.0.pre.4, and no label changes that: RubyGems sorts every hyphenated 0.1.0 prerelease below the dotted 0.1.0.pre.4. Release it as 0.1.0 with a bump and no label, stay dotted with exact[0.1.0.pre.5], or move to a later release in SemVer form, like exact[0.1.1-pre.1]", error.message
     assert_raises(ArgumentError) { bump("0.1.0.pre.4", :patch, "rc") }
   end
 
@@ -53,6 +53,7 @@ class TestGemVersion < Minitest::Test
 
     assert_includes error.message, "exact[0.1.0.pre.5]"
     assert_includes error.message, "exact[0.1.1-pre.1]"
+    assert_includes error.message, "Release it as 0.1.0 with a bump and no label"
     refute_includes error.message, "pick a label"
   end
 
@@ -96,13 +97,6 @@ class TestGemVersion < Minitest::Test
     assert_operator GemVersion.parse("1.0.0-beta.1"), :>, GemVersion.parse("0.1.0.pre.4")
     assert_operator GemVersion.parse("1.0.0"), :>, GemVersion.parse("1.0.0-rc.1")
     assert_operator GemVersion.parse("1.0.0-rc.1"), :>, GemVersion.parse("1.0.0-beta.2")
-  end
-
-  def test_an_unlabelled_zero_version_is_flagged
-    assert_predicate GemVersion.parse("0.9.0"), :unlabelled_zero?
-    refute_predicate GemVersion.parse("0.9.0-pre.1"), :unlabelled_zero?
-    refute_predicate GemVersion.parse("0.1.0.pre.4"), :unlabelled_zero?
-    refute_predicate GemVersion.parse("1.0.0"), :unlabelled_zero?
   end
 
   def test_bad_input_is_refused

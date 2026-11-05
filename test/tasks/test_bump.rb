@@ -135,34 +135,35 @@ class TestBump < Minitest::Test
   def test_a_prerelease_cannot_follow_a_dotted_one_of_the_same_release_in_hyphens
     error = assert_raises(Bump::Failure) { bump { |current| current.next(:patch, "pre") } }
 
-    assert_equal "0.1.0-pre.2 would come before 0.1.0.pre.1, and no label changes that: RubyGems sorts every hyphenated 0.1.0 prerelease below the dotted 0.1.0.pre.1. Stay dotted with exact[0.1.0.pre.2], or move to a later release in SemVer form, like exact[0.1.1-pre.1], or a minor or major bump with a label", error.message
+    assert_equal "0.1.0-pre.2 would come before 0.1.0.pre.1, and no label changes that: RubyGems sorts every hyphenated 0.1.0 prerelease below the dotted 0.1.0.pre.1. Release it as 0.1.0 with a bump and no label, stay dotted with exact[0.1.0.pre.2], or move to a later release in SemVer form, like exact[0.1.1-pre.1]", error.message
     assert_equal ["init"], log
   end
 
-  def test_an_unlabelled_zero_version_is_refused_with_how_to_label_it
-    error = assert_raises(Bump::Failure) { bump { |current| current.next(:patch) } }
+  def test_a_dotted_prerelease_is_released_as_the_plain_version
+    version = bump { |current| current.next(:patch) }
 
-    assert_equal "0.1.0 is a 0.x version without a prerelease label. RubyGems treats it as stable, which SemVer does not " \
-      "(plan 011, Versioning). Give it a label, like patch[pre] or exact[0.1.0-pre.1]", error.message
-    assert_equal 0, @gate_runs
-    assert_equal ["init"], log
+    assert_equal "0.1.0", version.to_s
+    assert_includes read("gems/demo/lib/ferro/demo/version.rb"), %(VERSION = "0.1.0")
+    assert_includes read("gems/demo/ext/ferro_demo/Cargo.toml"), %(version = "0.1.0")
+    assert_includes read("Gemfile.lock"), "ferro-demo (0.1.0)"
+    assert_includes read("gems/demo/CHANGELOG.md"), "## [0.1.0] - 2026-10-25"
+    assert_equal ["chore(demo): release 0.1.0", "init"], log
   end
 
-  def test_exact_to_an_unlabelled_zero_version_is_refused_and_a_labelled_one_accepted
-    assert_raises(Bump::Failure) { bump { GemVersion.parse("0.3.0") } }
-
-    assert_equal "0.3.0-pre.1", bump { GemVersion.parse("0.3.0-pre.1") }.to_s
+  def test_exact_accepts_a_plain_zero_version
+    assert_equal "0.3.0", bump { GemVersion.parse("0.3.0") }.to_s
   end
 
-  def test_current_is_refused_for_an_unlabelled_zero_version
+  def test_current_releases_a_plain_zero_version
     write("gems/demo/lib/ferro/demo/version.rb", %(module Ferro\n  module Demo\n    VERSION = "0.4.0"\n  end\nend\n))
-    commit_all("unlabelled")
+    write("gems/demo/ext/ferro_demo/Cargo.toml", %([package]\nname = "ferro_demo"\nversion = "0.4.0"\n))
+    write("gems/demo/Cargo.lock", %([[package]]\nname = "ferro_demo"\nversion = "0.4.0"\n))
+    write("Gemfile.lock", "PATH\n  specs:\n    ferro-demo (0.4.0)\n")
+    commit_all("plain")
     with_origin
 
-    error = assert_raises(Bump::Failure) { release_current }
-
-    assert_includes error.message, "0.4.0 is a 0.x version without a prerelease label"
-    assert_equal 0, @gate_runs
+    assert_equal "0.4.0", release_current.to_s
+    assert_equal 1, @gate_runs
   end
 
   def test_a_failing_gate_leaves_the_bump_uncommitted

@@ -93,12 +93,14 @@ see `gems/arboard/lib/ferro/arboard/error.rb`.
   hand off. Then walk the plan item by item and mark each done or
   deferred with a reason.
 - Hand off with the commit-session skill.
-- A new gem starts at `0.1.0-pre.1` with its entries under Unreleased.
-  A gem already on dotted `0.1.0.pre.N` stays dotted for that release
-  (`exact[0.1.0.pre.N+1]`) or moves to a later release in SemVer form;
-  the choice is the maintainer's.
-  Its first release is `rake bump:<name>:current`, which releases that
-  version rather than skipping to `pre.2`; then `rake release:<name>:tag`.
+- A new gem starts at `0.1.0` with its entries under Unreleased. A
+  prerelease label is an opt-in preview of a coming release, never a
+  step on the way to one. A gem already on dotted `0.1.0.pre.N` is
+  released as plain `0.1.0` with `rake bump:<name>:patch`, which sorts
+  above every `0.1.0.pre.N`.
+  A new gem's first release is `rake bump:<name>:current`, which
+  releases that version rather than skipping ahead; then
+  `rake release:<name>:tag`.
 
 The mistakes that shaped these rules are in
 [references/lessons.md](references/lessons.md). Skim it before designing.

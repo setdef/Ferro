@@ -102,12 +102,6 @@ class GemVersion
     major >= 1 && !prerelease?
   end
 
-  # Whether this is a 0.x version with no prerelease label, which RubyGems
-  # treats as stable and SemVer does not (plan 011, Versioning).
-  def unlabelled_zero?
-    major.zero? && !prerelease?
-  end
-
   # The version after bumping +segment+, which resets the segments after
   # it. A prerelease comes before its release, so bumping it to a segment
   # it already leads up to releases it: <tt>0.1.0.pre.2</tt> becomes
@@ -173,14 +167,15 @@ class GemVersion
   protected attr_reader :release
 
   # Why no label helps a dotted prerelease reach a hyphenated one of its
-  # own release, and the choices the maintainer has.
+  # own release, and the choices the maintainer has. The plain release
+  # sorts above every prerelease of it, dotted or not.
   private def dotted_conflict(candidate)
     counted = @prerelease.last.is_a?(Integer) ? [*@prerelease[0...-1], @prerelease.last + 1] : [*@prerelease, 1]
     stay = GemVersion.new(@release, counted, semver: false)
     later = GemVersion.new([@release[0], @release[1], @release[2] + 1], ["pre", 1])
     "#{candidate} would come before #{self}, and no label changes that: RubyGems sorts every hyphenated " \
-      "#{candidate.release.join('.')} prerelease below the dotted #{self}. Stay dotted with exact[#{stay}], " \
-      "or move to a later release in SemVer form, like exact[#{later}], or a minor or major bump with a label"
+      "#{candidate.release.join('.')} prerelease below the dotted #{self}. Release it as #{candidate.release.join('.')} with a bump and " \
+      "no label, stay dotted with exact[#{stay}], or move to a later release in SemVer form, like exact[#{later}]"
   end
 
   private def release_after(segment)
