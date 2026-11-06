@@ -12,6 +12,8 @@ own API. Releases are tagged `ferro-arboard/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-05
+
 ### Added
 
 - `debug` on each `Error` variant, `ImageData`, and (Linux) `LinuxClipboardKind`, answering arboard's `Debug` text as Rust formats it.
@@ -41,5 +43,6 @@ own API. Releases are tagged `ferro-arboard/vX.Y.Z`.
 - Images arboard would panic on (a zero width or height, or a byte count other than `width * height * 4`) raise `Error::ConversionFailure` instead; any panic inside arboard raises `Error` instead of ending the process.
 - Calls that can block (Linux reads and waiting writes) release Ruby's global VM lock, so other threads run meanwhile; the extension is Ractor-safe, and a frozen `Clipboard` is shareable.
 
-[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-arboard/v0.1.0.pre.2...HEAD
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-arboard/v0.1.0...HEAD
+[0.1.0]: https://github.com/setdef/Ferro/compare/ferro-arboard/v0.1.0.pre.2...ferro-arboard/v0.1.0
 [0.1.0.pre.2]: https://github.com/setdef/Ferro/releases/tag/ferro-arboard/v0.1.0.pre.2
