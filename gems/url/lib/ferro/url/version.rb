@@ -11,6 +11,6 @@ module Ferro
     #
     # It follows this gem's own API, not url's. The gemspec's
     # <tt>url_version</tt> metadata names the url release it binds.
-    VERSION = "0.1.0.pre.1"
+    VERSION = "0.1.0"
   end
 end
