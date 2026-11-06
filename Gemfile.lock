@@ -7,7 +7,7 @@ PATH
 PATH
   remote: gems/global-hotkey
   specs:
-    ferro-global-hotkey (0.1.0.pre.1)
+    ferro-global-hotkey (0.1.0)
       rb_sys (~> 0.9.129)
 
 PATH
@@ -220,7 +220,7 @@ CHECKSUMS
   drb (2.2.3) sha256=0b00d6fdb50995fe4a45dea13663493c841112e4068656854646f418fda13373
   erb (6.0.7) sha256=c5ca6dc25b0ef974a44dc8f59fe847577122483b1968a38dec305c60bf91ee92
   ferro-arboard (0.1.0)
-  ferro-global-hotkey (0.1.0.pre.1)
+  ferro-global-hotkey (0.1.0)
   ferro-idna (0.1.0.pre.1)
   ferro-notify-rust (0.1.0)
   ferro-rfd (0.1.0)

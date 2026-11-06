@@ -12,6 +12,6 @@ module Ferro
     # It follows this gem's own API, not global-hotkey's. The gemspec's
     # <tt>global_hotkey_version</tt> metadata names the global-hotkey
     # release it binds.
-    VERSION = "0.1.0.pre.1"
+    VERSION = "0.1.0"
   end
 end

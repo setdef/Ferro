@@ -12,6 +12,8 @@ its own API. Releases are tagged `ferro-global-hotkey/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-05
+
 ### Added
 
 - `TryRecvError#is_empty` and `#is_disconnected`; `RecvTimeoutError#is_timeout` and `#is_disconnected`.
@@ -51,5 +53,6 @@ its own API. Releases are tagged `ferro-global-hotkey/vX.Y.Z`.
 - `Error` with a subclass per global-hotkey error variant, `Hotkey::HotKeyParseError` with its three, `Hotkey::UnrecognizedCodeError`, and crossbeam's receive errors. A panic inside global-hotkey raises `Error` instead of ending the process.
 - Built with global-hotkey's `serde` and `tracing` features.
 
-[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-global-hotkey/v0.1.0.pre.1...HEAD
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-global-hotkey/v0.1.0...HEAD
+[0.1.0]: https://github.com/setdef/Ferro/compare/ferro-global-hotkey/v0.1.0.pre.1...ferro-global-hotkey/v0.1.0
 [0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-global-hotkey/v0.1.0.pre.1
