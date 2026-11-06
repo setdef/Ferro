@@ -12,6 +12,8 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-05
+
 ### Added
 
 - `to_a` on every variant that carries data (`Timeout::Milliseconds`, `Hint::Category` and the other `Hint` variants, `CloseReason::Other`, `NotificationResponse::Action`, `Reply`, and `Closed`, `ActionResponse::Custom` and `Closed`, `NotificationId::Xdg` and `Mac`), answering what `deconstruct` does.
@@ -72,7 +74,8 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 - Showing and waiting release Ruby's global VM lock; on Linux an interrupt ends a wait.
 - Built with notify-rust's `z` (zbus), `images`, and `chrono` features; `d`, `tokio`, `debug_namespace`, and `preview-macos-un` are not built.
 
-[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.4...HEAD
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0...HEAD
+[0.1.0]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.4...ferro-notify-rust/v0.1.0
 [0.1.0.pre.4]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.3...ferro-notify-rust/v0.1.0.pre.4
 [0.1.0.pre.3]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.2...ferro-notify-rust/v0.1.0.pre.3
 [0.1.0.pre.2]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.1...ferro-notify-rust/v0.1.0.pre.2
