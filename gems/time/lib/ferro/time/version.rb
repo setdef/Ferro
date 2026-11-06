@@ -11,6 +11,6 @@ module Ferro
     #
     # It follows this gem's own API, not time's. The gemspec's
     # <tt>time_version</tt> metadata names the time release it binds.
-    VERSION = "0.1.0.pre.4"
+    VERSION = "0.1.0"
   end
 end

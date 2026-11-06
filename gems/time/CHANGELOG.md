@@ -12,6 +12,8 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-05
+
 ### Added
 
 - `SignedDuration#to_s(precision)`, time's concise `Display` with a precision (Rust's `{:.3}`); a precision from 65,536 up to `usize`'s maximum raises `RangeError` ("Formatting argument out of range"), as Rust's formatter panics, and one from `2**64` up raises Ruby's own `RangeError`.
@@ -82,7 +84,8 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 - `UtcOffset.current_local_offset`, `.local_offset_at`, `OffsetDateTime.now_local`, and `Util` with `refresh_tz`.
 - `Error` with a class for each of time's error types and variants, and time's messages. Inputs time panics on raise `RangeError` with time's message instead of ending the process.
 
-[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.4...HEAD
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0...HEAD
+[0.1.0]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.4...ferro-time/v0.1.0
 [0.1.0.pre.4]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.3...ferro-time/v0.1.0.pre.4
 [0.1.0.pre.3]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.2...ferro-time/v0.1.0.pre.3
 [0.1.0.pre.2]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.1...ferro-time/v0.1.0.pre.2
