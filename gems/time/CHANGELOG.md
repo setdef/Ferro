@@ -12,6 +12,10 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `debug` on every error, answering time's `Debug` text for the error value it stands for, as Rust formats it, whether time raised it or Ruby built it; `nil` where no time value stands behind it, such as a panic or `Error::Format::StdIo`.
+
 ### Changed
 
 - **Breaking:** an iterator's `rev`, `count`, `last`, `max`, `min`, and `is_sorted`, which take the iterator by value in Rust, use it up: any later use of it, `dup` and `==` included, raises `IOError` naming the method that used it, as a closed IO does. `count` and `last` on a never-ending iterator use it up before they raise `RangeError`. Enumerable's `count`, `max`, and `min` with a block or an argument still walk a copy.

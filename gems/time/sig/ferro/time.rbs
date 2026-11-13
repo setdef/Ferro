@@ -332,6 +332,7 @@ module Ferro
       def self.modifier_enum_debug: (Symbol name, Integer index) -> String
       def self.trailing_input_to_i: (Integer index) -> Integer
       def self.month_debug: (Integer number) -> String
+      def self.error_debug: (String path, Array[String | bool | Integer] fields) -> String?
       def self.weekday_debug: (Integer days) -> String
       def self.unit_debug: (Symbol name, bool variant) -> String
       def self.iso8601_enum_debug: (Symbol kind, Integer index, Integer digits) -> String

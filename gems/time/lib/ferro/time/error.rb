@@ -100,6 +100,51 @@ module Ferro
         nil
       end
 
+      # time's +Debug+ text for the error value this exception stands for,
+      # formatted by Rust, or +nil+ when no time value stands behind it.
+      #
+      # Logging +inspect+ shows Ruby's view of an exception; a bug report
+      # against time, or a comparison with what a Rust program printed,
+      # needs time's own text. A class and its fields name exactly one time
+      # value, the type the class stands for, as #source answers it, so an
+      # error raised by time, built in Ruby, or derived through #source and
+      # the conversions all answer alike: Error::ComponentRange gives
+      # <tt>ComponentRange { name: "day", is_conditional: true }</tt>, and
+      # Error::Parse::TryFromParsed::ComponentRange wraps it as time's
+      # +Parse+ does. A message given to +new+ is no part of the value.
+      #
+      # +nil+ for this class itself, which the gem raises for a panic; for
+      # Error::Format, Error::Parse, and the other enums' own classes, which
+      # hold a variant this gem predates; for Error::Format::StdIo, whose
+      # <tt>std::io::Error</tt> has no Ruby value here; and for fields of a
+      # type no time value holds. Mirrors time's derived +Debug+ on each
+      # error type (<tt>src/error/*.rs</tt>; ADR 001, amendment of
+      # 2026-11-05).
+      #
+      # === Example
+      #
+      #   begin
+      #     Ferro::Time::Date.from_calendar_date(2019, Ferro::Time::Month::February, 29)
+      #   rescue Ferro::Time::Error => e
+      #     e.debug # => "ComponentRange { name: \"day\", is_conditional: true }"
+      #   end
+      def debug
+        Native.error_debug(Error.__send__(:debug_path, self.class), debug_fields)
+      end
+
+      # The path under Ferro::Time of the nearest class of the gem's own
+      # that +klass+ is, so a subclass answers as the class it extends.
+      def self.debug_path(klass)
+        ours = klass.ancestors.find { |ancestor| ancestor.is_a?(Class) && ancestor.name.to_s.start_with?("Ferro::Time::Error") }
+        ours.to_s.delete_prefix("Ferro::Time::")
+      end
+      private_class_method :debug_path
+
+      # The fields time's value holds, as +new+ takes them.
+      private def debug_fields
+        []
+      end
+
       # An error type indicating that a conversion failed because the
       # target type could not store the initial value.
       #
@@ -189,6 +234,11 @@ module Ferro
           @name = name
           @is_conditional = is_conditional
           super("#{name} was not in range")
+        end
+
+        # The fields time's value holds, as +new+ takes them.
+        private def debug_fields
+          [@name, @is_conditional]
         end
       end
 
@@ -320,6 +370,11 @@ module Ferro
             super("The #{component} component cannot be formatted into the requested format.")
           end
 
+          # The fields time's value holds, as +new+ takes them.
+          private def debug_fields
+            [@component]
+          end
+
           # The variant's one field, the component's name, positional as Rust leaves it
           # (ADR 001, 2026-11-05), so <tt>in InvalidComponent[name]</tt> reads as
           # Rust's pattern does.
@@ -347,6 +402,11 @@ module Ferro
             @name = name
             @is_conditional = is_conditional
             super("#{name} was not in range")
+          end
+
+          # The fields time's value holds, as +new+ takes them.
+          private def debug_fields
+            [@name, @is_conditional]
           end
 
           # The Error::ComponentRange this holds, as time's
@@ -480,6 +540,11 @@ module Ferro
             super("the '#{name}' component could not be parsed")
           end
 
+          # The fields time's value holds, as +new+ takes them.
+          private def debug_fields
+            [@name]
+          end
+
           # The variant's one field, the component's name, positional as Rust leaves it
           # (ADR 001, 2026-11-05), so <tt>in InvalidComponent[name]</tt> reads as
           # Rust's pattern does.
@@ -606,6 +671,11 @@ module Ferro
             @name = name
             @is_conditional = is_conditional
             super("#{name} was not in range")
+          end
+
+          # The fields time's value holds, as +new+ takes them.
+          private def debug_fields
+            [@name, @is_conditional]
           end
 
           # The Error::ComponentRange this holds, as time's
@@ -762,6 +832,11 @@ module Ferro
               super("#{name} was not in range")
             end
 
+            # The fields time's value holds, as +new+ takes them.
+            private def debug_fields
+              [@name, @is_conditional]
+            end
+
             # The Error::TryFromParsed::ComponentRange this holds, with the
             # same name and conditionality.
             #
@@ -839,6 +914,11 @@ module Ferro
               super("the '#{name}' component could not be parsed")
             end
 
+            # The fields time's value holds, as +new+ takes them.
+            private def debug_fields
+              [@name]
+            end
+
             # The Error::ParseFromDescription::InvalidComponent this holds,
             # naming the same component.
             #
@@ -900,6 +980,11 @@ module Ferro
             @index = index
             super("unclosed opening bracket at byte index #{index}")
           end
+
+          # The fields time's value holds, as +new+ takes them.
+          private def debug_fields
+            [@index]
+          end
         end
 
         # A component name is not valid.
@@ -922,6 +1007,11 @@ module Ferro
             @name = name
             @index = index
             super("invalid component name `#{name}` at byte index #{index}")
+          end
+
+          # The fields time's value holds, as +new+ takes them.
+          private def debug_fields
+            [@name, @index]
           end
         end
 
@@ -946,6 +1036,11 @@ module Ferro
             @index = index
             super("invalid modifier `#{value}` at byte index #{index}")
           end
+
+          # The fields time's value holds, as +new+ takes them.
+          private def debug_fields
+            [@value, @index]
+          end
         end
 
         # A component name is missing.
@@ -963,6 +1058,11 @@ module Ferro
           def initialize(index)
             @index = index
             super("missing component name at byte index #{index}")
+          end
+
+          # The fields time's value holds, as +new+ takes them.
+          private def debug_fields
+            [@index]
           end
         end
 
@@ -987,6 +1087,11 @@ module Ferro
             @index = index
             super("missing required modifier `#{name}` for component at byte index #{index}")
           end
+
+          # The fields time's value holds, as +new+ takes them.
+          private def debug_fields
+            [@name, @index]
+          end
         end
 
         # Something was expected, but not found.
@@ -1010,6 +1115,11 @@ module Ferro
             @what = what
             @index = index
             super("expected #{what} at byte index #{index}")
+          end
+
+          # The fields time's value holds, as +new+ takes them.
+          private def debug_fields
+            [@what, @index]
           end
         end
 
@@ -1042,6 +1152,11 @@ module Ferro
             super(context.empty? ? "#{what} is not supported at byte index #{index}" :
               "#{what} is not supported in #{context} at byte index #{index}")
           end
+
+          # The fields time's value holds, as +new+ takes them.
+          private def debug_fields
+            [@what, @context, @index]
+          end
         end
 
         # A modifier was present more than once.
@@ -1065,6 +1180,11 @@ module Ferro
             @name = name
             @index = index
             super("duplicate modifier `#{name}` at byte index #{index}")
+          end
+
+          # The fields time's value holds, as +new+ takes them.
+          private def debug_fields
+            [@name, @index]
           end
         end
 
@@ -1095,6 +1215,11 @@ module Ferro
             @context = context
             @index = index
             super("the `#{modifier}` modifier is not valid at byte index #{index} #{context}")
+          end
+
+          # The fields time's value holds, as +new+ takes them.
+          private def debug_fields
+            [@modifier, @context, @index]
           end
         end
       end

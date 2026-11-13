@@ -262,6 +262,75 @@ class TestErrors < Minitest::Test
     refute_operator E::Parse::TryFromParsed::ComponentRange, :<, E::ComponentRange
   end
 
+  # Every error answers time's Debug text for the value it stands for,
+  # formatted by Rust: the type's own, as #source answers it (ADR 001,
+  # amendment of 2026-11-05; plan 007, Follow-up: the four rulings).
+  # failure-side Rust tests pin each text against the value time returns.
+  def test_a_raised_error_answers_times_debug
+    iso = T::FormatDescription::WellKnown::Iso8601::DATE
+    [
+      [-> { T::Date.from_calendar_date(2019, Month::February, 29) }, 'ComponentRange { name: "day", is_conditional: true }'],
+      [-> { T::Date.parse("2019-02-30", iso) }, 'TryFromParsed(ComponentRange(ComponentRange { name: "day", is_conditional: true }))'],
+      [-> { T::Date.parse("x", iso) }, 'ParseFromDescription(InvalidComponent("year"))'],
+      [-> { T::Date.parse("2020", fd("[year]")) }, "TryFromParsed(InsufficientInformation)"],
+      [-> { T::Date.parse("2020x", fd("[year]")) }, "ParseFromDescription(UnexpectedTrailingCharacters)"],
+      [-> { T::Date.parse("2020x01", fd("[year]-[month]")) }, "ParseFromDescription(InvalidLiteral)"],
+      [-> { T::Time::MIDNIGHT.format(fd("[year]")) }, "InsufficientTypeInformation"],
+      [
+        -> { T::Date.from_calendar_date(-1, Month::January, 1).format(T::FormatDescription::WellKnown::Iso8601::DATE) },
+        'InvalidComponent("year")',
+],
+      [-> { T::Parsing::Parsed.parse_literal("a", "b") }, "InvalidLiteral"],
+      [-> { T::Date.try_from(T::Parsing::Parsed.new) }, "InsufficientInformation"],
+      [-> { fd("[foo") }, "UnclosedOpeningBracket { index: 0 }"],
+      [-> { fd("[foo]") }, 'InvalidComponentName { name: "foo", index: 1 }'],
+      [-> { fd("[day bar]") }, 'InvalidModifier { value: "bar", index: 5 }'],
+      [-> { fd("[]") }, "MissingComponentName { index: 0 }"],
+      [-> { fd("[ignore]") }, 'MissingRequiredModifier { name: "count", index: 1 }'],
+      [-> { fd("[optional]") }, 'Expected { what: "nested format description", index: 9 }'],
+      [-> { fd("[day padding:zero padding:zero]") }, 'DuplicateModifier { name: "padding", index: 18 }'],
+      [
+        -> { fd("[month repr:numerical case_sensitive:false]") },
+        'InvalidModifierCombination { modifier: "case_sensitive", context: "for numerical month", index: 22 }',
+],
+      [-> { Month.from_str("Smarch") }, "InvalidVariant"],
+      [-> { (-T::Duration::SECOND).to_r }, "ConversionRange"],
+      [
+        -> { T::FormatDescription::Component.try_from(T::FormatDescription::BorrowedFormatItem::StringLiteral.new("-")) },
+        "DifferentVariant",
+],
+    ].each do |call, expected|
+      error = assert_raises(E, expected, &call)
+      assert_equal expected, error.debug
+    end
+  end
+
+  # A class and its fields name one time value, so an error built in Ruby,
+  # or derived through #source or the conversions, answers as a raised one.
+  def test_an_error_built_in_ruby_answers_the_same_debug
+    assert_equal 'ComponentRange { name: "day", is_conditional: true }', E::ComponentRange.new("day", true).debug
+    assert_equal 'ComponentRange(ComponentRange { name: "year", is_conditional: false })',
+      E::Format::ComponentRange.new("year", false).debug
+    assert_equal 'ComponentRange { name: "year", is_conditional: false }', E::Format::ComponentRange.new("year", false).source.debug
+    assert_equal "InvalidLiteral", E::ParseFromDescription::InvalidLiteral.new("not time's message").debug
+    assert_equal "IndeterminateOffset", E::IndeterminateOffset.new.debug
+    assert_equal 'NotSupported { what: "x", context: "", index: 0 }', E::InvalidFormatDescription::NotSupported.new("x", "", 0).debug
+    raised = assert_raises(E::Parse) { T::Date.parse("2019-02-30", T::FormatDescription::WellKnown::Iso8601::DATE) }
+    assert_equal 'ComponentRange(ComponentRange { name: "day", is_conditional: true })', raised.source.debug
+    assert_equal raised.debug, E::Parse.from(raised.source).debug
+  end
+
+  # An error with no time value behind it answers nil: a panic, a variant
+  # this gem predates, a std::io::Error, or fields of no Rust type.
+  def test_an_error_with_no_time_value_answers_nil
+    assert_nil E.new("time panicked: x").debug
+    assert_nil E::Format.new("a variant time adds later").debug
+    assert_nil E::Parse::ParseFromDescription.new("a variant time adds later").debug
+    assert_nil E::Format::StdIo.new("broken pipe").debug
+    assert_nil E::ComponentRange.new(1, "x").debug
+    assert_equal 'ComponentRange { name: "day", is_conditional: true }', Class.new(E::ComponentRange).new("day", true).debug
+  end
+
   def test_a_wrong_version_is_refused
     [0, 4].each do |version|
       error = assert_raises(TypeError) { T::FormatDescription.parse_owned(version, "[year]") }

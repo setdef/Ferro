@@ -31,6 +31,7 @@ mod date;
 mod datetime;
 mod debug;
 mod duration;
+mod error_debug;
 mod extension;
 mod failure;
 mod format;
@@ -186,6 +187,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     std_duration::define(native)?;
     extension::define(native)?;
     debug::define(native)?;
+    error_debug::define(native)?;
     timestamp::define(native)?;
     iter::define(ruby, time, native)?;
     unit::define(native)?;
