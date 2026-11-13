@@ -37,6 +37,15 @@ module Ferro
     # decision 4). time's own methods keep their Rust names: +nth+,
     # +next_back+, +len+, +size_hint+, +all+, +any+, +is_sorted+.
     #
+    # time's +rev+, +count+, +last+, +max+, +min+, and +is_sorted+ take
+    # the iterator by value in Rust, so here each uses it up: any later
+    # use, +dup+ and comparison included, raises +IOError+, as a closed IO
+    # does, naming the method that used it (ADR 001, amendment of
+    # 2026-11-05). A frozen iterator is used up the same way, as Ruby
+    # closes a frozen IO and Rust moves a binding that is not +mut+.
+    # Enumerable's +count+, +max+, and +min+, with an argument or a block,
+    # walk a copy and use up nothing.
+    #
     # Iterators are mutable, so they are not shareable between Ractors.
     #
     # Mirrors time's +iter+ module (<tt>src/iter/mod.rs</tt>), plan 010.
@@ -75,7 +84,8 @@ module Ferro
       # If the start is after the end, the iterator is empty.
       #
       # Enumerable's methods walk a copy, so <tt>iter.first(3)</tt> twice
-      # gives the same three dates. #each without a block returns an
+      # gives the same three dates. #count, #last, #max, #min, and
+      # #is_sorted use the iterator up, as Rust's take it by value. #each without a block returns an
       # Enumerator whose +size+ is #len. A DateIter equals another with the
       # same place and end, as time derives +PartialEq+; +dup+ copies it.
       #
@@ -211,8 +221,10 @@ module Ferro
         end
 
         # How many dates are left, without walking them: time's
-        # <tt>Iterator::count</tt> (<tt>src/iter/date_iter.rs:90-93</tt>).
-        # With an argument or a block, Enumerable#count over a copy.
+        # <tt>Iterator::count</tt> (<tt>src/iter/date_iter.rs:90-93</tt>),
+        # which takes the iterator by value, so this uses it up. With an
+        # argument or a block, Enumerable#count over a copy, which uses up
+        # nothing.
         #
         # === Example
         #
@@ -227,8 +239,9 @@ module Ferro
         end
 
         # The last date, or +nil+ when the iterator is empty, without
-        # changing the iterator. Mirrors time's <tt>Iterator::last</tt>
-        # (<tt>src/iter/date_iter.rs:95-98</tt>).
+        # walking the dates before it. Mirrors time's <tt>Iterator::last</tt>
+        # (<tt>src/iter/date_iter.rs:95-98</tt>), which takes the iterator
+        # by value, so this uses it up.
         #
         # === Example
         #
@@ -240,8 +253,8 @@ module Ferro
         end
 
         # The latest date left, or +nil+: time's <tt>Iterator::max</tt>
-        # (<tt>src/iter/date_iter.rs:140-143</tt>). With an argument or a
-        # block, Enumerable#max over a copy.
+        # (<tt>src/iter/date_iter.rs:140-143</tt>), which uses the iterator
+        # up. With an argument or a block, Enumerable#max over a copy.
         #
         # === Example
         #
@@ -255,8 +268,8 @@ module Ferro
         end
 
         # The earliest date left, or +nil+: time's <tt>Iterator::min</tt>
-        # (<tt>src/iter/date_iter.rs:145-148</tt>). With an argument or a
-        # block, Enumerable#min over a copy.
+        # (<tt>src/iter/date_iter.rs:145-148</tt>), which uses the iterator
+        # up. With an argument or a block, Enumerable#min over a copy.
         #
         # === Example
         #
@@ -271,7 +284,8 @@ module Ferro
 
         # Whether the dates are in order, which they always are. Mirrors
         # time's <tt>Iterator::is_sorted</tt>
-        # (<tt>src/iter/date_iter.rs:150-153</tt>).
+        # (<tt>src/iter/date_iter.rs:150-153</tt>), which uses the iterator
+        # up.
         #
         # === Example
         #
@@ -390,8 +404,9 @@ module Ferro
         end
 
         # Make the iterator go in reverse order: a new Rev from this
-        # iterator's place, leaving this one unchanged. Mirrors time's
-        # <tt>MonthIter::rev</tt> (<tt>src/iter/month_iter.rs:36-48</tt>).
+        # iterator's place. Mirrors time's <tt>MonthIter::rev</tt>
+        # (<tt>src/iter/month_iter.rs:36-48</tt>), which takes the iterator
+        # by value, so this uses it up.
         #
         # === Example
         #
@@ -431,8 +446,10 @@ module Ferro
         end
 
         # Raises +RangeError+: the iterator is infinite and cannot be
-        # counted, where time panics (<tt>src/iter/month_iter.rs:73-75</tt>).
-        # With an argument or a block, Enumerable#count, which never ends.
+        # counted, where time panics (<tt>src/iter/month_iter.rs:73-75</tt>)
+        # after Rust moves the iterator into the call, so this uses it up
+        # first. With an argument or a block, Enumerable#count, which never
+        # ends.
         #
         # === Example
         #
@@ -445,7 +462,8 @@ module Ferro
         end
 
         # Raises +RangeError+: the iterator is infinite and has no last
-        # element, where time panics (<tt>src/iter/month_iter.rs:77-79</tt>).
+        # element, where time panics (<tt>src/iter/month_iter.rs:77-79</tt>),
+        # after using the iterator up.
         def last
           Native.month_iter_infinite(self, :last)
         end
@@ -477,8 +495,8 @@ module Ferro
         end
 
         # December, the latest month: time's <tt>Iterator::max</tt>
-        # (<tt>src/iter/month_iter.rs:97-100</tt>). With an argument or a
-        # block, Enumerable#max, which never ends.
+        # (<tt>src/iter/month_iter.rs:97-100</tt>), which uses the iterator
+        # up. With an argument or a block, Enumerable#max, which never ends.
         def max(*args, &block)
           return super unless Iter.__send__(:bare?, args, block)
 
@@ -486,8 +504,8 @@ module Ferro
         end
 
         # January, the earliest month: time's <tt>Iterator::min</tt>
-        # (<tt>src/iter/month_iter.rs:102-105</tt>). With an argument or a
-        # block, Enumerable#min, which never ends.
+        # (<tt>src/iter/month_iter.rs:102-105</tt>), which uses the iterator
+        # up. With an argument or a block, Enumerable#min, which never ends.
         def min(*args, &block)
           return super unless Iter.__send__(:bare?, args, block)
 
@@ -495,7 +513,8 @@ module Ferro
         end
 
         # +false+: December is always followed by January. Mirrors time's
-        # <tt>Iterator::is_sorted</tt> (<tt>src/iter/month_iter.rs:107-111</tt>).
+        # <tt>Iterator::is_sorted</tt> (<tt>src/iter/month_iter.rs:107-111</tt>),
+        # which uses the iterator up.
         def is_sorted
           Native.month_iter_ordered(self, :is_sorted)
         end
@@ -582,8 +601,9 @@ module Ferro
         end
 
         # Make the iterator go in reverse order: a new Rev from this
-        # iterator's place, leaving this one unchanged. Mirrors time's
-        # <tt>WeekdayIter::rev</tt> (<tt>src/iter/weekday_iter.rs:35-47</tt>).
+        # iterator's place. Mirrors time's <tt>WeekdayIter::rev</tt>
+        # (<tt>src/iter/weekday_iter.rs:35-47</tt>), which takes the
+        # iterator by value, so this uses it up.
         def rev
           Native.weekday_iter_rev(self)
         end
@@ -615,8 +635,9 @@ module Ferro
         end
 
         # Raises +RangeError+: the iterator is infinite and cannot be
-        # counted, where time panics (<tt>src/iter/weekday_iter.rs:72-74</tt>).
-        # With an argument or a block, Enumerable#count, which never ends.
+        # counted, where time panics (<tt>src/iter/weekday_iter.rs:72-74</tt>),
+        # after using the iterator up. With an argument or a block,
+        # Enumerable#count, which never ends.
         def count(*args, &block)
           return super if block || !args.empty?
 
@@ -624,7 +645,8 @@ module Ferro
         end
 
         # Raises +RangeError+: the iterator is infinite and has no last
-        # element, where time panics (<tt>src/iter/weekday_iter.rs:76-78</tt>).
+        # element, where time panics (<tt>src/iter/weekday_iter.rs:76-78</tt>),
+        # after using the iterator up.
         def last
           Native.weekday_iter_infinite(self, :last)
         end
@@ -709,8 +731,9 @@ module Ferro
       #
       #   rev = Ferro::Time::Iter::MonthIter.new(Ferro::Time::Month::March).rev
       #   rev.first(3) # => [Ferro::Time::Month::March, Ferro::Time::Month::February, Ferro::Time::Month::January]
-      #   rev.max # => Ferro::Time::Month::December
       #   rev.debug # => "Rev { iter: MonthIter { current: March } }"
+      #   rev.max # => Ferro::Time::Month::December
+      #   rev.next # raises IOError: Ferro::Time::Iter::Rev consumed by Rev#max
       #   Ferro::Time::Iter::WeekdayIter.new(Ferro::Time::Weekday::Monday).rev.respond_to?(:is_sorted) # => false
       class Rev
         include Enumerable
@@ -763,8 +786,9 @@ module Ferro
 
         # Raises +RangeError+: the iterator is infinite and cannot be
         # counted, where time panics (<tt>src/iter/month_iter.rs:136-138</tt>,
-        # <tt>src/iter/weekday_iter.rs:119-121</tt>). With an argument or a
-        # block, Enumerable#count, which never ends.
+        # <tt>src/iter/weekday_iter.rs:119-121</tt>), after using the
+        # iterator up. With an argument or a block, Enumerable#count, which
+        # never ends.
         #
         # === Example
         #
@@ -778,7 +802,8 @@ module Ferro
 
         # Raises +RangeError+: the iterator is infinite and has no last
         # element, where time panics (<tt>src/iter/month_iter.rs:140-142</tt>,
-        # <tt>src/iter/weekday_iter.rs:123-125</tt>).
+        # <tt>src/iter/weekday_iter.rs:123-125</tt>), after using the
+        # iterator up.
         def last
           Native.rev_infinite(self, :last)
         end
@@ -838,8 +863,9 @@ module Ferro
         # overrides only months have. Private to the gem.
         class Months < Rev # :nodoc:
           # December: time's <tt>Iterator::max</tt>
-          # (<tt>src/iter/month_iter.rs:160-163</tt>). With an argument or
-          # a block, Enumerable#max, which never ends.
+          # (<tt>src/iter/month_iter.rs:160-163</tt>), which uses the
+          # iterator up. With an argument or a block, Enumerable#max, which
+          # never ends.
           def max(*args, &block)
             return super unless Iter.__send__(:bare?, args, block)
 
@@ -847,8 +873,9 @@ module Ferro
           end
 
           # January: time's <tt>Iterator::min</tt>
-          # (<tt>src/iter/month_iter.rs:165-168</tt>). With an argument or
-          # a block, Enumerable#min, which never ends.
+          # (<tt>src/iter/month_iter.rs:165-168</tt>), which uses the
+          # iterator up. With an argument or a block, Enumerable#min, which
+          # never ends.
           def min(*args, &block)
             return super unless Iter.__send__(:bare?, args, block)
 
@@ -856,7 +883,8 @@ module Ferro
           end
 
           # +false+: time's <tt>Iterator::is_sorted</tt>
-          # (<tt>src/iter/month_iter.rs:170-173</tt>).
+          # (<tt>src/iter/month_iter.rs:170-173</tt>), which uses the
+          # iterator up.
           def is_sorted
             Native.rev_ordered(self, :is_sorted)
           end

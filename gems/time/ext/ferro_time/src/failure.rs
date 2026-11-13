@@ -40,6 +40,9 @@ pub enum Failure {
     Type(String),
     /// Ruby's `ArgumentError`.
     Argument(String),
+    /// Ruby's `IOError`: a value a method that takes `self` used up, as a
+    /// closed IO raises (ADR 001, amendment of 2026-11-05).
+    Io(String),
     /// time's `ConversionRange`, which only the conversions with std's
     /// `Duration` return.
     ConversionRange,
@@ -70,6 +73,8 @@ pub enum Target {
     Type(String),
     /// `ArgumentError`.
     Argument(String),
+    /// `IOError`.
+    Io(String),
 }
 
 /// A `ComponentRange`'s fields, as its Ruby class takes them.
@@ -242,6 +247,7 @@ impl Failure {
             Self::Range(message) => Target::Range(message.clone()),
             Self::Type(message) => Target::Type(message.clone()),
             Self::Argument(message) => Target::Argument(message.clone()),
+            Self::Io(message) => Target::Io(message.clone()),
             Self::Panic(message) => text("Error", &format!("time panicked: {message}")),
         }
     }
@@ -252,6 +258,7 @@ impl Failure {
             Target::Range(message) => Error::new(ruby.exception_range_error(), message),
             Target::Type(message) => Error::new(ruby.exception_type_error(), message),
             Target::Argument(message) => Error::new(ruby.exception_arg_error(), message),
+            Target::Io(message) => Error::new(ruby.exception_io_error(), message),
             Target::Time(path, args) => {
                 instance(ruby, path, &args).map_or_else(|error| error, Error::from)
             }
@@ -265,6 +272,7 @@ impl Failure {
             Target::Range(message) => (ruby.exception_range_error(), message),
             Target::Type(message) => (ruby.exception_type_error(), message),
             Target::Argument(message) => (ruby.exception_arg_error(), message),
+            Target::Io(message) => (ruby.exception_io_error(), message),
         };
         class.new_instance((message,))
     }

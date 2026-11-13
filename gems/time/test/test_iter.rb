@@ -68,14 +68,15 @@ class TestIter < Minitest::Test
 
   def test_the_overrides_take_enumerables_arguments_too
     iter = five_days
-    assert_equal 5, iter.count
     assert_equal 1, iter.count(january(3))
     assert_equal 2, iter.count { |d| d.day.even? }
     assert_equal [january(5), january(4)], iter.max(2)
     assert_equal [january(1), january(2)], iter.min(2)
     assert_equal january(1), iter.max { |a, b| b <=> a }
     assert_equal january(5), iter.min { |a, b| b <=> a }
-    assert_equal 5, iter.len
+    assert_equal 5, iter.len, "Enumerable's forms walk a copy and consume nothing"
+    assert_equal 5, iter.count
+    assert_raises(IOError) { iter.len }
     months = Month.iter_from(Month::May)
     assert_equal 1, months.each.lazy.select { |m| m == Month::June }.first(1).size
   end
@@ -98,14 +99,108 @@ class TestIter < Minitest::Test
     assert_equal [Weekday::Monday, Weekday::Sunday, Weekday::Saturday], Array.new(3) { days.next }
   end
 
-  def test_rev_starts_from_the_place_and_leaves_the_iterator_alone
+  def test_rev_starts_from_the_place_and_consumes_the_iterator
     months = Month.iter_from(Month::January)
     months.next
     rev = months.rev
-    assert_equal Month::February, months.next
     assert_equal [Month::February, Month::January, Month::December], rev.first(3)
+    error = assert_raises(IOError) { months.next }
+    assert_equal "Ferro::Time::Iter::MonthIter consumed by MonthIter#rev", error.message
     assert_kind_of I::Rev, Weekday.iter_from(Weekday::Monday).rev
     assert_raises(NoMethodError) { I::Rev.new }
+  end
+
+  # The iterators and the methods of time's that take the iterator by
+  # value (iter/date_iter.rs:91-98, :141-154; iter/month_iter.rs:46,
+  # :73-111, :136-174; iter/weekday_iter.rs:45, :72-78, :119-125): each
+  # uses it up, as a Rust move does.
+  private def consumers
+    [
+      ["DateIter", -> { five_days }, %i[count last max min is_sorted]],
+      ["MonthIter", -> { Month.iter_from(Month::May) }, %i[rev max min is_sorted]],
+      ["WeekdayIter", -> { Weekday.iter_from(Weekday::Monday) }, %i[rev]],
+      ["Rev", -> { Month.iter_from(Month::May).rev }, %i[max min is_sorted]],
+    ]
+  end
+
+  # A consumed iterator raises IOError on any later use, as a closed IO
+  # does (ADR 001, amendment of 2026-11-05; plan 007, Follow-up: the four
+  # rulings), naming the method that consumed it.
+  def test_a_method_that_takes_the_iterator_by_value_uses_it_up
+    consumers.each do |type, make, methods|
+      methods.each do |method|
+        iter = make.call
+        iter.public_send(method)
+        {
+          next: -> { iter.next },
+          nth: -> { iter.nth(0) },
+          size_hint: -> { iter.size_hint },
+          debug: -> { iter.debug },
+          dup: -> { iter.dup },
+          clone: -> { iter.clone },
+          first: -> { iter.first(1) },
+          again: -> { iter.public_send(method) },
+          left: -> { iter == make.call },
+          right: -> { make.call == iter },
+        }.each do |use, call|
+          error = assert_raises(IOError, "#{type}##{method}, then #{use}", &call)
+          assert_equal "Ferro::Time::Iter::#{type} consumed by #{type}##{method}", error.message
+        end
+      end
+    end
+  end
+
+  def test_every_use_of_a_consumed_date_iter_raises
+    iter = five_days
+    iter.last
+    [
+      -> { iter.next_back },
+      -> { iter.nth_back(0) },
+      -> { iter.len },
+      -> { iter.each { nil } },
+      -> { iter.reverse_each { nil } },
+      -> { iter.to_a },
+      -> { iter.count(january(1)) },
+    ].each { |use| assert_raises(IOError, &use) }
+    assert_match(/\A#<Ferro::Time::Iter::DateIter:0x\h+>\z/, iter.inspect, "inspect stays Ruby's, as a closed IO's does")
+  end
+
+  def test_every_use_of_a_consumed_cycle_raises
+    months = Month.iter_from(Month::May)
+    months.is_sorted
+    assert_raises(IOError) { months.all { true } }
+    assert_raises(IOError) { months.any { true } }
+    assert_raises(IOError) { months.count }
+    assert_raises(IOError) { months.rev }
+  end
+
+  # time panics on count and last of a cycle after the move, so the cycle
+  # is used up before the refusal.
+  def test_counting_a_cycle_uses_it_up_before_it_refuses
+    [
+      ["MonthIter", -> { Month.iter_from(Month::May) }],
+      ["WeekdayIter", -> { Weekday.iter_from(Weekday::Monday) }],
+      ["Rev", -> { Month.iter_from(Month::May).rev }],
+      ["Rev", -> { Weekday.iter_from(Weekday::Monday).rev }],
+    ].each do |type, make|
+      %i[count last].each do |method|
+        iter = make.call
+        assert_raises(RangeError) { iter.public_send(method) }
+        error = assert_raises(IOError) { iter.next }
+        assert_equal "Ferro::Time::Iter::#{type} consumed by #{type}##{method}", error.message
+      end
+    end
+  end
+
+  # Rust moves a binding that is not mut, and Ruby closes a frozen IO, so a
+  # frozen iterator is consumed like any other.
+  def test_a_frozen_iterator_can_be_consumed
+    iter = five_days.freeze
+    assert_equal january(5), iter.max
+    assert_raises(IOError) { iter.len }
+    months = Month.iter_from(Month::May).freeze
+    assert_equal Month::May, months.rev.next
+    assert_raises(IOError) { months.size_hint }
   end
 
   def test_dup_and_clone_copy_the_iterator
@@ -243,11 +338,11 @@ class TestIter < Minitest::Test
     refute_respond_to forward, :is_sorted
     refute_respond_to rev, :is_sorted
     assert_raises(NoMethodError) { rev.__send__(:is_sorted) }
-    months = Month.iter_from(Month::May).rev
-    assert_respond_to months, :is_sorted
-    refute months.is_sorted
-    assert_equal Month::December, months.max
-    assert_equal Month::January, months.min
+    months = -> { Month.iter_from(Month::May).rev }
+    assert_respond_to months.call, :is_sorted
+    refute months.call.is_sorted
+    assert_equal Month::December, months.call.max
+    assert_equal Month::January, months.call.min
   end
 
   def test_both_kinds_of_rev_are_revs_and_copy_as_their_kind
@@ -295,10 +390,9 @@ class TestIter < Minitest::Test
   end
 
   def test_max_and_min_of_nil_are_times
-    months = Month.iter_from(Month::May)
-    assert_equal Month::December, months.max(nil)
-    assert_equal Month::January, months.min(nil)
-    assert_equal Month::December, months.rev.max(nil)
+    assert_equal Month::December, Month.iter_from(Month::May).max(nil)
+    assert_equal Month::January, Month.iter_from(Month::May).min(nil)
+    assert_equal Month::December, Month.iter_from(Month::May).rev.max(nil)
     assert_equal january(5), five_days.max(nil)
     assert_equal january(1), five_days.min(nil)
   end

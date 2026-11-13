@@ -14,6 +14,7 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 
 ### Changed
 
+- **Breaking:** an iterator's `rev`, `count`, `last`, `max`, `min`, and `is_sorted`, which take the iterator by value in Rust, use it up: any later use of it, `dup` and `==` included, raises `IOError` naming the method that used it, as a closed IO does. `count` and `last` on a never-ending iterator use it up before they raise `RangeError`. Enumerable's `count`, `max`, and `min` with a block or an argument still walk a copy.
 - **Breaking:** the format items (`BorrowedFormatItem` and `OwnedFormatItem` variants) and the `Component` variants hold their one field by position, as Rust's tuple variants do: `deconstruct` and `to_a` give it, so `in Component::Day[modifier]` reads as Rust's pattern does. They are no longer `Data` classes, so the readers `literal`, `component`, `compound`, `item`, `items`, and `modifier` are gone, with keyword `new`, `to_h`, `with`, and `deconstruct_keys`. Rust's `TryFrom` from an item to a slice or `Vec` is the pattern `in Compound[items]`.
 
 ### Removed

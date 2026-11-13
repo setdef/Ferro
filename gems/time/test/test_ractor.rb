@@ -85,7 +85,7 @@ class TestRactor < Minitest::Test
         start = t::Date.from_calendar_date(2019, t::Month::December, 30)
         dates = start.iter_to(start.next_day.next_day).map(&:to_s)
         months = t::Month.iter_from(t::Month::May)
-        [dates, months.rev.first(2).map(&:to_s), months.any { |m| m == t::Month::June },
+        [dates, t::Month.iter_from(t::Month::May).rev.first(2).map(&:to_s), months.any { |m| m == t::Month::June },
           t::Unit::Nanosecond.per(second), second < t::Unit::Unit::Minute,]
       end.value
     RUBY

@@ -24,47 +24,92 @@ use time::{Date, Month, Weekday};
 use crate::values::{month, weekday, weekday_number, NDate};
 use crate::{frozen_option, guarded, Failure};
 
-/// A native value behind a lock, cloned out and written back whole.
+/// A native iterator, or, once a method that takes `self` used it up, the
+/// name of that method (ADR 001, amendment of 2026-11-05).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum State<T> {
+    /// The iterator, live.
+    Live(T),
+    /// Used up by the method named.
+    Consumed(&'static str),
+}
+
+/// A native value behind a lock, cloned out and written back whole, or
+/// taken out once by a method that consumes it.
 pub trait Held: TypedData {
     /// time's iterator.
     type Inner: Clone + PartialEq + Debug;
 
-    /// The lock around it.
-    fn cell(&self) -> &Mutex<Self::Inner>;
+    /// The Ruby class's public name, which an `IOError` names.
+    const CLASS: &'static str;
 
-    /// A copy of the iterator held.
-    fn get(&self) -> Self::Inner {
-        self.cell()
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
+    /// The type's short name, which an `IOError` names with the method.
+    const SHORT: &'static str;
+
+    /// The lock around it.
+    fn cell(&self) -> &Mutex<State<Self::Inner>>;
+
+    /// Ruby's `IOError` for an iterator `by` used up, worded as the gem's
+    /// other consumed values word it: `Ferro::Time::Iter::MonthIter
+    /// consumed by MonthIter#rev`.
+    fn consumed(by: &str) -> Failure {
+        Failure::Io(format!("{} consumed by {}#{by}", Self::CLASS, Self::SHORT))
     }
 
-    /// Replaces the iterator held.
+    /// A copy of the iterator held, or `IOError` once it is used up.
+    fn get(&self) -> Result<Self::Inner, Failure> {
+        match &*self.cell().lock().unwrap_or_else(PoisonError::into_inner) {
+            State::Live(inner) => Ok(inner.clone()),
+            State::Consumed(by) => Err(Self::consumed(by)),
+        }
+    }
+
+    /// Replaces the iterator held, live again.
     fn set(&self, inner: Self::Inner) {
-        *self.cell().lock().unwrap_or_else(PoisonError::into_inner) = inner;
+        *self.cell().lock().unwrap_or_else(PoisonError::into_inner) = State::Live(inner);
+    }
+
+    /// The iterator held, which `by`, a method that takes `self`, uses
+    /// up: Rust's move. `IOError` if it is already used up.
+    fn take(&self, by: &'static str) -> Result<Self::Inner, Failure> {
+        let previous = {
+            let mut state = self.cell().lock().unwrap_or_else(PoisonError::into_inner);
+            let previous = std::mem::replace(&mut *state, State::Consumed(by));
+            if let State::Consumed(earlier) = previous {
+                *state = State::Consumed(earlier);
+            }
+            previous
+        };
+        match previous {
+            State::Live(inner) => Ok(inner),
+            State::Consumed(earlier) => Err(Self::consumed(earlier)),
+        }
     }
 }
 
 macro_rules! held {
-    ($($wrapper:ident($inner:ty) => $class:literal, $placeholder:expr;)+) => {$(
+    ($($wrapper:ident($inner:ty) => $class:literal, $short:literal, $placeholder:expr;)+) => {$(
         #[doc = concat!("`", $class, "`, holding a `", stringify!($inner), "`.")]
         #[magnus::wrap(class = $class, free_immediately, size)]
-        pub struct $wrapper(Mutex<$inner>);
+        pub struct $wrapper(Mutex<State<$inner>>);
 
         impl Default for $wrapper {
             /// What Ruby's allocator makes before `initialize` or
             /// `initialize_copy` replaces it: a value time's public API
             /// also builds (plan 010, decision 1).
             fn default() -> Self {
-                Self(Mutex::new($placeholder))
+                Self(Mutex::new(State::Live($placeholder)))
             }
         }
 
         impl Held for $wrapper {
             type Inner = $inner;
 
-            fn cell(&self) -> &Mutex<$inner> {
+            const CLASS: &'static str = $class;
+
+            const SHORT: &'static str = $short;
+
+            fn cell(&self) -> &Mutex<State<$inner>> {
                 &self.0
             }
         }
@@ -72,10 +117,23 @@ macro_rules! held {
 }
 
 held! {
-    NDateIter(DateIter) => "Ferro::Time::Iter::DateIter", DateIter::new(Date::MAX, Date::MIN);
-    NMonthIter(MonthIter) => "Ferro::Time::Iter::MonthIter", MonthIter::new(Month::January);
-    NWeekdayIter(WeekdayIter) => "Ferro::Time::Iter::WeekdayIter", WeekdayIter::new(Weekday::Monday);
-    NRev(Reversed) => "Ferro::Time::Iter::Rev", Reversed::Month(MonthIter::new(Month::January).rev());
+    NDateIter(DateIter) => "Ferro::Time::Iter::DateIter", "DateIter", DateIter::new(Date::MAX, Date::MIN);
+    NMonthIter(MonthIter) => "Ferro::Time::Iter::MonthIter", "MonthIter", MonthIter::new(Month::January);
+    NWeekdayIter(WeekdayIter) => "Ferro::Time::Iter::WeekdayIter", "WeekdayIter", WeekdayIter::new(Weekday::Monday);
+    NRev(Reversed) => "Ferro::Time::Iter::Rev", "Rev", Reversed::Month(MonthIter::new(Month::January).rev());
+}
+
+/// The `'static` name of a method that takes `self`, as `State` keeps it.
+fn consuming(name: &str) -> Result<&'static str, Failure> {
+    Ok(match name {
+        "rev" => "rev",
+        "count" => "count",
+        "last" => "last",
+        "max" => "max",
+        "min" => "min",
+        "is_sorted" => "is_sorted",
+        other => return Err(unknown("Iterator", other)),
+    })
 }
 
 /// time's two `Rev` types, which Ruby holds in one class (plan 010,
@@ -263,6 +321,19 @@ fn replace<H: Held>(held: Obj<H>, inner: H::Inner) -> Result<(), Error> {
     Ok(())
 }
 
+/// A copy of `held`'s iterator, or Ruby's `IOError` once it is used up.
+fn live<H: Held>(ruby: &Ruby, held: &H) -> Result<H::Inner, Error> {
+    held.get().map_err(|failure| failure.into_error(ruby))
+}
+
+/// `held`'s iterator, which the method `name` takes by value and so uses
+/// up, or Ruby's `IOError` if something already did.
+fn take<H: Held>(ruby: &Ruby, held: &H, name: &str) -> Result<H::Inner, Error> {
+    consuming(name)
+        .and_then(|by| held.take(by))
+        .map_err(|failure| failure.into_error(ruby))
+}
+
 /// `DateIter::new(start, end)` (`src/iter/date_iter.rs:16-40`), for
 /// `initialize`.
 fn date_iter_initialize(iter: Obj<NDateIter>, start: &NDate, end: &NDate) -> Result<(), Error> {
@@ -273,7 +344,7 @@ fn date_iter_initialize(iter: Obj<NDateIter>, start: &NDate, end: &NDate) -> Res
 fn date_iter_step(ruby: &Ruby, iter: Obj<NDateIter>, name: Symbol) -> Result<Value, Error> {
     let name = name.name()?;
     iter.check_frozen()?;
-    let mut copy = iter.get();
+    let mut copy = live(ruby, &*iter)?;
     let item = guarded(ruby, || match name.as_ref() {
         "next" => Ok(copy.next()),
         "next_back" => Ok(copy.next_back()),
@@ -292,7 +363,7 @@ fn date_iter_nth(
 ) -> Result<Value, Error> {
     let name = name.name()?;
     iter.check_frozen()?;
-    let mut copy = iter.get();
+    let mut copy = live(ruby, &*iter)?;
     let item = guarded(ruby, || match name.as_ref() {
         "nth" => Ok(copy.nth(n)),
         "nth_back" => Ok(copy.nth_back(n)),
@@ -302,27 +373,30 @@ fn date_iter_nth(
     Ok(frozen_option(ruby, item.map(NDate)))
 }
 
-/// `len` or `count` (`src/iter/date_iter.rs:90-93`, `:207-216`), on a
-/// copy: `count` takes the iterator by value.
+/// `len` (`src/iter/date_iter.rs:207-216`), on a copy, or `count`
+/// (`:90-93`), which takes the iterator by value and uses it up.
 fn date_iter_count(ruby: &Ruby, iter: &NDateIter, name: Symbol) -> Result<usize, Error> {
     let name = name.name()?;
-    let copy = iter.get();
+    if name == "len" {
+        let copy = live(ruby, iter)?;
+        return guarded(ruby, || Ok(copy.len()));
+    }
+    let owned = take(ruby, iter, &name)?;
     guarded(ruby, || match name.as_ref() {
-        "len" => Ok(copy.len()),
-        "count" => Ok(copy.count()),
+        "count" => Ok(owned.count()),
         other => Err(unknown("DateIter", other)),
     })
 }
 
 /// `last`, `max`, or `min` (`src/iter/date_iter.rs:95-98`, `:140-148`),
-/// on a copy.
+/// each taking the iterator by value and using it up.
 fn date_iter_end(ruby: &Ruby, iter: &NDateIter, name: Symbol) -> Result<Value, Error> {
     let name = name.name()?;
-    let copy = iter.get();
+    let owned = take(ruby, iter, &name)?;
     let item = guarded(ruby, || match name.as_ref() {
-        "last" => Ok(copy.last()),
-        "max" => Ok(copy.max()),
-        "min" => Ok(copy.min()),
+        "last" => Ok(owned.last()),
+        "max" => Ok(owned.max()),
+        "min" => Ok(owned.min()),
         other => Err(unknown("DateIter", other)),
     })?;
     Ok(frozen_option(ruby, item.map(NDate)))
@@ -330,14 +404,15 @@ fn date_iter_end(ruby: &Ruby, iter: &NDateIter, name: Symbol) -> Result<Value, E
 
 /// `size_hint` (`src/iter/date_iter.rs:84-88`).
 fn date_iter_size_hint(ruby: &Ruby, iter: &NDateIter) -> Result<(usize, Option<usize>), Error> {
-    let copy = iter.get();
+    let copy = live(ruby, iter)?;
     guarded(ruby, || Ok(copy.size_hint()))
 }
 
-/// `is_sorted` (`src/iter/date_iter.rs:150-153`), on a copy.
+/// `is_sorted` (`src/iter/date_iter.rs:150-153`), which takes the iterator
+/// by value and uses it up.
 fn date_iter_is_sorted(ruby: &Ruby, iter: &NDateIter) -> Result<bool, Error> {
-    let copy = iter.get();
-    guarded(ruby, || Ok(copy.is_sorted()))
+    let owned = take(ruby, iter, "is_sorted")?;
+    guarded(ruby, || Ok(owned.is_sorted()))
 }
 
 /// `MonthIter::new(start)` (`src/iter/month_iter.rs:21-34`), for
@@ -368,18 +443,21 @@ fn rev_class(ruby: &Ruby, reversed: &Reversed) -> Result<RClass, Error> {
 /// `reversed`, wrapped as its private subclass of `Rev`.
 fn wrap_rev(ruby: &Ruby, reversed: Reversed) -> Result<Obj<NRev>, Error> {
     let class = rev_class(ruby, &reversed)?;
-    Ok(ruby.obj_wrap_as(NRev(Mutex::new(reversed)), class))
+    Ok(ruby.obj_wrap_as(NRev(Mutex::new(State::Live(reversed))), class))
 }
 
-/// `MonthIter::rev` (`src/iter/month_iter.rs:36-48`), on a copy, as
-/// `rev` takes the iterator by value.
+/// `MonthIter::rev` (`src/iter/month_iter.rs:36-48`), which takes the
+/// iterator by value and uses it up.
 fn month_iter_rev(ruby: &Ruby, iter: &NMonthIter) -> Result<Obj<NRev>, Error> {
-    wrap_rev(ruby, Reversed::Month(iter.get().rev()))
+    let owned = take(ruby, iter, "rev")?;
+    wrap_rev(ruby, Reversed::Month(owned.rev()))
 }
 
-/// `WeekdayIter::rev` (`src/iter/weekday_iter.rs:35-47`), on a copy.
+/// `WeekdayIter::rev` (`src/iter/weekday_iter.rs:35-47`), which takes the
+/// iterator by value and uses it up.
 fn weekday_iter_rev(ruby: &Ruby, iter: &NWeekdayIter) -> Result<Obj<NRev>, Error> {
-    wrap_rev(ruby, Reversed::Weekday(iter.get().rev()))
+    let owned = take(ruby, iter, "rev")?;
+    wrap_rev(ruby, Reversed::Weekday(owned.rev()))
 }
 
 /// `next` on one of the infinite iterators.
@@ -388,7 +466,7 @@ where
     H::Inner: Cycle,
 {
     iter.check_frozen()?;
-    let mut copy = iter.get();
+    let mut copy = live(ruby, &*iter)?;
     let number = guarded(ruby, || Ok(copy.next_number()))?;
     iter.set(copy);
     Ok(number)
@@ -400,7 +478,7 @@ where
     H::Inner: Cycle,
 {
     iter.check_frozen()?;
-    let mut copy = iter.get();
+    let mut copy = live(ruby, &*iter)?;
     let number = guarded(ruby, || Ok(copy.nth_number(n)))?;
     iter.set(copy);
     Ok(number)
@@ -411,26 +489,27 @@ fn cycle_size_hint<H: Held>(ruby: &Ruby, iter: &H) -> Result<(usize, Option<usiz
 where
     H::Inner: Cycle,
 {
-    let copy = iter.get();
+    let copy = live(ruby, iter)?;
     guarded(ruby, || Ok(copy.hint()))
 }
 
-/// `count` or `last` on one of the infinite iterators: time panics for
-/// both, so the gem refuses with `RangeError` and time's message, never
-/// calling it (plan 010, decision 8).
+/// `count` or `last` on one of the infinite iterators: each takes the
+/// iterator by value, so it is used up, and then time panics, so the gem
+/// refuses with `RangeError` and time's message, never calling it (plan
+/// 010, decision 8).
 fn cycle_infinite<H: Held>(ruby: &Ruby, iter: &H, name: Symbol) -> Result<(), Error>
 where
     H::Inner: Cycle,
 {
     let name = name.name()?;
-    let copy = iter.get();
+    let method = match name.as_ref() {
+        "count" => Infinite::Count,
+        "last" => Infinite::Last,
+        other => return Err(unknown("Iterator", other).into_error(ruby)),
+    };
+    let owned = take(ruby, iter, &name)?;
     guarded(ruby, || {
-        let method = match name.as_ref() {
-            "count" => Infinite::Count,
-            "last" => Infinite::Last,
-            other => return Err(unknown(copy.name(), other)),
-        };
-        Err(Failure::Range(infinite_message(copy.name(), method)))
+        Err(Failure::Range(infinite_message(owned.name(), method)))
     })
 }
 
@@ -450,7 +529,7 @@ where
         "any" => false,
         other => return Err(unknown("Iterator", other).into_error(ruby)),
     };
-    let mut copy = iter.get();
+    let mut copy = live(ruby, iter)?;
     let mut stopped: Option<Error> = None;
     let mut test = |number: u8| match ruby.yield_value::<u8, Value>(number) {
         Ok(answer) => answer.to_bool(),
@@ -470,14 +549,16 @@ where
 }
 
 /// `max`, `min`, or `is_sorted` on a month iterator (`src/iter/month_iter.rs:97-111`,
-/// `:160-173`), on a copy; `nil` for a weekday iterator, which has none.
+/// `:160-173`), each taking the iterator by value and using it up; `nil`
+/// for a weekday iterator, which has none and which the Ruby side never
+/// asks.
 fn cycle_ordered<H: Held>(ruby: &Ruby, iter: &H, name: Symbol) -> Result<Option<Value>, Error>
 where
     H::Inner: Cycle,
 {
     let name = name.name()?;
-    let copy = iter.get();
-    let ordered = guarded(ruby, || Ok(copy.ordered()))?;
+    let owned = take(ruby, iter, &name)?;
+    let ordered = guarded(ruby, || Ok(owned.ordered()))?;
     let Some(ordered) = ordered else {
         return Ok(None);
     };
@@ -485,27 +566,29 @@ where
         "max" => ruby.into_value(ordered.max),
         "min" => ruby.into_value(ordered.min),
         "is_sorted" => ruby.into_value(ordered.is_sorted),
-        other => return Err(unknown(copy.name(), other).into_error(ruby)),
+        other => return Err(unknown(owned.name(), other).into_error(ruby)),
     }))
 }
 
-/// time's derived `PartialEq`.
+/// time's derived `PartialEq`; `IOError` if either side is used up, as
+/// Rust cannot compare a value it moved.
 fn eq<H: Held>(ruby: &Ruby, left: &H, right: &H) -> Result<bool, Error> {
-    let (left, right) = (left.get(), right.get());
+    let (left, right) = (live(ruby, left)?, live(ruby, right)?);
     guarded(ruby, || Ok(left == right))
 }
 
 /// time's derived `Debug`.
 fn debug<H: Held>(ruby: &Ruby, iter: &H) -> Result<String, Error> {
-    let copy = iter.get();
+    let copy = live(ruby, iter)?;
     guarded(ruby, || Ok(format!("{copy:?}")))
 }
 
 /// `Clone`, for `dup` and `clone`: `initialize_copy` copies the iterator,
 /// refusing to overwrite a frozen one as Ruby's own `initialize_copy`
-/// refuses (`rb_obj_init_copy` in Ruby's `object.c`).
-fn initialize_copy<H: Held>(copy: Obj<H>, original: &H) -> Result<(), Error> {
-    replace(copy, original.get())
+/// refuses (`rb_obj_init_copy` in Ruby's `object.c`), and to copy one that
+/// is used up, as a closed IO refuses `dup`.
+fn initialize_copy<H: Held>(ruby: &Ruby, copy: Obj<H>, original: &H) -> Result<(), Error> {
+    replace(copy, live(ruby, original)?)
 }
 
 /// `initialize_copy` for a `Rev`, which also refuses an original of the
@@ -519,7 +602,7 @@ fn rev_initialize_copy(ruby: &Ruby, copy: Obj<NRev>, original: Obj<NRev>) -> Res
             "initialize_copy should take same class object",
         ));
     }
-    initialize_copy(copy, &original)
+    initialize_copy(ruby, copy, &original)
 }
 
 /// A method name the Ruby side never passes.
@@ -618,8 +701,22 @@ mod tests {
     use time::iter::{MonthIter, WeekdayIter};
     use time::{Month, Weekday};
 
-    use super::{infinite_message, Cycle, Infinite, Reversed};
-    use crate::{capture, Panic};
+    use super::{infinite_message, Cycle, Held, Infinite, NMonthIter, Reversed};
+    use crate::{capture, Failure, Panic};
+
+    /// A method that takes `self` moves the iterator out once; every read
+    /// after it, and a second move, fail with the first method's name
+    /// (ADR 001, amendment of 2026-11-05).
+    #[test]
+    fn a_consuming_method_takes_the_iterator_once() {
+        let held = NMonthIter::default();
+        assert_eq!(held.take("rev").ok(), Some(MonthIter::new(Month::January)));
+        let message = "Ferro::Time::Iter::MonthIter consumed by MonthIter#rev".to_owned();
+        assert!(matches!(held.get(), Err(Failure::Io(text)) if text == message));
+        assert!(matches!(held.take("count"), Err(Failure::Io(text)) if text == message));
+        held.set(MonthIter::new(Month::May));
+        assert_eq!(held.get().ok(), Some(MonthIter::new(Month::May)));
+    }
 
     #[test]
     fn the_refusals_carry_times_panic_messages() {
