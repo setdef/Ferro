@@ -18,15 +18,17 @@ module Ferro
       #   src/format_description/owned_format_item.rs
       #++
 
-      # What every format item shares: the checks +new+ makes, and
-      # +inspect+. Private to the gem.
+      # What every format item shares: its one positional field, the check
+      # +new+ makes, and +debug+. Private to the gem.
       module Item # :nodoc:
-        # Checks each field's type as Rust's type checker would, and keeps
-        # a frozen copy: a UTF-8 String for +StringLiteral+ (raising
+        include TupleVariant
+
+        # Checks the field's type as Rust's type checker would, and keeps a
+        # frozen copy: a UTF-8 String for +StringLiteral+ (raising
         # +EncodingError+ when it is not valid UTF-8, as Rust's +str+ must
         # be), and frozen Arrays of items of the same family.
-        def initialize(**fields)
-          super(**Arguments.item_fields(_ = self, fields))
+        private def check(field)
+          Arguments.item_field(_ = self, _ = field)
         end
 
         # time's +Debug+ for the item: a literal as is, a component as its
@@ -45,8 +47,9 @@ module Ferro
       # items you can read and build by hand: literal text, components,
       # compounds, optional parts, and alternatives.
       #
-      # BorrowedFormatItem is a module, and each variant is a +Data+ class
-      # that includes it. FormatDescription.parse_borrowed with version 1
+      # BorrowedFormatItem is a module, and each variant is a frozen class
+      # that includes it, holding one field by position, as Rust's tuple
+      # variants do. FormatDescription.parse_borrowed with version 1
       # or 2, and FormatDescription.parse_strftime_borrowed, return an
       # Array of them. Pass an item, or an Array of items, to +format+ and
       # +parse+ on any date and time type. In Rust a borrowed item points
@@ -91,6 +94,10 @@ module Ferro
 
         # A string that is formatted as-is.
         #
+        # Its one field is the text, a frozen UTF-8 String, positional as
+        # in Rust: #to_a gives it, and so does the pattern
+        # <tt>in StringLiteral[text]</tt>.
+        #
         # Mirrors time's <tt>BorrowedFormatItem::StringLiteral</tt>
         # (<tt>src/format_description/borrowed_format_item.rs:25-26</tt>).
         #
@@ -98,15 +105,15 @@ module Ferro
         #
         #   dash = Ferro::Time::FormatDescription::BorrowedFormatItem::StringLiteral.new("-")
         #   Ferro::Time::Date::MIN.format(dash) # => "-"
-        class StringLiteral < Data.define(:literal)
+        class StringLiteral
           include BorrowedFormatItem
-
-          ##
-          # :attr_reader: literal
-          # The text, a frozen UTF-8 String.
         end
 
         # A minimal representation of a single non-literal item.
+        #
+        # Its one field is the FormatDescription::Component, positional as
+        # in Rust: #to_a gives it, and so does the pattern
+        # <tt>in Component[component]</tt>.
         #
         # Mirrors time's <tt>BorrowedFormatItem::Component</tt>
         # (<tt>src/format_description/borrowed_format_item.rs:27-28</tt>).
@@ -116,12 +123,8 @@ module Ferro
         #   minute = Ferro::Time::FormatDescription::Component::Minute.new(Ferro::Time::FormatDescription::Modifier::Minute.default)
         #   item = Ferro::Time::FormatDescription::BorrowedFormatItem::Component.new(minute)
         #   item == minute # => true
-        class Component < Data.define(:component)
+        class Component
           include BorrowedFormatItem
-
-          ##
-          # :attr_reader: component
-          # The FormatDescription::Component.
 
           # Whether +other+ is the same item, or the component this item
           # holds, as time's <tt>PartialEq<Component></tt> has it
@@ -129,29 +132,29 @@ module Ferro
           #
           # [other] Object.
           def ==(other)
-            other.is_a?(FormatDescription::Component) ? component.eql?(other) : super
+            other.is_a?(FormatDescription::Component) ? deconstruct.first.eql?(other) : super
           end
         end
 
         # A series of literals or components that collectively form a
         # partial or complete description.
         #
+        # Its one field is the items, a frozen Array of
+        # BorrowedFormatItem, positional as in Rust: #to_a gives it, and
+        # so does the pattern <tt>in Compound[items]</tt>.
+        #
         # Mirrors time's <tt>BorrowedFormatItem::Compound</tt>
         # (<tt>src/format_description/borrowed_format_item.rs:29-31</tt>).
-        # Rust's <tt>TryFrom<BorrowedFormatItem></tt> for a slice is
-        # #compound here: Ruby's Array gains no conversion.
+        # Rust's <tt>TryFrom<BorrowedFormatItem></tt> for a slice is the
+        # pattern here: Ruby's Array gains no conversion.
         #
         # === Example
         #
         #   literal = Ferro::Time::FormatDescription::BorrowedFormatItem::StringLiteral.new("")
         #   compound = Ferro::Time::FormatDescription::BorrowedFormatItem::Compound.new([literal])
         #   compound == [literal] # => true
-        class Compound < Data.define(:compound)
+        class Compound
           include BorrowedFormatItem
-
-          ##
-          # :attr_reader: compound
-          # The items, a frozen Array of BorrowedFormatItem.
 
           # Whether +other+ is the same item, or an Array of the same items,
           # as time's <tt>PartialEq<&[Self]></tt> has it
@@ -161,7 +164,7 @@ module Ferro
           #
           # [other] Object.
           def ==(other)
-            other.is_a?(Array) ? compound == other : super
+            other.is_a?(Array) ? deconstruct.first == other : super
           end
         end
 
@@ -170,6 +173,10 @@ module Ferro
         #
         # This variant has no effect on formatting, as the value is
         # guaranteed to be present.
+        #
+        # Its one field is the BorrowedFormatItem that may be absent,
+        # positional as in Rust: #to_a gives it, and so does the pattern
+        # <tt>in Optional[item]</tt>.
         #
         # Mirrors time's <tt>BorrowedFormatItem::Optional</tt>
         # (<tt>src/format_description/borrowed_format_item.rs:32-36</tt>).
@@ -180,17 +187,17 @@ module Ferro
         #   second = fd::BorrowedFormatItem.from(fd::Component::Second.new(fd::Modifier::Second.default))
         #   optional = fd::BorrowedFormatItem::Optional.new(second)
         #   Ferro::Time::Time.from_hms(9, 5, 7).format(optional) # => "07"
-        class Optional < Data.define(:item)
+        class Optional
           include BorrowedFormatItem
-
-          ##
-          # :attr_reader: item
-          # The BorrowedFormatItem that may be absent.
         end
 
         # A series of FormatItems where, when parsing, the first successful
         # parse is used. When formatting, the first element of the slice is
         # used. An empty slice is a no-op when formatting or parsing.
+        #
+        # Its one field is the alternatives, a frozen Array of
+        # BorrowedFormatItem, positional as in Rust: #to_a gives it, and
+        # so does the pattern <tt>in First[items]</tt>.
         #
         # Mirrors time's <tt>BorrowedFormatItem::First</tt>
         # (<tt>src/format_description/borrowed_format_item.rs:37-41</tt>).
@@ -200,12 +207,8 @@ module Ferro
         #   fd = Ferro::Time::FormatDescription
         #   first = fd::BorrowedFormatItem::First.new([fd::BorrowedFormatItem::StringLiteral.new("a"), fd::BorrowedFormatItem::StringLiteral.new("b")])
         #   Ferro::Time::Date::MIN.format(first) # => "a"
-        class First < Data.define(:items)
+        class First
           include BorrowedFormatItem
-
-          ##
-          # :attr_reader: items
-          # The alternatives, a frozen Array of BorrowedFormatItem.
         end
       end
 
@@ -229,7 +232,7 @@ module Ferro
       # === Example
       #
       #   item = Ferro::Time::FormatDescription.parse_owned(2, "[year]-[month]")
-      #   item.compound.length # => 3
+      #   item.to_a.first.length # => 3
       #   Ferro::Time::Date.from_ordinal_date(2026, 1).format(item) # => "2026-01"
       module OwnedFormatItem
         include Item
@@ -260,26 +263,26 @@ module Ferro
 
         # A string that is formatted as-is.
         #
+        # Its one field is the text, a frozen UTF-8 String, positional as
+        # in Rust: #to_a gives it, and so does the pattern
+        # <tt>in StringLiteral[text]</tt>.
+        #
         # Mirrors time's <tt>OwnedFormatItem::StringLiteral</tt>
         # (<tt>src/format_description/owned_format_item.rs:24-25</tt>).
-        class StringLiteral < Data.define(:literal)
+        class StringLiteral
           include OwnedFormatItem
-
-          ##
-          # :attr_reader: literal
-          # The text, a frozen UTF-8 String.
         end
 
         # A minimal representation of a single non-literal item.
         #
+        # Its one field is the FormatDescription::Component, positional as
+        # in Rust: #to_a gives it, and so does the pattern
+        # <tt>in Component[component]</tt>.
+        #
         # Mirrors time's <tt>OwnedFormatItem::Component</tt>
         # (<tt>src/format_description/owned_format_item.rs:26-27</tt>).
-        class Component < Data.define(:component)
+        class Component
           include OwnedFormatItem
-
-          ##
-          # :attr_reader: component
-          # The FormatDescription::Component.
 
           # Whether +other+ is the same item, or the component this item
           # holds, as time's <tt>PartialEq<Component></tt> has it
@@ -287,23 +290,23 @@ module Ferro
           #
           # [other] Object.
           def ==(other)
-            other.is_a?(FormatDescription::Component) ? component.eql?(other) : super
+            other.is_a?(FormatDescription::Component) ? deconstruct.first.eql?(other) : super
           end
         end
 
         # A series of literals or components that collectively form a
         # partial or complete description.
         #
+        # Its one field is the items, a frozen Array of OwnedFormatItem,
+        # positional as in Rust: #to_a gives it, and so does the pattern
+        # <tt>in Compound[items]</tt>.
+        #
         # Mirrors time's <tt>OwnedFormatItem::Compound</tt>
         # (<tt>src/format_description/owned_format_item.rs:28-30</tt>).
-        # Rust's <tt>TryFrom<OwnedFormatItem></tt> for a +Vec+ is #compound
-        # here: Ruby's Array gains no conversion.
-        class Compound < Data.define(:compound)
+        # Rust's <tt>TryFrom<OwnedFormatItem></tt> for a +Vec+ is the
+        # pattern here: Ruby's Array gains no conversion.
+        class Compound
           include OwnedFormatItem
-
-          ##
-          # :attr_reader: compound
-          # The items, a frozen Array of OwnedFormatItem.
 
           # Whether +other+ is the same item, or an Array of the same items,
           # as time's <tt>PartialEq<&[Self]></tt> has it
@@ -313,7 +316,7 @@ module Ferro
           #
           # [other] Object.
           def ==(other)
-            other.is_a?(Array) ? compound == other : super
+            other.is_a?(Array) ? deconstruct.first == other : super
           end
         end
 
@@ -323,28 +326,28 @@ module Ferro
         # This variant has no effect on formatting, as the value is
         # guaranteed to be present.
         #
+        # Its one field is the OwnedFormatItem that may be absent,
+        # positional as in Rust: #to_a gives it, and so does the pattern
+        # <tt>in Optional[item]</tt>.
+        #
         # Mirrors time's <tt>OwnedFormatItem::Optional</tt>
         # (<tt>src/format_description/owned_format_item.rs:31-35</tt>).
-        class Optional < Data.define(:item)
+        class Optional
           include OwnedFormatItem
-
-          ##
-          # :attr_reader: item
-          # The OwnedFormatItem that may be absent.
         end
 
         # A series of FormatItems where, when parsing, the first successful
         # parse is used. When formatting, the first element is used. An
         # empty Array is a no-op when formatting or parsing.
         #
+        # Its one field is the alternatives, a frozen Array of
+        # OwnedFormatItem, positional as in Rust: #to_a gives it, and so
+        # does the pattern <tt>in First[items]</tt>.
+        #
         # Mirrors time's <tt>OwnedFormatItem::First</tt>
         # (<tt>src/format_description/owned_format_item.rs:36-39</tt>).
-        class First < Data.define(:items)
+        class First
           include OwnedFormatItem
-
-          ##
-          # :attr_reader: items
-          # The alternatives, a frozen Array of OwnedFormatItem.
         end
       end
 

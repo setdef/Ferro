@@ -19,7 +19,7 @@ module Ferro
       def self.iso_week_date: ([Integer, Integer, Integer] parts) -> [Integer, Integer, Weekday]
       def self.description: (FormatDescription::description description) -> native_description
       def self.items_description: (FormatDescription::item | Array[FormatDescription::item] description) -> [Symbol, Object]
-      def self.item_fields: (FormatDescription::item item, Hash[Symbol, Object] fields) -> Hash[Symbol, Object]
+      def self.item_field: (FormatDescription::item item, Object value) -> FormatDescription::item_field
       def self.item_of: (Module family, Object | FormatDescription::item item) -> FormatDescription::item
       def self.items_of: (Module family, Object items) -> Array[FormatDescription::item]
       def self.any_item: (Object item) -> FormatDescription::item

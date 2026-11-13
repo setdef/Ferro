@@ -12,6 +12,10 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** the format items (`BorrowedFormatItem` and `OwnedFormatItem` variants) and the `Component` variants hold their one field by position, as Rust's tuple variants do: `deconstruct` and `to_a` give it, so `in Component::Day[modifier]` reads as Rust's pattern does. They are no longer `Data` classes, so the readers `literal`, `component`, `compound`, `item`, `items`, and `modifier` are gone, with keyword `new`, `to_h`, `with`, and `deconstruct_keys`. Rust's `TryFrom` from an item to a slice or `Vec` is the pattern `in Compound[items]`.
+
 ### Removed
 
 - **Breaking:** time's deprecated items, which ADR 001 leaves unbound: `FormatDescription.parse` (use `parse_borrowed(1, ...)`), `Util.days_in_year_month` (use `days_in_month`), `Convert` (use `Unit`), `FormatDescription::FormatItem` (use `BorrowedFormatItem`), the `Literal` variants of `BorrowedFormatItem` and `OwnedFormatItem` (use `StringLiteral`), the `Month`, `Weekday`, `WeekNumber`, `Hour`, `UnixTimestamp`, and `Year` components, and the modifiers and modifier enums only they used. time's parsers never returned any of them.

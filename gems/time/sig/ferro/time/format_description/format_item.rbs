@@ -5,10 +5,16 @@ module Ferro
   module Time
     module FormatDescription
       type item = BorrowedFormatItem | OwnedFormatItem
+      type item_field = String | Component | item | Array[item]
 
       module Item : Object
-        def initialize: (**Object fields) -> void
+        include TupleVariant[item_field]
+
         def debug: () -> String
+
+        private
+
+        def check: (item_field field) -> item_field
       end
 
       module BorrowedFormatItem : Object
@@ -16,55 +22,28 @@ module Ferro
 
         def self.from: (FormatDescription::Component | Array[BorrowedFormatItem] value) -> (Component | Compound)
 
-        class StringLiteral < Data
+        class StringLiteral
           include BorrowedFormatItem
-
-          attr_reader literal: String
-
-          def self.new: (literal: String) -> instance
-                      | (String literal) -> instance
         end
 
-        class Component < Data
+        class Component
           include BorrowedFormatItem
-
-          attr_reader component: FormatDescription::Component
-
-          def self.new: (component: FormatDescription::Component) -> instance
-                      | (FormatDescription::Component component) -> instance
 
           def ==: (Object other) -> bool
         end
 
-        class Compound < Data
+        class Compound
           include BorrowedFormatItem
-
-          attr_reader compound: Array[BorrowedFormatItem]
-
-          def self.new: (compound: Array[BorrowedFormatItem]) -> instance
-                      | (Array[BorrowedFormatItem] compound) -> instance
 
           def ==: (Object other) -> bool
         end
 
-        class Optional < Data
+        class Optional
           include BorrowedFormatItem
-
-          attr_reader item: BorrowedFormatItem
-
-          def self.new: (item: BorrowedFormatItem) -> instance
-                      | (BorrowedFormatItem item) -> instance
-
         end
 
-        class First < Data
+        class First
           include BorrowedFormatItem
-
-          attr_reader items: Array[BorrowedFormatItem]
-
-          def self.new: (items: Array[BorrowedFormatItem]) -> instance
-                      | (Array[BorrowedFormatItem] items) -> instance
-
         end
       end
 
@@ -73,55 +52,28 @@ module Ferro
 
         def self.from: (FormatDescription::Component | BorrowedFormatItem | Array[BorrowedFormatItem] | Array[OwnedFormatItem] value) -> OwnedFormatItem
 
-        class StringLiteral < Data
+        class StringLiteral
           include OwnedFormatItem
-
-          attr_reader literal: String
-
-          def self.new: (literal: String) -> instance
-                      | (String literal) -> instance
         end
 
-        class Component < Data
+        class Component
           include OwnedFormatItem
-
-          attr_reader component: FormatDescription::Component
-
-          def self.new: (component: FormatDescription::Component) -> instance
-                      | (FormatDescription::Component component) -> instance
 
           def ==: (Object other) -> bool
         end
 
-        class Compound < Data
+        class Compound
           include OwnedFormatItem
-
-          attr_reader compound: Array[OwnedFormatItem]
-
-          def self.new: (compound: Array[OwnedFormatItem]) -> instance
-                      | (Array[OwnedFormatItem] compound) -> instance
 
           def ==: (Object other) -> bool
         end
 
-        class Optional < Data
+        class Optional
           include OwnedFormatItem
-
-          attr_reader item: OwnedFormatItem
-
-          def self.new: (item: OwnedFormatItem) -> instance
-                      | (OwnedFormatItem item) -> instance
-
         end
 
-        class First < Data
+        class First
           include OwnedFormatItem
-
-          attr_reader items: Array[OwnedFormatItem]
-
-          def self.new: (items: Array[OwnedFormatItem]) -> instance
-                      | (Array[OwnedFormatItem] items) -> instance
-
         end
       end
     end

@@ -233,10 +233,14 @@ The API is time's, translated where Rust has no Ruby meaning:
   FormatDescription.parse_borrowed and parse_owned return for versions 1
   and 2, and parse_strftime_borrowed and parse_strftime_owned for
   +strftime+. +format_into+ appends to a String.
-* Format items, components, and modifiers are frozen +Data+ values you
-  can read and build: <tt>Component::Day.new(Modifier::Day.default)</tt>.
-  A modifier comes only from its +default+ (or Modifier::Ignore.count)
-  and its +with_+ builders, as in Rust.
+* Format items and components are tuple variants in Rust, so each is a
+  frozen value holding one field by position:
+  <tt>Component::Day.new(Modifier::Day.default)</tt>, read back with
+  +to_a+ or a pattern, <tt>in Component::Day[modifier]</tt>, as Rust's
+  <tt>Component::Day(modifier)</tt> reads it. No reader names the field,
+  since time names none. Modifiers are frozen +Data+ values with time's
+  field names, and come only from their +default+ (or
+  Modifier::Ignore.count) and their +with_+ builders, as in Rust.
 * A Timestamp counts seconds and nanoseconds from the epoch, with the
   nanoseconds always forward: <tt>Timestamp.new(-1, 500_000_000)</tt> is
   half a second before the epoch. #replace_millisecond,
@@ -316,7 +320,7 @@ Not bound, or bound differently, each for a reason:
   fill of <tt>{:>8}</tt>: SignedDuration#to_s takes Rust's precision,
   <tt>duration.to_s(3)</tt> for <tt>{:.3}</tt>, and nothing else.
 
-Three rulings of ADR 001 are not applied to ferro-time yet, so it differs
+Two rulings of ADR 001 are not applied to ferro-time yet, so it differs
 from the Rust API's shape in these ways (plan 007's follow-up has the
 reasons):
 
@@ -327,13 +331,6 @@ reasons):
   <tt>last</tt>, and <tt>is_sorted</tt> in Rust. Here each runs on a copy
   and leaves the iterator usable, where a consumed one should raise
   +IOError+.
-* The format items and components that are tuple variants in Rust, such
-  as BorrowedFormatItem, OwnedFormatItem, and +Component+, are +Data+
-  classes with named readers (+literal+, +component+, +compound+, +item+,
-  +items+, and each component's modifier) that time does not name, where a
-  later release makes them positional. The error variants that are tuple
-  variants in Rust, such as Error::Format::InvalidComponent, are
-  positional already: they answer +deconstruct+ and +to_a+.
 
 time's +large-dates+ feature is off, as Tauri and its plugins build time,
 so years run from -9999 to 9999. The +serde+, +rand+, +quickcheck+, and

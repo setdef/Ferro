@@ -81,21 +81,79 @@ class TestFormatItems < Minitest::Test
     assert_raises(TypeError) { B::Compound.new([O::StringLiteral.new("x")]) }
     assert_raises(TypeError) { O::Optional.new(B::Component.new(day)) }
     assert_raises(TypeError) { B::First.new(B::StringLiteral.new("x")) }
-    assert_raises(TypeError) { B::Component.new(day).with(component: 1) }
+  end
+
+  # Every item and component variant is a tuple variant in Rust, so its one
+  # field is positional: deconstruct and to_a give it, and no reader names
+  # it (ADR 001, amendment of 2026-11-05; plan 007, Follow-up: the four
+  # rulings).
+  def test_a_variants_field_is_positional
+    day = C::Day.new(M::Day.default)
+    literal = B::StringLiteral.new("-")
+    owned = O::StringLiteral.new("-")
+    [
+      [literal, "-"],
+      [B::Component.new(day), day],
+      [B::Compound.new([literal]), [literal]],
+      [B::Optional.new(literal), literal],
+      [B::First.new([literal]), [literal]],
+      [owned, "-"],
+      [O::Component.new(day), day],
+      [O::Compound.new([]), []],
+      [O::Optional.new(owned), owned],
+      [O::First.new([owned]), [owned]],
+      [day, M::Day.default],
+    ].each do |variant, field|
+      assert_equal [field], variant.deconstruct, variant.class.name
+      assert_equal [field], variant.to_a, variant.class.name
+      %i[literal component compound item items modifier to_h deconstruct_keys with].each do |name|
+        refute_respond_to variant, name, "#{variant.class}##{name}"
+      end
+    end
+  end
+
+  def test_a_variant_takes_its_field_by_position_only
+    assert_raises(TypeError) { B::StringLiteral.new(literal: "-") }
+    assert_raises(TypeError) { C::Day.new(modifier: M::Day.default) }
+    assert_raises(ArgumentError) { C::Day.new }
+    assert_raises(ArgumentError) { O::First.new([], []) }
+  end
+
+  def test_a_pattern_reads_as_rusts_does
+    matched = case FD.parse_owned(2, "[year]-[month]")
+    in O::Compound[[O::Component[C::CalendarYearFullStandardRange[year]], O::StringLiteral["-"], *]] then year
+    end
+    assert_equal M::CalendarYearFullStandardRange.default, matched
+  end
+
+  def test_a_variant_is_a_frozen_value
+    literal = B::StringLiteral.new("-")
+    same = B::StringLiteral.new(+"-")
+    assert_equal literal, same
+    assert literal.eql?(same), "eql?"
+    assert_equal literal.hash, same.hash
+    refute_equal literal, O::StringLiteral.new("-")
+    refute literal.eql?(B::Optional.new(literal)), "another variant"
+    assert_equal 1, { C::Day.new(M::Day.default) => 1 }[C::Day.new(M::Day.default)]
+    [literal.dup, literal.clone, literal.clone(freeze: false)].each do |copy|
+      assert_predicate copy, :frozen?
+      assert_equal literal, copy
+    end
+    assert Ractor.shareable?(B::First.new([B::Compound.new([literal])])), "deeply frozen"
   end
 
   def test_items_hold_frozen_shareable_copies
     text = +"abc"
     literal = B::StringLiteral.new(text)
     text << "d"
-    assert_equal "abc", literal.literal
-    assert_predicate literal.literal, :frozen?
-    assert_equal Encoding::UTF_8, B::StringLiteral.new("abc".b).literal.encoding
+    assert_equal ["abc"], literal.to_a
+    assert_predicate literal.to_a.first, :frozen?
+    assert_equal Encoding::UTF_8, B::StringLiteral.new("abc".b).to_a.first.encoding
     items = [literal]
     compound = B::Compound.new(items)
     items << literal
-    assert_equal 1, compound.compound.length
-    assert_predicate compound.compound, :frozen?
+    assert_equal 1, compound.to_a.first.length
+    assert_predicate compound.to_a.first, :frozen?
     parsed = FD.parse_owned(2, "[optional [[year]-[month]]] [first [a] [[day]]]")
     assert Ractor.shareable?(parsed), "a parsed tree is deeply frozen"
     borrowed = FD.parse_borrowed(2, "[year]-[month]")
@@ -170,7 +228,7 @@ class TestFormatItems < Minitest::Test
     owned = O.from(fd)
     assert_equal "2026-10-31", date.format(owned)
     assert_equal date, T::Date.parse("2026-10-31", owned)
-    assert_equal date, T::Date.parse("2026-10-31", owned.compound)
+    assert_equal date, T::Date.parse("2026-10-31", owned.to_a.first)
     assert_equal "", date.format([])
     assert_raises(TypeError) { date.format([fd.first, owned]) }
     assert_raises(TypeError) { date.format([1]) }

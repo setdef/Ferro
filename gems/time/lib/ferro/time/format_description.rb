@@ -82,7 +82,7 @@ module Ferro
       #   Ferro::Time::Time.from_hms(9, 5, 0).format(description) # => "09:05"
       #
       #   items = Ferro::Time::FormatDescription.parse_borrowed(2, "[day]")
-      #   items.first.component # => Ferro::Time::FormatDescription::Component::Day.new(Ferro::Time::FormatDescription::Modifier::Day.default)
+      #   items.first.to_a # => [Ferro::Time::FormatDescription::Component::Day.new(Ferro::Time::FormatDescription::Modifier::Day.default)]
       def self.parse_borrowed(version, input)
         return Native.format_description_parse(version, false, input) unless [1, 2].include?(version)
 
@@ -146,7 +146,7 @@ module Ferro
       # === Example
       #
       #   item = Ferro::Time::FormatDescription.parse_strftime_owned("%Y")
-      #   item.compound.length # => 1
+      #   item.to_a.first.length # => 1
       def self.parse_strftime_owned(input)
         Arguments.decode_owned(Native.format_description_strftime_item(input))
       end

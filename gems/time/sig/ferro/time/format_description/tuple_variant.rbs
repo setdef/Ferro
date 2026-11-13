@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+module Ferro
+  module Time
+    module FormatDescription
+      module TupleVariant[F]
+        @field: F
+
+        def initialize: (F field) -> void
+        def deconstruct: () -> [F]
+        def to_a: () -> [F]
+        def ==: (Object other) -> bool
+        def eql?: (Object other) -> bool
+        def hash: () -> Integer
+
+        private
+
+        def initialize_copy: (self original) -> void
+      end
+    end
+  end
+end

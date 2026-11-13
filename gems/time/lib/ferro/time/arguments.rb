@@ -146,21 +146,18 @@ module Ferro
           items.map { |item| item_of(family, item) }.freeze
         end
 
-        # The fields a format item's +new+ keeps, each checked as Rust's
-        # type checker would and frozen.
-        def item_fields(item, fields)
-          family = item.is_a?(FormatDescription::BorrowedFormatItem) ? FormatDescription::BorrowedFormatItem : FormatDescription::OwnedFormatItem
-          # @type var checked: Hash[Symbol, Object]
-          checked = {}
-          fields.each do |name, value|
-            checked[name] = _ = case name
-              when :literal then text(value)
-              when :component then component(value)
-              when :item then item_of(family, value)
-              else items_of(family, value)
-            end
+        # The field a format item's +new+ keeps, checked as Rust's type
+        # checker would and frozen.
+        def item_field(item, value)
+          b = FormatDescription::BorrowedFormatItem
+          o = FormatDescription::OwnedFormatItem
+          family = item.is_a?(b) ? b : o
+          case item
+          when b::StringLiteral, o::StringLiteral then text(value)
+          when b::Component, o::Component then component(value)
+          when b::Optional, o::Optional then item_of(family, value)
+          else items_of(family, value)
           end
-          checked
         end
 
         # +item+, refusing anything but a BorrowedFormatItem or an
@@ -249,12 +246,13 @@ module Ferro
         def encode_item(item)
           b = FormatDescription::BorrowedFormatItem
           o = FormatDescription::OwnedFormatItem
+          field = item.deconstruct.first
           case item
-          when b::StringLiteral, o::StringLiteral then [1, item.literal]
-          when b::Component, o::Component then [2, (_ = item.component).__send__(:encode)]
-          when b::Compound, o::Compound then [3, item.compound.map { |inner| encode_item(inner) }]
-          when b::Optional, o::Optional then [4, encode_item(item.item)]
-          else [5, (_ = item).items.map { |inner| encode_item(inner) }]
+          when b::StringLiteral, o::StringLiteral then [1, field]
+          when b::Component, o::Component then [2, (_ = field).__send__(:encode)]
+          when b::Compound, o::Compound then [3, (_ = field).map { |inner| encode_item(inner) }]
+          when b::Optional, o::Optional then [4, encode_item(_ = field)]
+          else [5, (_ = field).map { |inner| encode_item(inner) }]
           end
         end
 
