@@ -22,10 +22,9 @@ module Ferro
       # +inspect+. Private to the gem.
       module Item # :nodoc:
         # Checks each field's type as Rust's type checker would, and keeps
-        # a frozen copy: a binary String for +Literal+, a UTF-8 one for
-        # +StringLiteral+ (raising +EncodingError+ when it is not valid
-        # UTF-8, as Rust's +str+ must be), and frozen Arrays of items of the
-        # same family.
+        # a frozen copy: a UTF-8 String for +StringLiteral+ (raising
+        # +EncodingError+ when it is not valid UTF-8, as Rust's +str+ must
+        # be), and frozen Arrays of items of the same family.
         def initialize(**fields)
           super(**Arguments.item_fields(_ = self, fields))
         end
@@ -57,8 +56,8 @@ module Ferro
       #
       # Mirrors time's <tt>format_description::BorrowedFormatItem</tt>
       # (<tt>src/format_description/borrowed_format_item.rs:12-144</tt>),
-      # plan 009. Its +Literal+ variant, of raw bytes, is deprecated since
-      # time 0.3.48 in favor of StringLiteral, and naming it warns.
+      # plan 009. time's deprecated +Literal+ variant, of raw bytes, is not
+      # bound (ADR 001, amendment of 2026-11-05): use StringLiteral.
       #
       # === Example
       #
@@ -90,35 +89,6 @@ module Ferro
           end
         end
 
-        # Bytes that are formatted as-is.
-        #
-        # These bytes should be UTF-8, but need not be; time passes them
-        # through <tt>String::from_utf8_lossy</tt> when it has to. The
-        # literal is a frozen binary copy of the String given.
-        #
-        # Deprecated since time 0.3.48: use StringLiteral instead; raw
-        # bytes are not recommended. Naming it warns, in the :deprecated
-        # category.
-        #
-        # Mirrors time's <tt>BorrowedFormatItem::Literal</tt>
-        # (<tt>src/format_description/borrowed_format_item.rs:16-24</tt>).
-        class Literal < Data.define(:literal)
-          include BorrowedFormatItem
-
-          ##
-          # :attr_reader: literal
-          # The bytes, a frozen binary String.
-
-          # Whether +other+ is the same item, or a StringLiteral of the same
-          # bytes, as time's +PartialEq+ has it
-          # (<tt>src/format_description/borrowed_format_item.rs:59-78</tt>).
-          #
-          # [other] Object.
-          def ==(other)
-            super || (other.is_a?(BorrowedFormatItem::StringLiteral) && literal.b == other.literal.b)
-          end
-        end
-
         # A string that is formatted as-is.
         #
         # Mirrors time's <tt>BorrowedFormatItem::StringLiteral</tt>
@@ -134,15 +104,6 @@ module Ferro
           ##
           # :attr_reader: literal
           # The text, a frozen UTF-8 String.
-
-          # Whether +other+ is the same item, or a deprecated Literal of the same
-          # bytes, as time's +PartialEq+ has it
-          # (<tt>src/format_description/borrowed_format_item.rs:59-78</tt>).
-          #
-          # [other] Object.
-          def ==(other)
-            super || (other.is_a?(LITERALS.fetch(:Literal)) && literal.b == other.literal.b)
-          end
         end
 
         # A minimal representation of a single non-literal item.
@@ -246,13 +207,6 @@ module Ferro
           # :attr_reader: items
           # The alternatives, a frozen Array of BorrowedFormatItem.
         end
-
-        # The deprecated variant by name, so the gem reaches it without
-        # warning. Private to the gem.
-        LITERALS = { Literal: Literal }.freeze
-        private_constant :LITERALS
-
-        deprecate_constant :Literal
       end
 
       # A complete description of how to format and parse a type, holding
@@ -269,8 +223,8 @@ module Ferro
       #
       # Mirrors time's <tt>format_description::OwnedFormatItem</tt>
       # (<tt>src/format_description/owned_format_item.rs:12-190</tt>),
-      # plan 009. Its +Literal+ variant is deprecated since time 0.3.48 in
-      # favor of StringLiteral, and naming it warns.
+      # plan 009. time's deprecated +Literal+ variant is not bound: use
+      # StringLiteral.
       #
       # === Example
       #
@@ -304,34 +258,6 @@ module Ferro
           end
         end
 
-        # Bytes that are formatted as-is.
-        #
-        # These bytes should be UTF-8, but need not be; time passes them
-        # through <tt>String::from_utf8_lossy</tt> when it has to.
-        #
-        # Deprecated since time 0.3.48: use StringLiteral instead; raw
-        # bytes are not recommended. Naming it warns, in the :deprecated
-        # category.
-        #
-        # Mirrors time's <tt>OwnedFormatItem::Literal</tt>
-        # (<tt>src/format_description/owned_format_item.rs:15-23</tt>).
-        class Literal < Data.define(:literal)
-          include OwnedFormatItem
-
-          ##
-          # :attr_reader: literal
-          # The bytes, a frozen binary String.
-
-          # Whether +other+ is the same item, or a StringLiteral of the same
-          # bytes, as time's +PartialEq+ has it
-          # (<tt>src/format_description/owned_format_item.rs:57-76</tt>).
-          #
-          # [other] Object.
-          def ==(other)
-            super || (other.is_a?(OwnedFormatItem::StringLiteral) && literal.b == other.literal.b)
-          end
-        end
-
         # A string that is formatted as-is.
         #
         # Mirrors time's <tt>OwnedFormatItem::StringLiteral</tt>
@@ -342,15 +268,6 @@ module Ferro
           ##
           # :attr_reader: literal
           # The text, a frozen UTF-8 String.
-
-          # Whether +other+ is the same item, or a deprecated Literal of the same
-          # bytes, as time's +PartialEq+ has it
-          # (<tt>src/format_description/owned_format_item.rs:57-76</tt>).
-          #
-          # [other] Object.
-          def ==(other)
-            super || (other.is_a?(LITERALS.fetch(:Literal)) && literal.b == other.literal.b)
-          end
         end
 
         # A minimal representation of a single non-literal item.
@@ -429,21 +346,7 @@ module Ferro
           # :attr_reader: items
           # The alternatives, a frozen Array of OwnedFormatItem.
         end
-
-        # The deprecated variant by name, so the gem reaches it without
-        # warning. Private to the gem.
-        LITERALS = { Literal: Literal }.freeze
-        private_constant :LITERALS
-
-        deprecate_constant :Literal
       end
-
-      # The old name of BorrowedFormatItem, the same module. Deprecated
-      # since time 0.3.37: use BorrowedFormatItem for clarity. Naming it
-      # warns. Mirrors time's hidden <tt>FormatItem</tt> alias
-      # (<tt>src/format_description/mod.rs:44-47</tt>).
-      FormatItem = BorrowedFormatItem
-      deprecate_constant :FormatItem
 
       #--
       # SPDX-SnippetEnd

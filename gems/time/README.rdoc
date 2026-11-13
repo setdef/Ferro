@@ -236,8 +236,7 @@ The API is time's, translated where Rust has no Ruby meaning:
 * Format items, components, and modifiers are frozen +Data+ values you
   can read and build: <tt>Component::Day.new(Modifier::Day.default)</tt>.
   A modifier comes only from its +default+ (or Modifier::Ignore.count)
-  and its +with_+ builders, as in Rust. Naming a type or variant time
-  deprecates warns in Ruby's +:deprecated+ category.
+  and its +with_+ builders, as in Rust.
 * A Timestamp counts seconds and nanoseconds from the epoch, with the
   nanoseconds always forward: <tt>Timestamp.new(-1, 500_000_000)</tt> is
   half a second before the epoch. #replace_millisecond,
@@ -262,8 +261,7 @@ The API is time's, translated where Rust has no Ruby meaning:
 * The units of time are frozen values: <tt>Unit::Nanosecond.per(Unit::Second)</tt>
   is 1_000_000_000, and <tt>per_t(Float, ...)</tt> takes the output type
   first, Integer or Float. Rust's const +N+ on each unit is 1 here, the
-  only value +per+ exists for. The deprecated +Convert+ is the same
-  module, and naming it warns.
+  only value +per+ exists for.
 * time's macros check their input when Rust compiles; their run-time
   equivalents are bound. <tt>date!(2020-01-02)</tt> is
   <tt>Date.from_calendar_date(2020, Month::January, 2)</tt>; +time!+,
@@ -306,12 +304,19 @@ Not bound, or bound differently, each for a reason:
   SignedDuration in +x+ where Rust's <tt>AddAssign<SignedDuration> for
   std::time::Duration</tt> keeps std's type.
 * +InstantExt+, since no Ruby class stands for std's +Instant+.
-* time's hidden items.
+* time's hidden and deprecated items, which Tauri never calls (ADR 001).
+  Each deprecated one has the replacement time names:
+  <tt>FormatDescription.parse</tt> is <tt>parse_borrowed(1, ...)</tt>,
+  <tt>util::days_in_year_month</tt> is Util.days_in_month, the
+  +convert+ module is Unit, +FormatItem+ is BorrowedFormatItem, a
+  +Literal+ item is a +StringLiteral+, and the six deprecated components
+  and their modifiers are the ones time's parsers return instead, such as
+  Component::Hour24 for <tt>[hour]</tt>.
 * Rust's trait machinery that has no Ruby meaning, such as the width and
   fill of <tt>{:>8}</tt>: SignedDuration#to_s takes Rust's precision,
   <tt>duration.to_s(3)</tt> for <tt>{:.3}</tt>, and nothing else.
 
-Four rulings of ADR 001 are not applied to ferro-time yet, so it differs
+Three rulings of ADR 001 are not applied to ferro-time yet, so it differs
 from the Rust API's shape in these ways (plan 007's follow-up has the
 reasons):
 
@@ -322,12 +327,6 @@ reasons):
   <tt>last</tt>, and <tt>is_sorted</tt> in Rust. Here each runs on a copy
   and leaves the iterator usable, where a consumed one should raise
   +IOError+.
-* time's deprecated items are bound, and warn in Ruby's +:deprecated+
-  category: <tt>FormatDescription.parse</tt>,
-  <tt>Util.days_in_year_month</tt>, <tt>Convert</tt>, <tt>FormatItem</tt>,
-  six deprecated +Component+ variants, the
-  deprecated +Literal+ items, and the deprecated modifier enums. Tauri
-  uses none of them, so a later release removes them.
 * The format items and components that are tuple variants in Rust, such
   as BorrowedFormatItem, OwnedFormatItem, and +Component+, are +Data+
   classes with named readers (+literal+, +component+, +compound+, +item+,

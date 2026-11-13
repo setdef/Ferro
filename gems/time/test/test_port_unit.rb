@@ -15,8 +15,8 @@ require "test_helper"
 #++
 
 # time's own tests in <tt>tests/integration/convert.rs</tt>, ported whole.
-# The file is named for the deprecated +convert+ module and imports
-# +time::unit+.
+# The file is named for the deprecated +convert+ module, which the gem
+# does not bind, and imports +time::unit+.
 class TestPortUnit < Minitest::Test
   include TimeSuite
 

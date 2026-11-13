@@ -42,15 +42,6 @@ class TestPortOffsetDateTime < Minitest::Test
     datetime(year, month, day, hour, minute, second, nanosecond).assume_utc
   end
 
-  # Names a deprecated method quietly, since the tests run under -w.
-  private def quietly
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = false
-    yield
-  ensure
-    Warning[:deprecated] = deprecated
-  end
-
   # <tt>offset_date_time.rs:14</tt>, +new_utc+.
   def test_new_utc
     dt = T::OffsetDateTime.new_utc(date(2023, 12, 18), clock(10, 13, 44, 250_000_000))

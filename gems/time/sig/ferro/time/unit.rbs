@@ -3,8 +3,6 @@
 
 module Ferro
   module Time
-    Convert: singleton(Unit)
-
     module Unit
       type side = [bool, Integer]
 

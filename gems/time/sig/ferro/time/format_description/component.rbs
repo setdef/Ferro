@@ -349,60 +349,6 @@ module Ferro
                       | (Modifier::End modifier) -> instance
         end
 
-        class Month < Data
-          include Component
-
-          attr_reader modifier: Modifier::Month
-
-          def self.new: (modifier: Modifier::Month) -> instance
-                      | (Modifier::Month modifier) -> instance
-        end
-
-        class Weekday < Data
-          include Component
-
-          attr_reader modifier: Modifier::Weekday
-
-          def self.new: (modifier: Modifier::Weekday) -> instance
-                      | (Modifier::Weekday modifier) -> instance
-        end
-
-        class WeekNumber < Data
-          include Component
-
-          attr_reader modifier: Modifier::WeekNumber
-
-          def self.new: (modifier: Modifier::WeekNumber) -> instance
-                      | (Modifier::WeekNumber modifier) -> instance
-        end
-
-        class Hour < Data
-          include Component
-
-          attr_reader modifier: Modifier::Hour
-
-          def self.new: (modifier: Modifier::Hour) -> instance
-                      | (Modifier::Hour modifier) -> instance
-        end
-
-        class UnixTimestamp < Data
-          include Component
-
-          attr_reader modifier: Modifier::UnixTimestamp
-
-          def self.new: (modifier: Modifier::UnixTimestamp) -> instance
-                      | (Modifier::UnixTimestamp modifier) -> instance
-        end
-
-        class Year < Data
-          include Component
-
-          attr_reader modifier: Modifier::Year
-
-          def self.new: (modifier: Modifier::Year) -> instance
-                      | (Modifier::Year modifier) -> instance
-        end
-
         CLASSES: Hash[Symbol, Class]
       end
     end

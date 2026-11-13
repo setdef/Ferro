@@ -10,7 +10,6 @@ module Ferro
 
       def self.parse_borrowed: (Integer version, String input) -> (FormatDescriptionV3 | Array[BorrowedFormatItem])
       def self.parse_owned: (Integer version, String input) -> (FormatDescriptionV3 | OwnedFormatItem)
-      def self.parse: (String input) -> (FormatDescriptionV3 | Array[BorrowedFormatItem])
       def self.parse_strftime_borrowed: (String input) -> Array[BorrowedFormatItem]
       def self.parse_strftime_owned: (String input) -> OwnedFormatItem
     end

@@ -154,7 +154,7 @@ module Ferro
           checked = {}
           fields.each do |name, value|
             checked[name] = _ = case name
-              when :literal then item.is_a?(family.const_get(:LITERALS).fetch(:Literal)) ? bytes(value) : text(value)
+              when :literal then text(value)
               when :component then component(value)
               when :item then item_of(family, value)
               else items_of(family, value)
@@ -232,13 +232,6 @@ module Ferro
           _ = component
         end
 
-        # A frozen binary copy of the bytes of +string+.
-        def bytes(string)
-          raise TypeError, "no implicit conversion of #{string.class} into String" unless string.is_a?(String)
-
-          string.b.freeze
-        end
-
         # A frozen UTF-8 copy of +string+, refusing one that is not valid
         # UTF-8 as Rust's +str+ would.
         def text(string)
@@ -251,7 +244,8 @@ module Ferro
         end
 
         # The native form of a format item: its variant's place in time's
-        # enum and its contents.
+        # enum (+StringLiteral+ is 1, since time's deprecated +Literal+, which
+        # the gem does not bind, is 0) and its contents.
         def encode_item(item)
           b = FormatDescription::BorrowedFormatItem
           o = FormatDescription::OwnedFormatItem
@@ -260,8 +254,7 @@ module Ferro
           when b::Component, o::Component then [2, (_ = item.component).__send__(:encode)]
           when b::Compound, o::Compound then [3, item.compound.map { |inner| encode_item(inner) }]
           when b::Optional, o::Optional then [4, encode_item(item.item)]
-          when b::First, o::First then [5, item.items.map { |inner| encode_item(inner) }]
-          else [0, (_ = item).literal]
+          else [5, (_ = item).items.map { |inner| encode_item(inner) }]
           end
         end
 
@@ -272,7 +265,6 @@ module Ferro
 
           tag, value = encoded
           case tag
-          when 0 then b.const_get(:LITERALS).fetch(:Literal).new(value)
           when 1 then b::StringLiteral.new(value)
           when 2 then b::Component.new(decode_component(value))
           when 3 then b::Compound.new(value.map { |inner| decode_borrowed(inner) })
@@ -288,7 +280,6 @@ module Ferro
 
           tag, value = encoded
           case tag
-          when 0 then o.const_get(:LITERALS).fetch(:Literal).new(value)
           when 1 then o::StringLiteral.new(value)
           when 2 then o::Component.new(decode_component(value))
           when 3 then o::Compound.new(value.map { |inner| decode_owned(inner) })

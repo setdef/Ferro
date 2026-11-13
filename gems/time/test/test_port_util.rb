@@ -37,17 +37,12 @@ class TestPortUtil < Minitest::Test
     nil
   end
 
-  # Names a deprecated method quietly, since the tests run under -w.
-  private def quietly
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = false
-    yield
-  ensure
-    Warning[:deprecated] = deprecated
-  end
-
-  # <tt>util.rs:30</tt>, +days_in_year_month+.
-  def test_days_in_year_month
+  # The cases of <tt>util.rs:30</tt>, +days_in_year_month+, through
+  # +days_in_month+, which that deprecated function calls
+  # (<tt>src/util.rs:52-54</tt>). The function itself is not bound (ADR
+  # 001, amendment of 2026-11-05), and time has no test of its own for
+  # +days_in_month+.
+  def test_days_in_month
     [
       [2019, Month::January, 31],
       [2019, Month::February, 28],
@@ -74,7 +69,6 @@ class TestPortUtil < Minitest::Test
       [2020, Month::November, 30],
       [2020, Month::December, 31],
     ].each do |year, month, expected|
-      assert_case expected, quietly { T::Util.days_in_year_month(year, month) }
       assert_case expected, T::Util.days_in_month(month, year)
     end
   end

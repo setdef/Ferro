@@ -37,15 +37,6 @@ class TestPortUtcOffset < Minitest::Test
     nil
   end
 
-  # Names a deprecated method quietly, since the tests run under -w.
-  private def quietly
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = false
-    yield
-  ensure
-    Warning[:deprecated] = deprecated
-  end
-
   # <tt>utc_offset.rs:8</tt>, +utc_is_zero+.
   def test_utc_is_zero
     assert_equal offset(0), T::UtcOffset::UTC

@@ -269,15 +269,6 @@ module Ferro
       end
     end
 
-    # The units of time under their name before time 0.3.48.
-    #
-    # Deprecated: import from Unit instead. It is the same module, and
-    # naming it warns, in the :deprecated category, as rustc warns where
-    # Rust code names it. Mirrors time's deprecated +convert+ module
-    # (<tt>src/lib.rs:93-97</tt>).
-    Convert = Unit
-    deprecate_constant :Convert
-
     #--
     # SPDX-SnippetEnd
     #++

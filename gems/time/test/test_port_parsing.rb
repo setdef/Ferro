@@ -55,15 +55,6 @@ class TestPortParsing < Minitest::Test
     end
   end
 
-  # Names a deprecated method quietly, since the tests run under -w.
-  private def quietly
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = false
-    yield
-  ensure
-    Warning[:deprecated] = deprecated
-  end
-
   # <tt>parsing.rs:30</tt>, +rfc_2822_odt+.
   def test_rfc_2822_odt
     [

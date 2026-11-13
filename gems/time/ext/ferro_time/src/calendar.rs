@@ -113,12 +113,6 @@ fn util_days_in_month(ruby: &Ruby, number: u8, year: i32) -> Result<u8, Error> {
     guarded(ruby, || Ok(util::days_in_month(month(number)?, year)))
 }
 
-/// The deprecated `util::days_in_year_month` (`src/util.rs:41-56`).
-#[allow(deprecated)]
-fn util_days_in_year_month(ruby: &Ruby, year: i32, number: u8) -> Result<u8, Error> {
-    guarded(ruby, || Ok(util::days_in_year_month(year, month(number)?)))
-}
-
 /// `util::refresh_tz` (`src/util.rs:126-133`): `Some(())` is `true`
 /// (plan 007, decision 13).
 fn util_refresh_tz(ruby: &Ruby) -> Result<Option<bool>, Error> {
@@ -146,10 +140,6 @@ pub fn define(native: RModule) -> Result<(), Error> {
     native.define_singleton_method("util_days_in_year", function!(util_days_in_year, 1))?;
     native.define_singleton_method("util_weeks_in_year", function!(util_weeks_in_year, 1))?;
     native.define_singleton_method("util_days_in_month", function!(util_days_in_month, 2))?;
-    native.define_singleton_method(
-        "util_days_in_year_month",
-        function!(util_days_in_year_month, 2),
-    )?;
     native.define_singleton_method("util_refresh_tz", function!(util_refresh_tz, 0))?;
     Ok(())
 }

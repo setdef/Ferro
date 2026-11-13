@@ -111,22 +111,6 @@ module Ferro
         Arguments.decode_owned(Native.format_description_item(version, input))
       end
 
-      # Parses a version 1 format description from +input+, as
-      # <tt>parse_borrowed(1, input)</tt> does.
-      #
-      # Deprecated since time 0.3.48: use parse_borrowed with the version
-      # for clarity. It warns in Ruby's +:deprecated+ category, which Ruby
-      # shows when <tt>Warning[:deprecated]</tt> is on. Mirrors time's
-      # <tt>format_description::parse</tt>
-      # (<tt>src/format_description/parse/mod.rs:96-117</tt>).
-      #
-      # [input] String, the description.
-      def self.parse(input)
-        warn("Ferro::Time::FormatDescription.parse is deprecated since time 0.3.48; use parse_borrowed with the version",
-          category: :deprecated, uplevel: 1)
-        parse_borrowed(1, input)
-      end
-
       # Parses a +strftime+ description from +input+ into an Array of
       # BorrowedFormatItem, raising an Error::InvalidFormatDescription
       # variant when it is not valid.

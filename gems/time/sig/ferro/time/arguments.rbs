@@ -30,7 +30,6 @@ module Ferro
       def self.encode_field: (FormatDescription::Modifier::field value) -> (Integer | bool)
       def self.component_modifier: (Module component_class, Object modifier) -> void
       def self.component: (Object | FormatDescription::Component component) -> FormatDescription::Component
-      def self.bytes: (Object string) -> String
       def self.text: (Object string) -> String
       def self.encode_item: (FormatDescription::item item) -> encoded_item
       def self.decode_borrowed: (Object encoded) -> FormatDescription::BorrowedFormatItem

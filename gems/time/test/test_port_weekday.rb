@@ -37,15 +37,6 @@ class TestPortWeekday < Minitest::Test
     nil
   end
 
-  # Names a deprecated method quietly, since the tests run under -w.
-  private def quietly
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = false
-    yield
-  ensure
-    Warning[:deprecated] = deprecated
-  end
-
   # <tt>weekday.rs:12</tt>, +previous+.
   def test_previous
     [

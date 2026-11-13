@@ -8,7 +8,8 @@
 require "test_helper"
 
 # The Ruby side of the format-item tree (plan 009): what Rust's type
-# checker and visibility give a Rust caller, deprecations, the conversions
+# checker and visibility give a Rust caller, the deprecated items left
+# unbound, the conversions
 # time's tests leave out, and the nesting limit.
 class TestFormatItems < Minitest::Test
   include TimeSuite
@@ -18,25 +19,6 @@ class TestFormatItems < Minitest::Test
   C = FD::Component
   B = FD::BorrowedFormatItem
   O = FD::OwnedFormatItem
-
-  # The warnings +block+ prints with Ruby's deprecation warnings on.
-  private def deprecation_warnings(&)
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = true
-    _, err = capture_io(&)
-    err
-  ensure
-    Warning[:deprecated] = deprecated
-  end
-
-  # The block's value, with Ruby's deprecation warnings off.
-  private def quietly
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = false
-    yield
-  ensure
-    Warning[:deprecated] = deprecated
-  end
 
   def test_modifiers_are_built_only_from_their_defaults
     assert_raises(NoMethodError) { M::Day.new(padding: M::Padding::Zero) }
@@ -54,7 +36,6 @@ class TestFormatItems < Minitest::Test
     assert_same M::TrailingInput::Prohibit, M::TrailingInput.default
     assert_equal "None", M::Padding::None.debug
     assert_equal "OneOrMore", M::SubsecondDigits::OneOrMore.debug
-    assert_equal "Extended", quietly { M::YearRange::Extended.debug }
   end
 
   # TrailingInput alone of the modifier enums is exhaustive, so Rust may
@@ -122,63 +103,43 @@ class TestFormatItems < Minitest::Test
     assert(borrowed.all? { |item| Ractor.shareable?(item) })
   end
 
-  def test_deprecated_types_warn_where_they_are_named
-    assert_match(/constant Ferro::Time::FormatDescription::Modifier::Month is deprecated/, deprecation_warnings { M::Month })
-    assert_match(/Modifier::YearRepr is deprecated/, deprecation_warnings { M::YearRepr })
-    assert_match(/Component::Hour is deprecated/, deprecation_warnings { C::Hour })
-    assert_match(/BorrowedFormatItem::Literal is deprecated/, deprecation_warnings { B::Literal })
-    assert_match(/OwnedFormatItem::Literal is deprecated/, deprecation_warnings { O::Literal })
-    assert_match(/FormatDescription::FormatItem is deprecated/, deprecation_warnings { FD::FormatItem })
-    assert_match(/FormatDescription.parse is deprecated since time 0.3.48/, deprecation_warnings { FD.parse("[day]") })
-    assert_empty deprecation_warnings { M::Day.default.with_padding(M::Padding::Space) }
-    assert_empty deprecation_warnings { FD.parse_owned(1, "[year] [month repr:short]").debug }
-  end
-
-  def test_the_deprecated_parse_is_version_1
-    assert_equal FD.parse_borrowed(1, "[[[day]"), quietly { FD.parse("[[[day]") }
-  end
-
-  def test_deprecated_components_format_as_time_converts_them
-    date = T::Date.from_calendar_date(2021, Month::February, 3)
-    quietly do
-      month = C::Month.new(M::Month.default.with_repr(M::MonthRepr::Long))
-      assert_equal "February", date.format(B::Component.new(month))
-      year = C::Year.new(M::Year.default.with_repr(M::YearRepr::LastTwo).with_iso_week_based(true))
-      assert_equal "21", date.format(O::Component.new(year))
-      weekday = C::Weekday.new(M::Weekday.default.with_repr(M::WeekdayRepr::Monday).with_one_indexed(false))
-      assert_equal "2", date.format(B::Component.new(weekday))
-      hour = C::Hour.new(M::Hour.default.with_is_12_hour_clock(true).with_padding(M::Padding::None))
-      assert_equal "1", T::Time.from_hms(13, 0, 0).format(B::Component.new(hour))
-      stamp = C::UnixTimestamp.new(M::UnixTimestamp.default.with_precision(M::UnixTimestampPrecision::Millisecond))
-      assert_equal "1000", T::OffsetDateTime::UNIX_EPOCH.replace_second(1).format(B::Component.new(stamp))
-      week = C::WeekNumber.new(M::WeekNumber.default.with_repr(M::WeekNumberRepr::Sunday))
-      assert_equal "05", date.format(B::Component.new(week))
-      assert_equal "Year(Year { padding: Zero, repr: LastTwo, range: Extended, iso_week_based: true, sign_is_mandatory: false })",
-        year.debug
+  # time's deprecated items are no part of the gem's API (ADR 001,
+  # amendment of 2026-11-05), so none is bound (plan 007, Follow-up: the
+  # four rulings).
+  def test_times_deprecated_items_are_unbound
+    refute_respond_to FD, :parse
+    refute_respond_to T::Util, :days_in_year_month
+    refute T.const_defined?(:Convert, false), "Convert"
+    refute FD.const_defined?(:FormatItem, false), "FormatItem"
+    refute B.const_defined?(:Literal, false), "BorrowedFormatItem::Literal"
+    refute O.const_defined?(:Literal, false), "OwnedFormatItem::Literal"
+    %i[Month Weekday WeekNumber Hour UnixTimestamp Year].each do |name|
+      refute C.const_defined?(name, false), "Component::#{name}"
+    end
+    modifiers = %i[MonthRepr Month WeekdayRepr Weekday WeekNumberRepr WeekNumber YearRepr YearRange Year Hour]
+    (modifiers + %i[UnixTimestampPrecision UnixTimestamp]).each do |name|
+      refute M.const_defined?(name, false), "Modifier::#{name}"
     end
   end
 
-  def test_a_literal_of_bytes_equals_the_text_of_the_same_bytes
-    quietly do
-      assert_equal B::StringLiteral.new("ab"), B::Literal.new("ab")
-      assert_equal B::Literal.new("ab"), B::StringLiteral.new("ab")
-      assert_equal O::Literal.new("é"), O::StringLiteral.new("é")
-      refute_equal B::Literal.new("ab"), O::StringLiteral.new("ab")
-      refute B::Literal.new("ab").eql?(B::StringLiteral.new("ab")), "eql? stays strict"
-      assert_equal Encoding::BINARY, B::Literal.new("ab").literal.encoding
+  # time's parsers lower the old component names to the new components
+  # (format_description/parse/format_item.rs:326-604) and make
+  # StringLiteral, never Literal, so nothing the gem returns needs a
+  # deprecated item.
+  def test_times_parsers_return_no_deprecated_item
+    description = "[hour] [hour repr:12] [month] [month repr:long] [weekday] [week_number] [year] " \
+      "[year repr:last_two] [unix_timestamp precision:millisecond]"
+    [1, 2].each do |version|
+      assert_equal "[Hour24(Hour24 { padding: Zero }),  , Hour12(Hour12 { padding: Zero }),  , " \
+        "MonthNumerical(MonthNumerical { padding: Zero }),  , MonthLong(MonthLong { case_sensitive: true }),  , " \
+        "WeekdayLong(WeekdayLong { case_sensitive: true }),  , WeekNumberIso(WeekNumberIso { padding: Zero }),  , " \
+        "CalendarYearFullStandardRange(CalendarYearFullStandardRange { padding: Zero, sign_is_mandatory: false }),  , " \
+        "CalendarYearLastTwo(CalendarYearLastTwo { padding: Zero }),  , " \
+        "UnixTimestampMillisecond(UnixTimestampMillisecond { sign_is_mandatory: false })]",
+        FD.parse_owned(version, description).debug, "version #{version}"
     end
-  end
-
-  def test_a_literal_that_is_not_utf8_formats_as_time_replaces_it
-    quietly do
-      literal = O::Literal.new("a\xFFb".b)
-      assert_equal "a\u{FFFD}b", T::Date::MIN.format(literal)
-      assert_equal "a\u{FFFD}b", literal.debug
-      out = +""
-      T::Date::MIN.format_into(out, literal)
-      assert_equal "a\xFFb".b, out.b
-      assert_equal O::Literal.new("a\xFFb".b), O.from(B::Literal.new("a\xFFb".b))
-    end
+    assert_equal [B::StringLiteral] * 2, FD.parse_borrowed(1, "a[day]b").values_at(0, 2).map(&:class)
+    assert_equal [B::StringLiteral] * 2, FD.parse_strftime_borrowed("a%db").values_at(0, 2).map(&:class)
   end
 
   def test_borrowed_and_owned_items_never_compare_equal

@@ -8,7 +8,6 @@ module Ferro
       def self.days_in_year: (Integer year) -> Integer
       def self.weeks_in_year: (Integer year) -> Integer
       def self.days_in_month: (Month month, Integer year) -> Integer
-      def self.days_in_year_month: (Integer year, Month month) -> Integer
       def self.refresh_tz: () -> true?
     end
   end

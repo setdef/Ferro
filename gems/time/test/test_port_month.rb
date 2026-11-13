@@ -37,15 +37,6 @@ class TestPortMonth < Minitest::Test
     nil
   end
 
-  # Names a deprecated method quietly, since the tests run under -w.
-  private def quietly
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = false
-    yield
-  ensure
-    Warning[:deprecated] = deprecated
-  end
-
   # <tt>month.rs:17</tt>, +previous+.
   def test_previous
     [

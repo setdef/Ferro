@@ -10,7 +10,7 @@ require "test_helper"
 # The Ruby side of time's units (plan 010, batch 2): every +per+ and
 # +per_t+ against time-core's documented values, the refusals Rust's
 # compiler stands for, ordering across units and Unit's variants, and the
-# deprecated Convert.
+# deprecated Convert left unbound.
 class TestUnit < Minitest::Test
   include TimeSuite
 
@@ -149,12 +149,9 @@ class TestUnit < Minitest::Test
     assert_raises(NoMethodError) { U::Second.class.allocate }
   end
 
-  def test_convert_is_unit_and_warns
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = true
-    _, err = capture_io { assert_same U, Ferro::Time::Convert }
-    assert_match(/Ferro::Time::Convert is deprecated/, err)
-  ensure
-    Warning[:deprecated] = deprecated
+  # time's deprecated +convert+ module is not bound (ADR 001, amendment of
+  # 2026-11-05); Unit is its name.
+  def test_the_deprecated_convert_is_unbound
+    refute Ferro::Time.const_defined?(:Convert, false)
   end
 end

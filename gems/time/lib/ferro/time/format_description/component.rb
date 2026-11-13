@@ -31,9 +31,9 @@ module Ferro
       # modifier, and also the BorrowedFormatItem::Component or
       # OwnedFormatItem::Component that holds it, as time's
       # <tt>PartialEq<Component></tt> impls have it. The six components
-      # time deprecated in 0.3.48 (Month, Weekday, WeekNumber, Hour,
-      # UnixTimestamp, Year) still format and parse, as time keeps them
-      # working, and naming one warns.
+      # time deprecated in 0.3.48 (+Month+, +Weekday+, +WeekNumber+,
+      # +Hour+, +UnixTimestamp+, +Year+) are not bound (ADR 001, amendment
+      # of 2026-11-05); time's parsers never return one.
       #
       # Mirrors time's <tt>format_description::Component</tt>
       # (<tt>src/format_description/component.rs:9-124</tt>), plan 009.
@@ -559,111 +559,9 @@ module Ferro
           # The Modifier::End that says how to format and parse it.
         end
 
-        # Month of the year.
-        #
-        # Deprecated since time 0.3.48: use +MonthShort+, +MonthLong+, or
-        # +MonthNumeric+ instead. Naming it warns, in the :deprecated
-        # category, as rustc warns where Rust code names it.
-        #
-        # Mirrors time's <tt>Component::Month</tt>
-        # (<tt>src/format_description/component.rs:90-95</tt>).
-        class Month < Data.define(:modifier)
-          include Component
-
-          ##
-          # :attr_reader: modifier
-          # The Modifier::Month that says how to format and parse it.
-        end
-
-        # Day of the week.
-        #
-        # Deprecated since time 0.3.48: use +WeekdayShort+, +WeekdayLong+,
-        # or +WeekdaySunday+, or +WeekdayMonday+ instead. Naming it warns,
-        # in the :deprecated category, as rustc warns where Rust code names
-        # it.
-        #
-        # Mirrors time's <tt>Component::Weekday</tt>
-        # (<tt>src/format_description/component.rs:96-101</tt>).
-        class Weekday < Data.define(:modifier)
-          include Component
-
-          ##
-          # :attr_reader: modifier
-          # The Modifier::Weekday that says how to format and parse it.
-        end
-
-        # Week within the year.
-        #
-        # Deprecated since time 0.3.48: use +WeekNumberIso+,
-        # +WeekNumberSunday+, or +WeekNumberMonday+ instead. Naming it
-        # warns, in the :deprecated category, as rustc warns where Rust code
-        # names it.
-        #
-        # Mirrors time's <tt>Component::WeekNumber</tt>
-        # (<tt>src/format_description/component.rs:102-107</tt>).
-        class WeekNumber < Data.define(:modifier)
-          include Component
-
-          ##
-          # :attr_reader: modifier
-          # The Modifier::WeekNumber that says how to format and parse it.
-        end
-
-        # Hour of the day.
-        #
-        # Deprecated since time 0.3.48: use +Hour12+ or +Hour24+ instead.
-        # Naming it warns, in the :deprecated category, as rustc warns where
-        # Rust code names it.
-        #
-        # Mirrors time's <tt>Component::Hour</tt>
-        # (<tt>src/format_description/component.rs:108-110</tt>).
-        class Hour < Data.define(:modifier)
-          include Component
-
-          ##
-          # :attr_reader: modifier
-          # The Modifier::Hour that says how to format and parse it.
-        end
-
-        # A Unix timestamp.
-        #
-        # Deprecated since time 0.3.48: use +UnixTimestampSeconds+,
-        # +UnixTimestampMilliseconds+, +UnixTimestampMicroseconds+, or
-        # +UnixTimestampNanoseconds+ instead. Naming it warns, in the
-        # :deprecated category, as rustc warns where Rust code names it.
-        #
-        # Mirrors time's <tt>Component::UnixTimestamp</tt>
-        # (<tt>src/format_description/component.rs:111-117</tt>).
-        class UnixTimestamp < Data.define(:modifier)
-          include Component
-
-          ##
-          # :attr_reader: modifier
-          # The Modifier::UnixTimestamp that says how to format and parse it.
-        end
-
-        # Year of the date.
-        #
-        # Deprecated since time 0.3.48: use one of the various
-        # <tt>Year*</tt> components instead. Naming it warns, in the
-        # :deprecated category, as rustc warns where Rust code names it.
-        #
-        # Mirrors time's <tt>Component::Year</tt>
-        # (<tt>src/format_description/component.rs:118-123</tt>).
-        class Year < Data.define(:modifier)
-          include Component
-
-          ##
-          # :attr_reader: modifier
-          # The Modifier::Year that says how to format and parse it.
-        end
-
-        # Every variant by name, deprecated ones included, so the gem reaches
-        # them without warning. Private to the gem.
-        CLASSES = { Day: Day, MonthShort: MonthShort, MonthLong: MonthLong, MonthNumerical: MonthNumerical, Ordinal: Ordinal, WeekdayShort: WeekdayShort, WeekdayLong: WeekdayLong, WeekdaySunday: WeekdaySunday, WeekdayMonday: WeekdayMonday, WeekNumberIso: WeekNumberIso, WeekNumberSunday: WeekNumberSunday, WeekNumberMonday: WeekNumberMonday, CalendarYearFullExtendedRange: CalendarYearFullExtendedRange, CalendarYearFullStandardRange: CalendarYearFullStandardRange, IsoYearFullExtendedRange: IsoYearFullExtendedRange, IsoYearFullStandardRange: IsoYearFullStandardRange, CalendarYearCenturyExtendedRange: CalendarYearCenturyExtendedRange, CalendarYearCenturyStandardRange: CalendarYearCenturyStandardRange, IsoYearCenturyExtendedRange: IsoYearCenturyExtendedRange, IsoYearCenturyStandardRange: IsoYearCenturyStandardRange, CalendarYearLastTwo: CalendarYearLastTwo, IsoYearLastTwo: IsoYearLastTwo, Hour12: Hour12, Hour24: Hour24, Minute: Minute, Period: Period, Second: Second, Subsecond: Subsecond, OffsetHour: OffsetHour, OffsetMinute: OffsetMinute, OffsetSecond: OffsetSecond, Ignore: Ignore, UnixTimestampSecond: UnixTimestampSecond, UnixTimestampMillisecond: UnixTimestampMillisecond, UnixTimestampMicrosecond: UnixTimestampMicrosecond, UnixTimestampNanosecond: UnixTimestampNanosecond, End: End, Month: Month, Weekday: Weekday, WeekNumber: WeekNumber, Hour: Hour, UnixTimestamp: UnixTimestamp, Year: Year }.freeze
+        # Every variant by name, for the native encoding. Private to the gem.
+        CLASSES = { Day: Day, MonthShort: MonthShort, MonthLong: MonthLong, MonthNumerical: MonthNumerical, Ordinal: Ordinal, WeekdayShort: WeekdayShort, WeekdayLong: WeekdayLong, WeekdaySunday: WeekdaySunday, WeekdayMonday: WeekdayMonday, WeekNumberIso: WeekNumberIso, WeekNumberSunday: WeekNumberSunday, WeekNumberMonday: WeekNumberMonday, CalendarYearFullExtendedRange: CalendarYearFullExtendedRange, CalendarYearFullStandardRange: CalendarYearFullStandardRange, IsoYearFullExtendedRange: IsoYearFullExtendedRange, IsoYearFullStandardRange: IsoYearFullStandardRange, CalendarYearCenturyExtendedRange: CalendarYearCenturyExtendedRange, CalendarYearCenturyStandardRange: CalendarYearCenturyStandardRange, IsoYearCenturyExtendedRange: IsoYearCenturyExtendedRange, IsoYearCenturyStandardRange: IsoYearCenturyStandardRange, CalendarYearLastTwo: CalendarYearLastTwo, IsoYearLastTwo: IsoYearLastTwo, Hour12: Hour12, Hour24: Hour24, Minute: Minute, Period: Period, Second: Second, Subsecond: Subsecond, OffsetHour: OffsetHour, OffsetMinute: OffsetMinute, OffsetSecond: OffsetSecond, Ignore: Ignore, UnixTimestampSecond: UnixTimestampSecond, UnixTimestampMillisecond: UnixTimestampMillisecond, UnixTimestampMicrosecond: UnixTimestampMicrosecond, UnixTimestampNanosecond: UnixTimestampNanosecond, End: End }.freeze
         private_constant :CLASSES
-
-        deprecate_constant :Month, :Weekday, :WeekNumber, :Hour, :UnixTimestamp, :Year
       end
 
       #--

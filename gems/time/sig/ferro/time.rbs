@@ -69,7 +69,6 @@ module Ferro
       def self.util_days_in_year: (Integer year) -> Integer
       def self.util_weeks_in_year: (Integer year) -> Integer
       def self.util_days_in_month: (Integer month, Integer year) -> Integer
-      def self.util_days_in_year_month: (Integer year, Integer month) -> Integer
       def self.util_refresh_tz: () -> true?
 
       def self.duration_constant: (Symbol name) -> SignedDuration

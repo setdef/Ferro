@@ -37,15 +37,6 @@ class TestPortPlainDateTime < Minitest::Test
     nil
   end
 
-  # Names a deprecated method quietly, since the tests run under -w.
-  private def quietly
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = false
-    yield
-  ensure
-    Warning[:deprecated] = deprecated
-  end
-
   # <tt>plain_date_time.rs:10</tt>, +new+.
   def test_new
     [

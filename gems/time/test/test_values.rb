@@ -199,16 +199,4 @@ class TestValues < Minitest::Test
 ]
     assert_equal 29, Month::February.length(2024)
   end
-
-  # time deprecates util::days_in_year_month since 0.3.37; Ruby warns in
-  # the :deprecated category (plan 007, row 70).
-  def test_the_deprecated_util_function_warns
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = true
-    assert_output(nil, /days_in_year_month is deprecated since time 0\.3\.37; use days_in_month/) do
-      assert_equal 29, T::Util.days_in_year_month(2020, Month::February)
-    end
-  ensure
-    Warning[:deprecated] = deprecated
-  end
 end

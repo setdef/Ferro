@@ -32,56 +32,6 @@ module Ferro
         end
 
 
-        class MonthRepr < Enum
-          Numerical: MonthRepr
-          Long: MonthRepr
-          Short: MonthRepr
-
-          ALL: Array[MonthRepr]
-
-          def self.default: () -> MonthRepr
-        end
-
-        class WeekdayRepr < Enum
-          Short: WeekdayRepr
-          Long: WeekdayRepr
-          Sunday: WeekdayRepr
-          Monday: WeekdayRepr
-
-          ALL: Array[WeekdayRepr]
-
-          def self.default: () -> WeekdayRepr
-        end
-
-        class WeekNumberRepr < Enum
-          Iso: WeekNumberRepr
-          Sunday: WeekNumberRepr
-          Monday: WeekNumberRepr
-
-          ALL: Array[WeekNumberRepr]
-
-          def self.default: () -> WeekNumberRepr
-        end
-
-        class YearRepr < Enum
-          Full: YearRepr
-          Century: YearRepr
-          LastTwo: YearRepr
-
-          ALL: Array[YearRepr]
-
-          def self.default: () -> YearRepr
-        end
-
-        class YearRange < Enum
-          Standard: YearRange
-          Extended: YearRange
-
-          ALL: Array[YearRange]
-
-          def self.default: () -> YearRange
-        end
-
         class SubsecondDigits < Enum
           One: SubsecondDigits
           Two: SubsecondDigits
@@ -107,17 +57,6 @@ module Ferro
           ALL: Array[Padding]
 
           def self.default: () -> Padding
-        end
-
-        class UnixTimestampPrecision < Enum
-          Second: UnixTimestampPrecision
-          Millisecond: UnixTimestampPrecision
-          Microsecond: UnixTimestampPrecision
-          Nanosecond: UnixTimestampPrecision
-
-          ALL: Array[UnixTimestampPrecision]
-
-          def self.default: () -> UnixTimestampPrecision
         end
 
         class TrailingInput < Enum
@@ -195,25 +134,6 @@ module Ferro
           private
 
           attr_reader padding: Padding
-        end
-
-        class Month < Data
-          include Value
-
-          KINDS: Hash[Symbol, kind]
-          DEFAULT: Month
-
-          attr_reader padding: Padding
-          attr_reader repr: MonthRepr
-          attr_reader case_sensitive: bool
-
-          private def self.new: (padding: Padding, repr: MonthRepr, case_sensitive: bool) -> instance
-                              | (Padding padding, MonthRepr repr, bool case_sensitive) -> instance
-
-          def self.default: () -> Month
-          def with_padding: (Padding padding) -> Month
-          def with_repr: (MonthRepr repr) -> Month
-          def with_case_sensitive: (bool case_sensitive) -> Month
         end
 
         class Ordinal < Data
@@ -299,25 +219,6 @@ module Ferro
           attr_reader one_indexed: bool
         end
 
-        class Weekday < Data
-          include Value
-
-          KINDS: Hash[Symbol, kind]
-          DEFAULT: Weekday
-
-          attr_reader repr: WeekdayRepr
-          attr_reader one_indexed: bool
-          attr_reader case_sensitive: bool
-
-          private def self.new: (repr: WeekdayRepr, one_indexed: bool, case_sensitive: bool) -> instance
-                              | (WeekdayRepr repr, bool one_indexed, bool case_sensitive) -> instance
-
-          def self.default: () -> Weekday
-          def with_repr: (WeekdayRepr repr) -> Weekday
-          def with_one_indexed: (bool one_indexed) -> Weekday
-          def with_case_sensitive: (bool case_sensitive) -> Weekday
-        end
-
         class WeekNumberIso < Data
           include Value
 
@@ -361,23 +262,6 @@ module Ferro
 
           def self.default: () -> WeekNumberMonday
           def with_padding: (Padding padding) -> WeekNumberMonday
-        end
-
-        class WeekNumber < Data
-          include Value
-
-          KINDS: Hash[Symbol, kind]
-          DEFAULT: WeekNumber
-
-          attr_reader padding: Padding
-          attr_reader repr: WeekNumberRepr
-
-          private def self.new: (padding: Padding, repr: WeekNumberRepr) -> instance
-                              | (Padding padding, WeekNumberRepr repr) -> instance
-
-          def self.default: () -> WeekNumber
-          def with_padding: (Padding padding) -> WeekNumber
-          def with_repr: (WeekNumberRepr repr) -> WeekNumber
         end
 
         class CalendarYearFullExtendedRange < Data
@@ -566,29 +450,6 @@ module Ferro
           attr_reader padding: Padding
         end
 
-        class Year < Data
-          include Value
-
-          KINDS: Hash[Symbol, kind]
-          DEFAULT: Year
-
-          attr_reader padding: Padding
-          attr_reader repr: YearRepr
-          attr_reader range: YearRange
-          attr_reader iso_week_based: bool
-          attr_reader sign_is_mandatory: bool
-
-          private def self.new: (padding: Padding, repr: YearRepr, range: YearRange, iso_week_based: bool, sign_is_mandatory: bool) -> instance
-                              | (Padding padding, YearRepr repr, YearRange range, bool iso_week_based, bool sign_is_mandatory) -> instance
-
-          def self.default: () -> Year
-          def with_padding: (Padding padding) -> Year
-          def with_repr: (YearRepr repr) -> Year
-          def with_range: (YearRange range) -> Year
-          def with_iso_week_based: (bool iso_week_based) -> Year
-          def with_sign_is_mandatory: (bool sign_is_mandatory) -> Year
-        end
-
         class Hour12 < Data
           include Value
 
@@ -621,23 +482,6 @@ module Ferro
           private
 
           attr_reader padding: Padding
-        end
-
-        class Hour < Data
-          include Value
-
-          KINDS: Hash[Symbol, kind]
-          DEFAULT: Hour
-
-          attr_reader padding: Padding
-          attr_reader is_12_hour_clock: bool
-
-          private def self.new: (padding: Padding, is_12_hour_clock: bool) -> instance
-                              | (Padding padding, bool is_12_hour_clock) -> instance
-
-          def self.default: () -> Hour
-          def with_padding: (Padding padding) -> Hour
-          def with_is_12_hour_clock: (bool is_12_hour_clock) -> Hour
         end
 
         class Minute < Data
@@ -829,23 +673,6 @@ module Ferro
           private
 
           attr_reader sign_is_mandatory: bool
-        end
-
-        class UnixTimestamp < Data
-          include Value
-
-          KINDS: Hash[Symbol, kind]
-          DEFAULT: UnixTimestamp
-
-          attr_reader precision: UnixTimestampPrecision
-          attr_reader sign_is_mandatory: bool
-
-          private def self.new: (precision: UnixTimestampPrecision, sign_is_mandatory: bool) -> instance
-                              | (UnixTimestampPrecision precision, bool sign_is_mandatory) -> instance
-
-          def self.default: () -> UnixTimestamp
-          def with_precision: (UnixTimestampPrecision precision) -> UnixTimestamp
-          def with_sign_is_mandatory: (bool sign_is_mandatory) -> UnixTimestamp
         end
 
         class End < Data

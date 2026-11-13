@@ -175,13 +175,7 @@ class TestExamples < Minitest::Test
       context = Context.new(self, section)
       usings, section = refinements(section)
       source = program(section, context)
-      deprecated = Warning[:deprecated]
-      # An example may call a deprecated method; its warning is the
-      # method's own test's business (TestValues).
-      Warning[:deprecated] = false
       run_section(context, usings, source, section.file, section.lines.first&.last || section.line)
-    ensure
-      Warning[:deprecated] = deprecated
     end
   end
 

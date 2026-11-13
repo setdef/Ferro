@@ -90,24 +90,6 @@ module Ferro
         Native.util_days_in_month(Arguments.month(month), year)
       end
 
-      # The number of days in +month+ of +year+, as days_in_month answers.
-      # Deprecated in time since 0.3.37 ("use +days_in_month+ or
-      # <tt>Month::length</tt> instead"), so it warns in Ruby's
-      # +:deprecated+ category, naming days_in_month and Month#length. Mirrors
-      # time's <tt>util::days_in_year_month</tt> (<tt>src/util.rs:40-54</tt>).
-      #
-      # [year] Integer.
-      # [month] Month.
-      #
-      # === Example
-      #
-      #   Ferro::Time::Util.days_in_year_month(2020, Ferro::Time::Month::February) # => 29
-      def self.days_in_year_month(year, month)
-        warn("Ferro::Time::Util.days_in_year_month is deprecated since time 0.3.37; use days_in_month or Month#length",
-          category: :deprecated, uplevel: 1)
-        Native.util_days_in_year_month(year, Arguments.month(month))
-      end
-
       # Attempts to update time zone information from the system, as
       # +tzset+ does. Returns +true+ when it ran, or +nil+ when the call is
       # not known to be sound: time runs it only on illumos, NetBSD, and

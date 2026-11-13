@@ -37,15 +37,6 @@ class TestPortUtcDateTime < Minitest::Test
     nil
   end
 
-  # Names a deprecated method quietly, since the tests run under -w.
-  private def quietly
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = false
-    yield
-  ensure
-    Warning[:deprecated] = deprecated
-  end
-
   # <tt>utc_date_time.rs:11</tt>, +new+.
   def test_new
     dt = T::UtcDateTime.new(date(2023, 12, 18), clock(10, 13, 44, 250_000_000))

@@ -8,7 +8,8 @@
 //!
 //! Ruby owns the tree as `Data` values. It crosses as nested Arrays: an
 //! item is `[tag, payload]`, its tag the variant's place in time's enum
-//! (`Literal` 0 to `First` 5), and a component is its variant's name and
+//! (`StringLiteral` 1 to `First` 5; the deprecated `Literal`, 0, is not
+//! bound, ADR 001, amendment of 2026-11-05), and a component is its variant's name and
 //! then its modifier's fields in time's order, an enum as its variant's
 //! place, a `bool` as itself, and `Ignore`'s count as an Integer.
 //!
@@ -18,17 +19,12 @@
 //! holds exactly when the field is `v`, since each builder sets one field
 //! and `PartialEq` is derived (plan 009, decision 10).
 
-#![allow(deprecated)]
-
 use std::num::NonZero;
 
 use magnus::{
-    function, prelude::*, Error, Integer, RArray, RModule, RString, Ruby, Symbol, TryConvert, Value,
+    function, prelude::*, Error, Integer, RArray, RModule, Ruby, Symbol, TryConvert, Value,
 };
-use time::format_description::modifier::{
-    self, MonthRepr, Padding, SubsecondDigits, TrailingInput, UnixTimestampPrecision,
-    WeekNumberRepr, WeekdayRepr, YearRange, YearRepr,
-};
+use time::format_description::modifier::{self, Padding, SubsecondDigits, TrailingInput};
 use time::format_description::{BorrowedFormatItem, Component, OwnedFormatItem};
 
 use crate::{guarded, Failure};
@@ -117,12 +113,6 @@ fields! {
     Padding => [Space, Zero, None],
     SubsecondDigits => [One, Two, Three, Four, Five, Six, Seven, Eight, Nine, OneOrMore],
     TrailingInput => [Prohibit, Discard],
-    MonthRepr => [Numerical, Long, Short],
-    WeekdayRepr => [Short, Long, Sunday, Monday],
-    WeekNumberRepr => [Iso, Sunday, Monday],
-    YearRepr => [Full, Century, LastTwo],
-    YearRange => [Standard, Extended],
-    UnixTimestampPrecision => [Second, Millisecond, Microsecond, Nanosecond],
 }
 
 /// The value of one field of `modifier`: the one `with` leaves unchanged.
@@ -224,17 +214,14 @@ modifiers! {
         MonthShort { case_sensitive: bool = with_case_sensitive },
         MonthLong { case_sensitive: bool = with_case_sensitive },
         MonthNumerical { padding: Padding = with_padding },
-        Month { padding: Padding = with_padding, repr: MonthRepr = with_repr, case_sensitive: bool = with_case_sensitive },
         Ordinal { padding: Padding = with_padding },
         WeekdayShort { case_sensitive: bool = with_case_sensitive },
         WeekdayLong { case_sensitive: bool = with_case_sensitive },
         WeekdaySunday { one_indexed: bool = with_one_indexed },
         WeekdayMonday { one_indexed: bool = with_one_indexed },
-        Weekday { repr: WeekdayRepr = with_repr, one_indexed: bool = with_one_indexed, case_sensitive: bool = with_case_sensitive },
         WeekNumberIso { padding: Padding = with_padding },
         WeekNumberSunday { padding: Padding = with_padding },
         WeekNumberMonday { padding: Padding = with_padding },
-        WeekNumber { padding: Padding = with_padding, repr: WeekNumberRepr = with_repr },
         CalendarYearFullExtendedRange { padding: Padding = with_padding, sign_is_mandatory: bool = with_sign_is_mandatory },
         CalendarYearFullStandardRange { padding: Padding = with_padding, sign_is_mandatory: bool = with_sign_is_mandatory },
         IsoYearFullExtendedRange { padding: Padding = with_padding, sign_is_mandatory: bool = with_sign_is_mandatory },
@@ -245,10 +232,8 @@ modifiers! {
         IsoYearCenturyStandardRange { padding: Padding = with_padding, sign_is_mandatory: bool = with_sign_is_mandatory },
         CalendarYearLastTwo { padding: Padding = with_padding },
         IsoYearLastTwo { padding: Padding = with_padding },
-        Year { padding: Padding = with_padding, repr: YearRepr = with_repr, range: YearRange = with_range, iso_week_based: bool = with_iso_week_based, sign_is_mandatory: bool = with_sign_is_mandatory },
         Hour12 { padding: Padding = with_padding },
         Hour24 { padding: Padding = with_padding },
-        Hour { padding: Padding = with_padding, is_12_hour_clock: bool = with_is_12_hour_clock },
         Minute { padding: Padding = with_padding },
         Period { is_uppercase: bool = with_is_uppercase, case_sensitive: bool = with_case_sensitive },
         Second { padding: Padding = with_padding },
@@ -260,7 +245,6 @@ modifiers! {
         UnixTimestampMillisecond { sign_is_mandatory: bool = with_sign_is_mandatory },
         UnixTimestampMicrosecond { sign_is_mandatory: bool = with_sign_is_mandatory },
         UnixTimestampNanosecond { sign_is_mandatory: bool = with_sign_is_mandatory },
-        UnixTimestamp { precision: UnixTimestampPrecision = with_precision, sign_is_mandatory: bool = with_sign_is_mandatory },
         End { trailing_input: TrailingInput = with_trailing_input },
 }
 
@@ -296,7 +280,6 @@ pub fn item_from(ruby: &Ruby, value: Value, depth: usize) -> Result<OwnedFormatI
     let tag = u8::try_convert(array.entry(0)?)?;
     let payload: Value = array.entry(1)?;
     Ok(match tag {
-        0 => OwnedFormatItem::Literal(RString::try_convert(payload)?.to_bytes().to_vec().into()),
         1 => OwnedFormatItem::StringLiteral(String::try_convert(payload)?.into()),
         2 => OwnedFormatItem::Component(component_value(ruby, payload)?),
         3 => OwnedFormatItem::Compound(items_from(ruby, payload, depth + 1)?.into()),
@@ -322,7 +305,6 @@ pub fn items_from(ruby: &Ruby, value: Value, depth: usize) -> Result<Vec<OwnedFo
 /// `item` as Ruby reads it.
 fn item_to(ruby: &Ruby, item: &OwnedFormatItem) -> Result<RArray, Error> {
     let (tag, payload): (u8, Value) = match item {
-        OwnedFormatItem::Literal(bytes) => (0, ruby.str_from_slice(bytes).as_value()),
         OwnedFormatItem::StringLiteral(text) => (1, ruby.str_new(text).as_value()),
         OwnedFormatItem::Component(component) => (2, component_to(ruby, *component)?.as_value()),
         OwnedFormatItem::Compound(items) => (3, items_to(ruby, items)?.as_value()),
@@ -472,12 +454,6 @@ fn modifier_enum_debug(ruby: &Ruby, name: Symbol, index: u64) -> Result<String, 
         "Padding" => variant_debug::<Padding>(index),
         "SubsecondDigits" => variant_debug::<SubsecondDigits>(index),
         "TrailingInput" => variant_debug::<TrailingInput>(index),
-        "MonthRepr" => variant_debug::<MonthRepr>(index),
-        "WeekdayRepr" => variant_debug::<WeekdayRepr>(index),
-        "WeekNumberRepr" => variant_debug::<WeekNumberRepr>(index),
-        "YearRepr" => variant_debug::<YearRepr>(index),
-        "YearRange" => variant_debug::<YearRange>(index),
-        "UnixTimestampPrecision" => variant_debug::<UnixTimestampPrecision>(index),
         _ => Err(unknown("modifier enum")),
     })
 }
@@ -550,7 +526,7 @@ mod tests {
     #[test]
     fn every_setting_reads_back_as_it_was_built() {
         let all = every_component();
-        assert_eq!(all.len(), 268);
+        assert_eq!(all.len(), 139);
         for component in all {
             let (name, fields) = fields_of(component).unwrap();
             assert_eq!(build(name, &fields).unwrap(), component);
@@ -565,6 +541,24 @@ mod tests {
         assert!(build("Day", &[Encoded::Bool(true)]).is_err());
         assert!(build("Ignore", &[Encoded::Int(0)]).is_err());
         assert!(build("Ignore", &[Encoded::Int(65_536)]).is_err());
+    }
+
+    /// time's deprecated components are unbound (ADR 001, amendment of
+    /// 2026-11-05), so their encodings are refused like any unknown one.
+    #[test]
+    fn a_deprecated_component_is_refused() {
+        let padding = Encoded::Int(1);
+        let flag = Encoded::Bool(false);
+        assert!(build("Month", &[padding, Encoded::Int(0), flag]).is_err());
+        assert!(build("Weekday", &[Encoded::Int(0), flag, flag]).is_err());
+        assert!(build("WeekNumber", &[padding, Encoded::Int(0)]).is_err());
+        assert!(build(
+            "Year",
+            &[padding, Encoded::Int(0), Encoded::Int(0), flag, flag]
+        )
+        .is_err());
+        assert!(build("Hour", &[padding, flag]).is_err());
+        assert!(build("UnixTimestamp", &[Encoded::Int(0), flag]).is_err());
     }
 
     #[test]
@@ -602,6 +596,6 @@ mod tests {
             compare!(utc);
             assert_eq!(format!("{borrowed:?}"), format!("{owned:?}"));
         }
-        assert_eq!(compared, 6 * 268);
+        assert_eq!(compared, 6 * 139);
     }
 }

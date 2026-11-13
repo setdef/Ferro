@@ -92,170 +92,6 @@ module Ferro
         end
         private_constant :Enum
 
-        # The representation of a month.
-        #
-        # Deprecated since time 0.3.48: used only in the deprecated +Month+
-        # component. Naming it warns, in the :deprecated category, as rustc
-        # warns where Rust code names it.
-        #
-        # Mirrors time's <tt>modifier::MonthRepr</tt>
-        # (<tt>src/format_description/modifier.rs:254-268</tt>). Variants
-        # compare by identity, as time derives +PartialEq+.
-        class MonthRepr < Enum
-          # Creates a modifier that indicates the value uses the +Numerical+
-          # representation. Mirrors time's <tt>Default</tt> for
-          # <tt>MonthRepr</tt>.
-          def self.default
-            Numerical
-          end
-
-          # The number of the month (January is 1, December is 12).
-          Numerical = new(0, :Numerical)
-
-          # The long form of the month name (e.g. "January").
-          Long = new(1, :Long)
-
-          # The short form of the month name (e.g. "Jan").
-          Short = new(2, :Short)
-
-          ALL = [Numerical, Long, Short].freeze
-          private_constant :ALL
-        end
-
-        # The representation used for the day of the week.
-        #
-        # Deprecated since time 0.3.48: used only in the deprecated +Weekday+
-        # component. Naming it warns, in the :deprecated category, as rustc
-        # warns where Rust code names it.
-        #
-        # Mirrors time's <tt>modifier::WeekdayRepr</tt>
-        # (<tt>src/format_description/modifier.rs:356-376</tt>). Variants
-        # compare by identity, as time derives +PartialEq+.
-        class WeekdayRepr < Enum
-          # Creates a modifier that indicates the value uses the +Long+
-          # representation. Mirrors time's <tt>Default</tt> for
-          # <tt>WeekdayRepr</tt>.
-          def self.default
-            Long
-          end
-
-          # The short form of the weekday (e.g. "Mon").
-          Short = new(0, :Short)
-
-          # The long form of the weekday (e.g. "Monday").
-          Long = new(1, :Long)
-
-          # A numerical representation using Sunday as the first day of the
-          # week.
-          #
-          # Sunday is either 0 or 1, depending on the other modifier's value.
-          Sunday = new(2, :Sunday)
-
-          # A numerical representation using Monday as the first day of the
-          # week.
-          #
-          # Monday is either 0 or 1, depending on the other modifier's value.
-          Monday = new(3, :Monday)
-
-          ALL = [Short, Long, Sunday, Monday].freeze
-          private_constant :ALL
-        end
-
-        # The representation used for the week number.
-        #
-        # Deprecated since time 0.3.48: used only in the deprecated
-        # +WeekNumber+ component. Naming it warns, in the :deprecated
-        # category, as rustc warns where Rust code names it.
-        #
-        # Mirrors time's <tt>modifier::WeekNumberRepr</tt>
-        # (<tt>src/format_description/modifier.rs:463-477</tt>). Variants
-        # compare by identity, as time derives +PartialEq+.
-        class WeekNumberRepr < Enum
-          # Creates a modifier that indicates that the value uses the +Iso+
-          # representation. Mirrors time's <tt>Default</tt> for
-          # <tt>WeekNumberRepr</tt>.
-          def self.default
-            Iso
-          end
-
-          # Week 1 is the week that contains January 4.
-          Iso = new(0, :Iso)
-
-          # Week 1 begins on the first Sunday of the calendar year.
-          Sunday = new(1, :Sunday)
-
-          # Week 1 begins on the first Monday of the calendar year.
-          Monday = new(2, :Monday)
-
-          ALL = [Iso, Sunday, Monday].freeze
-          private_constant :ALL
-        end
-
-        # The representation used for a year value.
-        #
-        # Deprecated since time 0.3.48: used only in the deprecated +Year+
-        # component. Naming it warns, in the :deprecated category, as rustc
-        # warns where Rust code names it.
-        #
-        # Mirrors time's <tt>modifier::YearRepr</tt>
-        # (<tt>src/format_description/modifier.rs:552-566</tt>). Variants
-        # compare by identity, as time derives +PartialEq+.
-        class YearRepr < Enum
-          # Creates a modifier that indicates the value uses the +Full+
-          # representation. Mirrors time's <tt>Default</tt> for
-          # <tt>YearRepr</tt>.
-          def self.default
-            Full
-          end
-
-          # The full value of the year.
-          Full = new(0, :Full)
-
-          # All digits except the last two. Includes the sign, if any.
-          Century = new(1, :Century)
-
-          # Only the last two digits of the year.
-          LastTwo = new(2, :LastTwo)
-
-          ALL = [Full, Century, LastTwo].freeze
-          private_constant :ALL
-        end
-
-        # The range of years that are supported.
-        #
-        # This modifier has no effect when the year repr is +LastTwo+.
-        #
-        # Deprecated since time 0.3.48: used only in the deprecated +Year+
-        # component. Naming it warns, in the :deprecated category, as rustc
-        # warns where Rust code names it.
-        #
-        # Mirrors time's <tt>modifier::YearRange</tt>
-        # (<tt>src/format_description/modifier.rs:568-585</tt>). Variants
-        # compare by identity, as time derives +PartialEq+.
-        class YearRange < Enum
-          # Creates a modifier that indicates the value uses the +Extended+
-          # range. Note that this is the default modifier for version 1 and 2
-          # format descriptions. Version 3 format descriptions (which cannot
-          # be manually constructed) use +Standard+ as the default. Mirrors
-          # time's <tt>Default</tt> for <tt>YearRange</tt>.
-          def self.default
-            Extended
-          end
-
-          # Years between -9999 and 9999 are supported.
-          Standard = new(0, :Standard)
-
-          # Years between -999_999 and 999_999 are supported, with the sign
-          # being required if the year contains more than four digits.
-          #
-          # If the <tt>large-dates</tt> feature is not enabled, this variant
-          # is equivalent to +Standard+.
-          Extended = new(1, :Extended)
-
-          ALL = [Standard, Extended].freeze
-          private_constant :ALL
-        end
-
         # The number of digits present in a subsecond representation.
         #
         # Mirrors time's <tt>modifier::SubsecondDigits</tt>
@@ -338,39 +174,6 @@ module Ferro
           private_constant :ALL
         end
 
-        # The precision of a Unix timestamp.
-        #
-        # Deprecated since time 0.3.48: only used in the deprecated
-        # +UnixTimestamp+ component. Naming it warns, in the :deprecated
-        # category, as rustc warns where Rust code names it.
-        #
-        # Mirrors time's <tt>modifier::UnixTimestampPrecision</tt>
-        # (<tt>src/format_description/modifier.rs:1045-1061</tt>). Variants
-        # compare by identity, as time derives +PartialEq+.
-        class UnixTimestampPrecision < Enum
-          # Creates a modifier that indicates the value represents the number
-          # of seconds since the Unix epoch. Mirrors time's <tt>Default</tt>
-          # for <tt>UnixTimestampPrecision</tt>.
-          def self.default
-            Second
-          end
-
-          # Seconds since the Unix epoch.
-          Second = new(0, :Second)
-
-          # Milliseconds since the Unix epoch.
-          Millisecond = new(1, :Millisecond)
-
-          # Microseconds since the Unix epoch.
-          Microsecond = new(2, :Microsecond)
-
-          # Nanoseconds since the Unix epoch.
-          Nanosecond = new(3, :Nanosecond)
-
-          ALL = [Second, Millisecond, Microsecond, Nanosecond].freeze
-          private_constant :ALL
-        end
-
         # Whether trailing input after the declared end is permitted.
         #
         # Mirrors time's <tt>modifier::TrailingInput</tt>
@@ -432,8 +235,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -481,8 +283,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(case_sensitive: true)
           private_constant :DEFAULT
 
@@ -529,8 +330,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(case_sensitive: true)
           private_constant :DEFAULT
 
@@ -578,8 +378,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -598,74 +397,6 @@ module Ferro
           end
 
           private :padding
-        end
-
-        # Month of the year.
-        #
-        # Deprecated since time 0.3.48: use +MonthShort+, +MonthLong+, or
-        # +MonthNumeric+ instead. Naming it warns, in the :deprecated
-        # category, as rustc warns where Rust code names it.
-        #
-        # Mirrors time's <tt>modifier::Month</tt>
-        # (<tt>src/format_description/modifier.rs:312-339</tt>).
-        class Month < Data.define(:padding, :repr, :case_sensitive)
-          include Value
-
-          KINDS = { padding: Padding, repr: MonthRepr, case_sensitive: :bool }.freeze
-          private_constant :KINDS
-
-          private_class_method :new
-
-          # Creates an instance of this type that indicates the value uses the
-          # +Numerical+ representation, is padded with zeroes, and is
-          # case-sensitive when parsing. Mirrors time's
-          # <tt>Month::default</tt>.
-          def self.default
-            DEFAULT
-          end
-
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
-          DEFAULT = new(padding: Padding::Zero, repr: MonthRepr::Numerical, case_sensitive: true)
-          private_constant :DEFAULT
-
-          ##
-          # :attr_reader: padding
-          # The padding to obtain the minimum width. A Padding.
-
-          ##
-          # :attr_reader: repr
-          # What form of representation should be used? A MonthRepr.
-
-          ##
-          # :attr_reader: case_sensitive
-          # Is the value case sensitive when parsing? true or false.
-
-          # Set the padding type. Returns a new Month, leaving this one as it
-          # is. Mirrors time's <tt>Month::with_padding</tt>.
-          #
-          # [padding] Padding.
-          def with_padding(padding)
-            with(padding:)
-          end
-
-          # Set the manner in which the month is represented. Returns a new
-          # Month, leaving this one as it is. Mirrors time's
-          # <tt>Month::with_repr</tt>.
-          #
-          # [repr] MonthRepr.
-          def with_repr(repr)
-            with(repr:)
-          end
-
-          # Set whether the value is case sensitive when parsing. Returns a
-          # new Month, leaving this one as it is. Mirrors time's
-          # <tt>Month::with_case_sensitive</tt>.
-          #
-          # [case_sensitive] true or false.
-          def with_case_sensitive(case_sensitive)
-            with(case_sensitive:)
-          end
         end
 
         # Ordinal day of the year.
@@ -690,8 +421,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -739,8 +469,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(case_sensitive: true)
           private_constant :DEFAULT
 
@@ -787,8 +516,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(case_sensitive: true)
           private_constant :DEFAULT
 
@@ -836,8 +564,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(one_indexed: true)
           private_constant :DEFAULT
 
@@ -885,8 +612,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(one_indexed: true)
           private_constant :DEFAULT
 
@@ -905,77 +631,6 @@ module Ferro
           end
 
           private :one_indexed
-        end
-
-        # Day of the week.
-        #
-        # Deprecated since time 0.3.48: use +WeekdayShort+, +WeekdayLong+,
-        # +WeekdaySunday+, or +WeekdayMonday+ instead. Naming it warns, in the
-        # :deprecated category, as rustc warns where Rust code names it.
-        #
-        # Mirrors time's <tt>modifier::Weekday</tt>
-        # (<tt>src/format_description/modifier.rs:434-461</tt>).
-        class Weekday < Data.define(:repr, :one_indexed, :case_sensitive)
-          include Value
-
-          KINDS = { repr: WeekdayRepr, one_indexed: :bool, case_sensitive: :bool }.freeze
-          private_constant :KINDS
-
-          private_class_method :new
-
-          # Creates a modifier that indicates the value uses the +Long+
-          # representation and is case-sensitive when parsing. If the
-          # representation is changed to a numerical one, the instance
-          # defaults to one-based indexing. Mirrors time's
-          # <tt>Weekday::default</tt>.
-          def self.default
-            DEFAULT
-          end
-
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
-          DEFAULT = new(repr: WeekdayRepr::Long, one_indexed: true, case_sensitive: true)
-          private_constant :DEFAULT
-
-          ##
-          # :attr_reader: repr
-          # What form of representation should be used? A WeekdayRepr.
-
-          ##
-          # :attr_reader: one_indexed
-          # When using a numerical representation, should it be zero or
-          # one-indexed? true or false.
-
-          ##
-          # :attr_reader: case_sensitive
-          # Is the value case sensitive when parsing? true or false.
-
-          # Set the manner in which the weekday is represented. Returns a new
-          # Weekday, leaving this one as it is. Mirrors time's
-          # <tt>Weekday::with_repr</tt>.
-          #
-          # [repr] WeekdayRepr.
-          def with_repr(repr)
-            with(repr:)
-          end
-
-          # Set whether the value is one-indexed when using a numerical
-          # representation. Returns a new Weekday, leaving this one as it is.
-          # Mirrors time's <tt>Weekday::with_one_indexed</tt>.
-          #
-          # [one_indexed] true or false.
-          def with_one_indexed(one_indexed)
-            with(one_indexed:)
-          end
-
-          # Set whether the value is case sensitive when parsing. Returns a
-          # new Weekday, leaving this one as it is. Mirrors time's
-          # <tt>Weekday::with_case_sensitive</tt>.
-          #
-          # [case_sensitive] true or false.
-          def with_case_sensitive(case_sensitive)
-            with(case_sensitive:)
-          end
         end
 
         # Week within the year using the ISO week calendar.
@@ -1003,8 +658,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -1050,8 +704,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -1098,8 +751,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -1119,61 +771,6 @@ module Ferro
           #   # => "WeekNumberMonday { padding: Space }"
           def with_padding(padding)
             with(padding:)
-          end
-        end
-
-        # Week within the year.
-        #
-        # Deprecated since time 0.3.48: use +WeekNumberIso+,
-        # +WeekNumberSunday+, or +WeekNumberMonday+ instead. Naming it warns,
-        # in the :deprecated category, as rustc warns where Rust code names
-        # it.
-        #
-        # Mirrors time's <tt>modifier::WeekNumber</tt>
-        # (<tt>src/format_description/modifier.rs:527-550</tt>).
-        class WeekNumber < Data.define(:padding, :repr)
-          include Value
-
-          KINDS = { padding: Padding, repr: WeekNumberRepr }.freeze
-          private_constant :KINDS
-
-          private_class_method :new
-
-          # Creates a modifier that indicates that the value is padded with
-          # zeroes and uses the +Iso+ representation. Mirrors time's
-          # <tt>WeekNumber::default</tt>.
-          def self.default
-            DEFAULT
-          end
-
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
-          DEFAULT = new(padding: Padding::Zero, repr: WeekNumberRepr::Iso)
-          private_constant :DEFAULT
-
-          ##
-          # :attr_reader: padding
-          # The padding to obtain the minimum width. A Padding.
-
-          ##
-          # :attr_reader: repr
-          # What kind of representation should be used? A WeekNumberRepr.
-
-          # Set the padding type. Returns a new WeekNumber, leaving this one
-          # as it is. Mirrors time's <tt>WeekNumber::with_padding</tt>.
-          #
-          # [padding] Padding.
-          def with_padding(padding)
-            with(padding:)
-          end
-
-          # Set the manner in which the week number is represented. Returns a
-          # new WeekNumber, leaving this one as it is. Mirrors time's
-          # <tt>WeekNumber::with_repr</tt>.
-          #
-          # [repr] WeekNumberRepr.
-          def with_repr(repr)
-            with(repr:)
           end
         end
 
@@ -1206,8 +803,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero, sign_is_mandatory: false)
           private_constant :DEFAULT
 
@@ -1273,8 +869,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero, sign_is_mandatory: false)
           private_constant :DEFAULT
 
@@ -1339,8 +934,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero, sign_is_mandatory: false)
           private_constant :DEFAULT
 
@@ -1405,8 +999,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero, sign_is_mandatory: false)
           private_constant :DEFAULT
 
@@ -1472,8 +1065,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero, sign_is_mandatory: false)
           private_constant :DEFAULT
 
@@ -1541,8 +1133,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero, sign_is_mandatory: false)
           private_constant :DEFAULT
 
@@ -1609,8 +1200,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero, sign_is_mandatory: false)
           private_constant :DEFAULT
 
@@ -1677,8 +1267,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero, sign_is_mandatory: false)
           private_constant :DEFAULT
 
@@ -1741,8 +1330,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -1790,8 +1378,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -1810,102 +1397,6 @@ module Ferro
           end
 
           private :padding
-        end
-
-        # Year of the date.
-        #
-        # Deprecated since time 0.3.48: use one of the various <tt>Year*</tt>
-        # components instead. Naming it warns, in the :deprecated category, as
-        # rustc warns where Rust code names it.
-        #
-        # Mirrors time's <tt>modifier::Year</tt>
-        # (<tt>src/format_description/modifier.rs:778-814</tt>).
-        class Year < Data.define(:padding, :repr, :range, :iso_week_based, :sign_is_mandatory)
-          include Value
-
-          KINDS = { padding: Padding, repr: YearRepr, range: YearRange, iso_week_based: :bool, sign_is_mandatory: :bool }.freeze
-          private_constant :KINDS
-
-          private_class_method :new
-
-          # Creates a modifier that indicates the value uses the +Full+
-          # representation, is padded with zeroes, uses the Gregorian calendar
-          # as its base, and only includes the year's sign if necessary.
-          # Mirrors time's <tt>Year::default</tt>.
-          def self.default
-            DEFAULT
-          end
-
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
-          DEFAULT = new(padding: Padding::Zero, repr: YearRepr::Full, range: YearRange::Extended, iso_week_based: false, sign_is_mandatory: false)
-          private_constant :DEFAULT
-
-          ##
-          # :attr_reader: padding
-          # The padding to obtain the minimum width. A Padding.
-
-          ##
-          # :attr_reader: repr
-          # What kind of representation should be used? A YearRepr.
-
-          ##
-          # :attr_reader: range
-          # What range of years is supported? A YearRange.
-
-          ##
-          # :attr_reader: iso_week_based
-          # Whether the value is based on the ISO week number or the Gregorian
-          # calendar. true or false.
-
-          ##
-          # :attr_reader: sign_is_mandatory
-          # Whether the <tt>+</tt> sign is present when a non-negative year
-          # contains fewer digits than necessary. true or false.
-
-          # Set the padding type. Returns a new Year, leaving this one as it
-          # is. Mirrors time's <tt>Year::with_padding</tt>.
-          #
-          # [padding] Padding.
-          def with_padding(padding)
-            with(padding:)
-          end
-
-          # Set the manner in which the year is represented. Returns a new
-          # Year, leaving this one as it is. Mirrors time's
-          # <tt>Year::with_repr</tt>.
-          #
-          # [repr] YearRepr.
-          def with_repr(repr)
-            with(repr:)
-          end
-
-          # Set the range of years that are supported. Returns a new Year,
-          # leaving this one as it is. Mirrors time's
-          # <tt>Year::with_range</tt>.
-          #
-          # [range] YearRange.
-          def with_range(range)
-            with(range:)
-          end
-
-          # Set whether the year is based on the ISO week number. Returns a
-          # new Year, leaving this one as it is. Mirrors time's
-          # <tt>Year::with_iso_week_based</tt>.
-          #
-          # [iso_week_based] true or false.
-          def with_iso_week_based(iso_week_based)
-            with(iso_week_based:)
-          end
-
-          # Set whether the <tt>+</tt> sign is mandatory for positive years
-          # with fewer than five digits. Returns a new Year, leaving this one
-          # as it is. Mirrors time's <tt>Year::with_sign_is_mandatory</tt>.
-          #
-          # [sign_is_mandatory] true or false.
-          def with_sign_is_mandatory(sign_is_mandatory)
-            with(sign_is_mandatory:)
-          end
         end
 
         # Hour of the day using a 12-hour clock.
@@ -1933,8 +1424,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -1979,8 +1469,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -1998,60 +1487,6 @@ module Ferro
           end
 
           private :padding
-        end
-
-        # Hour of the day.
-        #
-        # Deprecated since time 0.3.48: use +Hour12+ or +Hour24+ instead.
-        # Naming it warns, in the :deprecated category, as rustc warns where
-        # Rust code names it.
-        #
-        # Mirrors time's <tt>modifier::Hour</tt>
-        # (<tt>src/format_description/modifier.rs:844-863</tt>).
-        class Hour < Data.define(:padding, :is_12_hour_clock)
-          include Value
-
-          KINDS = { padding: Padding, is_12_hour_clock: :bool }.freeze
-          private_constant :KINDS
-
-          private_class_method :new
-
-          # Creates a modifier that indicates the value is padded with zeroes
-          # and has the 24-hour representation. Mirrors time's
-          # <tt>Hour::default</tt>.
-          def self.default
-            DEFAULT
-          end
-
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
-          DEFAULT = new(padding: Padding::Zero, is_12_hour_clock: false)
-          private_constant :DEFAULT
-
-          ##
-          # :attr_reader: padding
-          # The padding to obtain the minimum width. A Padding.
-
-          ##
-          # :attr_reader: is_12_hour_clock
-          # Is the hour displayed using a 12 or 24-hour clock? true or false.
-
-          # Set the padding type. Returns a new Hour, leaving this one as it
-          # is. Mirrors time's <tt>Hour::with_padding</tt>.
-          #
-          # [padding] Padding.
-          def with_padding(padding)
-            with(padding:)
-          end
-
-          # Set whether the hour uses a 12-hour clock. Returns a new Hour,
-          # leaving this one as it is. Mirrors time's
-          # <tt>Hour::with_is_12_hour_clock</tt>.
-          #
-          # [is_12_hour_clock] true or false.
-          def with_is_12_hour_clock(is_12_hour_clock)
-            with(is_12_hour_clock:)
-          end
         end
 
         # Minute within the hour.
@@ -2076,8 +1511,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -2122,8 +1556,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(is_uppercase: true, case_sensitive: true)
           private_constant :DEFAULT
 
@@ -2188,8 +1621,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -2233,8 +1665,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(digits: SubsecondDigits::OneOrMore)
           private_constant :DEFAULT
 
@@ -2280,8 +1711,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(sign_is_mandatory: false, padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -2344,8 +1774,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -2389,8 +1818,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(padding: Padding::Zero)
           private_constant :DEFAULT
 
@@ -2488,8 +1916,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(sign_is_mandatory: false)
           private_constant :DEFAULT
 
@@ -2537,8 +1964,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(sign_is_mandatory: false)
           private_constant :DEFAULT
 
@@ -2586,8 +2012,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(sign_is_mandatory: false)
           private_constant :DEFAULT
 
@@ -2635,8 +2060,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(sign_is_mandatory: false)
           private_constant :DEFAULT
 
@@ -2656,63 +2080,6 @@ module Ferro
           end
 
           private :sign_is_mandatory
-        end
-
-        # A Unix timestamp.
-        #
-        # Deprecated since time 0.3.48: use +UnixTimestampSeconds+,
-        # +UnixTimestampMilliseconds+, +UnixTimestampMicroseconds+, or
-        # +UnixTimestampNanoseconds+ instead. Naming it warns, in the
-        # :deprecated category, as rustc warns where Rust code names it.
-        #
-        # Mirrors time's <tt>modifier::UnixTimestamp</tt>
-        # (<tt>src/format_description/modifier.rs:1119-1143</tt>).
-        class UnixTimestamp < Data.define(:precision, :sign_is_mandatory)
-          include Value
-
-          KINDS = { precision: UnixTimestampPrecision, sign_is_mandatory: :bool }.freeze
-          private_constant :KINDS
-
-          private_class_method :new
-
-          # Creates a modifier that indicates the value represents the number
-          # of seconds since the Unix epoch. The sign is not mandatory.
-          # Mirrors time's <tt>UnixTimestamp::default</tt>.
-          def self.default
-            DEFAULT
-          end
-
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
-          DEFAULT = new(precision: UnixTimestampPrecision::Second, sign_is_mandatory: false)
-          private_constant :DEFAULT
-
-          ##
-          # :attr_reader: precision
-          # The precision of the timestamp. A UnixTimestampPrecision.
-
-          ##
-          # :attr_reader: sign_is_mandatory
-          # Whether the <tt>+</tt> sign must be present for a non-negative
-          # timestamp. true or false.
-
-          # Set the precision of the timestamp. Returns a new UnixTimestamp,
-          # leaving this one as it is. Mirrors time's
-          # <tt>UnixTimestamp::with_precision</tt>.
-          #
-          # [precision] UnixTimestampPrecision.
-          def with_precision(precision)
-            with(precision:)
-          end
-
-          # Set whether the <tt>+</tt> sign is mandatory for non-negative
-          # timestamps. Returns a new UnixTimestamp, leaving this one as it
-          # is. Mirrors time's <tt>UnixTimestamp::with_sign_is_mandatory</tt>.
-          #
-          # [sign_is_mandatory] true or false.
-          def with_sign_is_mandatory(sign_is_mandatory)
-            with(sign_is_mandatory:)
-          end
         end
 
         # The end of input.
@@ -2742,8 +2109,7 @@ module Ferro
             DEFAULT
           end
 
-          # The default, made while the deprecated enums can still be named
-          # without a warning.
+          # The one value +default+ answers.
           DEFAULT = new(trailing_input: TrailingInput::Prohibit)
           private_constant :DEFAULT
 
@@ -2764,16 +2130,14 @@ module Ferro
           private :trailing_input
         end
 
-        # Every modifier class by name, deprecated ones included, so the gem
-        # reaches them without warning. Private to the gem.
-        CLASSES = { Day: Day, MonthShort: MonthShort, MonthLong: MonthLong, MonthNumerical: MonthNumerical, Month: Month, Ordinal: Ordinal, WeekdayShort: WeekdayShort, WeekdayLong: WeekdayLong, WeekdaySunday: WeekdaySunday, WeekdayMonday: WeekdayMonday, Weekday: Weekday, WeekNumberIso: WeekNumberIso, WeekNumberSunday: WeekNumberSunday, WeekNumberMonday: WeekNumberMonday, WeekNumber: WeekNumber, CalendarYearFullExtendedRange: CalendarYearFullExtendedRange, CalendarYearFullStandardRange: CalendarYearFullStandardRange, IsoYearFullExtendedRange: IsoYearFullExtendedRange, IsoYearFullStandardRange: IsoYearFullStandardRange, CalendarYearCenturyExtendedRange: CalendarYearCenturyExtendedRange, CalendarYearCenturyStandardRange: CalendarYearCenturyStandardRange, IsoYearCenturyExtendedRange: IsoYearCenturyExtendedRange, IsoYearCenturyStandardRange: IsoYearCenturyStandardRange, CalendarYearLastTwo: CalendarYearLastTwo, IsoYearLastTwo: IsoYearLastTwo, Year: Year, Hour12: Hour12, Hour24: Hour24, Hour: Hour, Minute: Minute, Period: Period, Second: Second, Subsecond: Subsecond, OffsetHour: OffsetHour, OffsetMinute: OffsetMinute, OffsetSecond: OffsetSecond, Ignore: Ignore, UnixTimestampSecond: UnixTimestampSecond, UnixTimestampMillisecond: UnixTimestampMillisecond, UnixTimestampMicrosecond: UnixTimestampMicrosecond, UnixTimestampNanosecond: UnixTimestampNanosecond, UnixTimestamp: UnixTimestamp, End: End }.freeze
+        # Every modifier class by name, for the native encoding. Private to
+        # the gem.
+        CLASSES = { Day: Day, MonthShort: MonthShort, MonthLong: MonthLong, MonthNumerical: MonthNumerical, Ordinal: Ordinal, WeekdayShort: WeekdayShort, WeekdayLong: WeekdayLong, WeekdaySunday: WeekdaySunday, WeekdayMonday: WeekdayMonday, WeekNumberIso: WeekNumberIso, WeekNumberSunday: WeekNumberSunday, WeekNumberMonday: WeekNumberMonday, CalendarYearFullExtendedRange: CalendarYearFullExtendedRange, CalendarYearFullStandardRange: CalendarYearFullStandardRange, IsoYearFullExtendedRange: IsoYearFullExtendedRange, IsoYearFullStandardRange: IsoYearFullStandardRange, CalendarYearCenturyExtendedRange: CalendarYearCenturyExtendedRange, CalendarYearCenturyStandardRange: CalendarYearCenturyStandardRange, IsoYearCenturyExtendedRange: IsoYearCenturyExtendedRange, IsoYearCenturyStandardRange: IsoYearCenturyStandardRange, CalendarYearLastTwo: CalendarYearLastTwo, IsoYearLastTwo: IsoYearLastTwo, Hour12: Hour12, Hour24: Hour24, Minute: Minute, Period: Period, Second: Second, Subsecond: Subsecond, OffsetHour: OffsetHour, OffsetMinute: OffsetMinute, OffsetSecond: OffsetSecond, Ignore: Ignore, UnixTimestampSecond: UnixTimestampSecond, UnixTimestampMillisecond: UnixTimestampMillisecond, UnixTimestampMicrosecond: UnixTimestampMicrosecond, UnixTimestampNanosecond: UnixTimestampNanosecond, End: End }.freeze
         private_constant :CLASSES
 
         # Every enum class by name. Private to the gem.
-        ENUMS = { MonthRepr: MonthRepr, WeekdayRepr: WeekdayRepr, WeekNumberRepr: WeekNumberRepr, YearRepr: YearRepr, YearRange: YearRange, SubsecondDigits: SubsecondDigits, Padding: Padding, UnixTimestampPrecision: UnixTimestampPrecision, TrailingInput: TrailingInput }.freeze
+        ENUMS = { SubsecondDigits: SubsecondDigits, Padding: Padding, TrailingInput: TrailingInput }.freeze
         private_constant :ENUMS
-
-        deprecate_constant :MonthRepr, :Month, :WeekdayRepr, :Weekday, :WeekNumberRepr, :WeekNumber, :YearRepr, :YearRange, :Year, :Hour, :UnixTimestampPrecision, :UnixTimestamp
       end
 
       #--

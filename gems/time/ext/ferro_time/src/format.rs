@@ -205,9 +205,8 @@ fn write<T: Formatted>(
     }
 }
 
-/// `format` (`src/date.rs:1484-1489` and each type's): UTF-8 text, with
-/// a deprecated `Literal`'s bytes that are not UTF-8 replaced, as time's
-/// `format` replaces them (`src/formatting/formattable.rs:291-313`).
+/// `format` (`src/date.rs:1484-1489` and each type's): UTF-8 text, read
+/// as time's `format` reads what it wrote (`src/formatting/formattable.rs:291-313`).
 fn format<W: Wrapped>(ruby: &Ruby, value: &W, description: Value) -> Result<String, Error>
 where
     W::Inner: Formatted,
@@ -371,20 +370,6 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(out, theirs);
         assert_eq!(String::from_utf8(out).unwrap(), "2020-03-");
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn a_literal_that_is_not_utf8_formats_as_time_formats_it() {
-        use time::format_description::OwnedFormatItem;
-        let item = OwnedFormatItem::Literal(Box::new(*b"a\xFFb"));
-        let mut out = Vec::new();
-        write(Date::MIN, &Description::Item(item.clone()), &mut out).unwrap();
-        assert_eq!(
-            String::from_utf8_lossy(&out),
-            Date::MIN.format(&item).unwrap()
-        );
-        assert_eq!(Date::MIN.format(&item).unwrap(), "a\u{FFFD}b");
     }
 
     #[test]

@@ -12,6 +12,10 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Removed
+
+- **Breaking:** time's deprecated items, which ADR 001 leaves unbound: `FormatDescription.parse` (use `parse_borrowed(1, ...)`), `Util.days_in_year_month` (use `days_in_month`), `Convert` (use `Unit`), `FormatDescription::FormatItem` (use `BorrowedFormatItem`), the `Literal` variants of `BorrowedFormatItem` and `OwnedFormatItem` (use `StringLiteral`), the `Month`, `Weekday`, `WeekNumber`, `Hour`, `UnixTimestamp`, and `Year` components, and the modifiers and modifier enums only they used. time's parsers never returned any of them.
+
 ## [0.1.0] - 2026-11-05
 
 ### Added

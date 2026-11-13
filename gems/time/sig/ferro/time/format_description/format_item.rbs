@@ -14,20 +14,7 @@ module Ferro
       module BorrowedFormatItem : Object
         include Item
 
-        LITERALS: Hash[Symbol, singleton(Literal)]
-
         def self.from: (FormatDescription::Component | Array[BorrowedFormatItem] value) -> (Component | Compound)
-
-        class Literal < Data
-          include BorrowedFormatItem
-
-          attr_reader literal: String
-
-          def self.new: (literal: String) -> instance
-                      | (String literal) -> instance
-
-          def ==: (Object other) -> bool
-        end
 
         class StringLiteral < Data
           include BorrowedFormatItem
@@ -36,8 +23,6 @@ module Ferro
 
           def self.new: (literal: String) -> instance
                       | (String literal) -> instance
-
-          def ==: (Object other) -> bool
         end
 
         class Component < Data
@@ -86,20 +71,7 @@ module Ferro
       module OwnedFormatItem : Object
         include Item
 
-        LITERALS: Hash[Symbol, singleton(Literal)]
-
         def self.from: (FormatDescription::Component | BorrowedFormatItem | Array[BorrowedFormatItem] | Array[OwnedFormatItem] value) -> OwnedFormatItem
-
-        class Literal < Data
-          include OwnedFormatItem
-
-          attr_reader literal: String
-
-          def self.new: (literal: String) -> instance
-                      | (String literal) -> instance
-
-          def ==: (Object other) -> bool
-        end
 
         class StringLiteral < Data
           include OwnedFormatItem
@@ -108,8 +80,6 @@ module Ferro
 
           def self.new: (literal: String) -> instance
                       | (String literal) -> instance
-
-          def ==: (Object other) -> bool
         end
 
         class Component < Data
@@ -154,8 +124,6 @@ module Ferro
 
         end
       end
-
-      FormatItem: singleton(BorrowedFormatItem)
     end
   end
 end

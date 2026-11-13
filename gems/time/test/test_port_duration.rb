@@ -37,15 +37,6 @@ class TestPortDuration < Minitest::Test
     nil
   end
 
-  # Names a deprecated method quietly, since the tests run under -w.
-  private def quietly
-    deprecated = Warning[:deprecated]
-    Warning[:deprecated] = false
-    yield
-  ensure
-    Warning[:deprecated] = deprecated
-  end
-
   # <tt>duration.rs:19</tt>, +unit_values+.
   def test_unit_values
     [
