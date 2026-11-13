@@ -257,8 +257,10 @@ its full output.
 
 Ferro's rules for people and agents alike are in [AGENTS.md](AGENTS.md),
 which also names the design records behind them. To build and check
-every gem, install the toolchains that `mise.toml` pins with
-[mise](https://mise.jdx.dev), and the [REUSE tool](https://reuse.software):
+every gem, install [mise](https://mise.jdx.dev) and run `bin/setup`. It
+installs the toolchains `mise.toml` pins, the
+[REUSE tool](https://reuse.software), the bundle, and a git hook that
+runs every check on a commit before you push it:
 
 <!-- SPDX-SnippetBegin -->
 <!--
@@ -266,9 +268,7 @@ every gem, install the toolchains that `mise.toml` pins with
   SPDX-License-Identifier: MIT-0
 -->
 ```sh
-mise install
-mise x -- pip install "reuse[charset-normalizer]==6.2.0"
-bundle install
+bin/setup
 bundle exec rake                # every check, across every gem
 bundle exec rake gate:arboard   # one gem's checks
 ```

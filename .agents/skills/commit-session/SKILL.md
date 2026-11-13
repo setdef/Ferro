@@ -45,8 +45,8 @@ For the clean build the definition of done asks for, remove build output
 first:
 
 ```sh
-rm -rf tmp target gems/*/tmp
-find gems -name '*.bundle' -delete
+rm -rf tmp target gems/*/tmp gems/*/target
+find gems \( -name '*.bundle' -o -name '*.so' -o -name '*.dll' \) -delete
 ```
 
 Then sync and push the commit you have checked out, which is `trunk` in

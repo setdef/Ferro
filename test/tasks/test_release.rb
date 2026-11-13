@@ -44,10 +44,12 @@ class TestRelease < Minitest::Test
     IO.popen(["git", *, chdir: @root], err: File::NULL, &:read)
   end
 
+  # A release whose commands only record themselves, and succeed unless
+  # +succeed+ is false or names the command's second word.
   private def release(version: "0.1.0", succeed: true)
     runner = lambda do |command, chdir:|
       @ran << [command, chdir]
-      succeed
+      succeed == true || (succeed && succeed != command[1])
     end
     Release.new(root: @root, name: "ferro-demo", dir: "gems/demo", version:, scope: "demo", runner:)
   end
@@ -56,13 +58,13 @@ class TestRelease < Minitest::Test
     assert_equal "ferro-demo/v0.1.0", release.tag
   end
 
-  def test_a_ready_repository_runs_build_tag_push_and_publish_in_order
+  def test_a_ready_repository_runs_build_push_tag_and_publish_in_order
     release.run!
 
     assert_equal [
       ["gem", "build", "ferro-demo.gemspec", "--output", File.join(@root, "pkg/ferro-demo-0.1.0.gem")],
-      ["git", "tag", "--annotate", "ferro-demo/v0.1.0", "--message", "ferro-demo 0.1.0"],
       %w[git push origin trunk],
+      ["git", "tag", "--annotate", "ferro-demo/v0.1.0", "--message", "ferro-demo 0.1.0"],
       ["git", "push", "origin", "ferro-demo/v0.1.0"],
       ["gem", "push", File.join(@root, "pkg/ferro-demo-0.1.0.gem")],
     ], @ran.map(&:first)
@@ -74,6 +76,16 @@ class TestRelease < Minitest::Test
 
     assert_includes error.message, "gem build"
     assert_equal 1, @ran.size
+  end
+
+  # Pushing trunk runs the gate. Were the tag made first, a push the gate
+  # refused would leave it behind, and the next try would stop at "already
+  # exists".
+  def test_a_branch_push_that_is_refused_leaves_no_tag
+    error = assert_raises(Release::Failure) { release(succeed: "push").run! }
+
+    assert_equal "git push origin trunk failed", error.message
+    assert_equal [%w[gem build], %w[git push]], @ran.map { |command, _| command.first(2) }
   end
 
   def test_another_branch_is_refused

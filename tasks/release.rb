@@ -19,7 +19,10 @@ require_relative "gem_version"
 # repository of many gems, each with its own version, those tags collide.
 # This release names the tag for the gem, <tt>ferro-arboard/v0.1.0</tt>
 # (ADR 001, section 5), and otherwise does what Bundler's does: build the
-# gem, tag the commit, push the branch and the tag, and push the gem.
+# gem, push the branch, tag the commit, push the tag, and push the gem. The
+# branch goes before the tag because a push of it runs the gate (the
+# pre-push hook): a push the gate refuses then leaves no tag behind for the
+# next try to trip over.
 #
 # A release can also stop at the tag (#tag!). Ferro publishes nothing to
 # RubyGems.org yet, but a pushed tag is enough for Bundler's git sources,
@@ -151,8 +154,8 @@ class Release
   def commands
     [
       [["gem", "build", "#{@name}.gemspec", "--output", package], File.join(@root, @dir)],
-      [["git", "tag", "--annotate", tag, "--message", "#{@name} #{@version}"], @root],
       [["git", "push", "origin", BRANCH], @root],
+      [["git", "tag", "--annotate", tag, "--message", "#{@name} #{@version}"], @root],
       [["git", "push", "origin", tag], @root],
       [["gem", "push", package], @root],
     ]

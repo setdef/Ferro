@@ -21,9 +21,9 @@ fi
 mise install
 # the REUSE tool, at CI's version
 mise x -- python -m pip install --quiet "reuse[charset-normalizer]==6.2.0"
-# A CI runner (CI=true) installs the bundle as ci.yml's setup-ruby does:
-# frozen to Gemfile.lock, in vendor/bundle, which a runner keeps between
-# runs.
+# A CI runner (CI=true) installs the bundle much as ci.yml's setup-ruby
+# does: locked to Gemfile.lock, in vendor/bundle, which a runner that
+# keeps its checkout or caches that folder has from its last run.
 if [ "${CI:-}" = true ]; then
   mise x -- bundle config set --local path vendor/bundle
   mise x -- bundle config set --local frozen true
@@ -53,12 +53,15 @@ STUB
   chmod +x "$stub"
 fi
 
-# A CI runner commits nothing. pre-commit refuses to install where
-# core.hooksPath is set, so there the commit hook is yours to wire up.
-if [ "${CI:-}" != true ]; then
-  if git config --get core.hooksPath >/dev/null; then
-    echo "core.hooksPath is set, so pre-commit's hook is not installed; run pre-commit from your own hook." >&2
-  else
-    mise x -- pre-commit install
-  fi
+# Where core.hooksPath is set, git runs the hooks in that folder and never
+# this clone's, so the stub above runs only if the pre-push hook there
+# hands off to it, and pre-commit refuses to install its own. A CI runner
+# commits nothing.
+hooks_path="$(git config --get core.hooksPath || true)"
+if [ -n "$hooks_path" ]; then
+  echo "core.hooksPath is set, so git runs the hooks in $hooks_path, not this clone's:" >&2
+  echo "git push runs .githooks/pre-push only if the pre-push hook there runs $stub," >&2
+  echo "and pre-commit's hook is not installed." >&2
+elif [ "${CI:-}" != true ]; then
+  mise x -- pre-commit install
 fi
