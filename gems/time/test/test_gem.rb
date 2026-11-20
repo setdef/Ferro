@@ -22,8 +22,9 @@ class TestGem < Minitest::Test
     assert_equal locked("time"), SPEC.metadata.fetch("time_version")
   end
 
-  # The features ADR 002 builds in are on, the ones it drops (serde, rand,
-  # quickcheck) are off, and large-dates is off (plan 007, decision 2).
+  # The features doc/contributors/design/cargo-features.md builds in are on,
+  # the ones it drops (serde, rand, quickcheck) are off, and large-dates is
+  # off (plan 007, decision 2).
   def test_the_manifest_pins_that_time_without_large_dates
     manifest = File.read(File.join(ROOT, "ext/ferro_time/Cargo.toml"))
     time = manifest[/^time = .*$/]

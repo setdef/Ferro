@@ -22,8 +22,8 @@ class TestGem < Minitest::Test
     assert_equal locked("global-hotkey"), SPEC.metadata.fetch("global_hotkey_version")
   end
 
-  # Neither of global-hotkey's features, serde and tracing, is built (ADR 002;
-  # plan 004, decision 2).
+  # Neither of global-hotkey's features, serde and tracing, is built
+  # (doc/contributors/design/cargo-features.md; plan 004, decision 2).
   def test_the_manifest_pins_that_global_hotkey_with_no_feature
     manifest = File.read(File.join(ROOT, "ext/ferro_global_hotkey/Cargo.toml"))
     global_hotkey = manifest[/^global-hotkey = .*$/]

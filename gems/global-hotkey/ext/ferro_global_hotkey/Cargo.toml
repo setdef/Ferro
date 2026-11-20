@@ -12,8 +12,8 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-# global-hotkey's features, serde and tracing, are dropped (ADR 002; plan 004,
-# decision 2).
+# global-hotkey's features, serde and tracing, are dropped
+# (doc/contributors/design/cargo-features.md; plan 004, decision 2).
 global-hotkey = "=0.9.0"
 # global-hotkey's own channel crate, for a wait Ruby can interrupt and the
 # handler's channel (plan 004, decisions 5 and 6).
@@ -36,7 +36,7 @@ bitflags = "=2.13.2"
 # this on (ADR 001, amendment of 2026-11-05: test hooks). The hooks are off
 # unless the installer passes `--enable-test-hooks` to extconf.rb, which
 # only the repository's own build does, and it is no option an app
-# chooses (ADR 002).
+# chooses (doc/contributors/design/cargo-features.md).
 test-hooks = []
 
 # Each crate states its lints itself instead of inheriting them with

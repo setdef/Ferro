@@ -179,10 +179,11 @@ What differs from calling url from Rust:
 
 url's +std+ feature (its default) is built. Three others are off. +serde+
 reaches only Rust, since the string it writes is Url#as_str, which
-Url.parse reads; ADR 002 drops it. +expose_internals+ adds only items to
-the unbound +quirks+ module. +debugger_visualizer+ names a file the
-published crate does not include, so it cannot build; it would add no Ruby
-API.
+Url.parse reads; Ferro drops it
+(doc/contributors/design/cargo-features.md). +expose_internals+ adds only
+items to the unbound +quirks+ module. +debugger_visualizer+ names a file
+the published crate does not include, so it cannot build; it would add no
+Ruby API.
 
 url keeps one piece of process-wide state, the counter that numbers opaque
 origins, and nothing the operating system holds, so another library in the

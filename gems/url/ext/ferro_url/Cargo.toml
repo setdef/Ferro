@@ -12,11 +12,11 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-# url's std (its default) is built. serde reaches only Rust (ADR 002), so
-# nothing here uses it; expose_internals adds only items to url's
-# #[doc(hidden)] quirks module, which the gem does not bind, and
-# debugger_visualizer names a file the published crate lacks, so all three
-# are off.
+# url's std (its default) is built. serde reaches only Rust
+# (doc/contributors/design/cargo-features.md), so nothing here uses it;
+# expose_internals adds only items to url's #[doc(hidden)] quirks module,
+# which the gem does not bind, and debugger_visualizer names a file the
+# published crate lacks, so all three are off.
 url = "=2.5.8"
 # url's own form_urlencoded, named because the native layer writes to its
 # Serializer over a String target (plan 005, decision 19).
@@ -31,7 +31,7 @@ rb-sys = "0.9.130"
 # turn this on (ADR 001, amendment of 2026-11-05: test hooks). The hooks
 # are off unless the installer passes `--enable-test-hooks` to extconf.rb,
 # which only the repository's own build does, and it is no option an app
-# chooses (ADR 002).
+# chooses (doc/contributors/design/cargo-features.md).
 test-hooks = []
 
 # Each crate states its lints itself instead of inheriting them with

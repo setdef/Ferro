@@ -12,13 +12,14 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-# Every arboard feature is built in (ADR 002, decision 1; plan 001,
-# decision 15): image-data, the default, adds ImageData and the image
-# methods, and implies core-graphics, image, and windows-sys;
-# wayland-data-control adds the Wayland clipboard, whose client is pure
-# Rust, and implies wl-clipboard-rs. Ruby reaches each, none excludes
-# another, and none needs a system library, so none is dropped or offered,
-# and the crate declares no [features] of its own.
+# Every arboard feature is built in
+# (doc/contributors/design/cargo-features.md; plan 001, decision 15):
+# image-data, the default, adds ImageData and the image methods, and implies
+# core-graphics, image, and windows-sys; wayland-data-control adds the
+# Wayland clipboard, whose client is pure Rust, and implies wl-clipboard-rs.
+# Ruby reaches each, none excludes another, and none needs a system library,
+# so none is dropped or offered, and the crate declares no [features] of its
+# own.
 arboard = { version = "=3.7.0", features = ["image-data", "wayland-data-control"] }
 magnus = { version = "0.9.3", features = ["bytes", "rb-sys"] }
 rb-sys = "0.9.130"
@@ -36,7 +37,7 @@ image = { version = "=0.25.10", default-features = false, features = ["png"] }
 # this on (ADR 001, amendment of 2026-11-05: test hooks). The hooks are off
 # unless the installer passes `--enable-test-hooks` to extconf.rb, which
 # only the repository's own build does, and it is no option an app
-# chooses (ADR 002).
+# chooses (doc/contributors/design/cargo-features.md).
 test-hooks = []
 
 # Each crate states its lints itself instead of inheriting them with

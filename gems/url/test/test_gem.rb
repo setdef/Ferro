@@ -22,8 +22,9 @@ class TestGem < Minitest::Test
     assert_equal locked("url"), SPEC.metadata.fetch("url_version")
   end
 
-  # serde reaches only Rust (ADR 002), and expose_internals adds only items
-  # to url's hidden quirks module, so both are off.
+  # serde reaches only Rust (doc/contributors/design/cargo-features.md), and
+  # expose_internals adds only items to url's hidden quirks module, so both
+  # are off.
   def test_the_manifest_pins_that_url_and_form_urlencoded
     manifest = File.read(File.join(ROOT, "ext/ferro_url/Cargo.toml"))
     url = manifest[/^url = .*$/]

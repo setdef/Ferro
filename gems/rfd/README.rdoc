@@ -59,8 +59,9 @@ installs, so the machine that installs it needs:
   (<tt>libwayland-dev</tt> on Debian and Ubuntu, +wayland-devel+ on
   Fedora): rfd's +wayland+ feature, which the 0.1.0 build has on,
   links <tt>libwayland-client</tt>, so it has to be present at run time
-  too. ADR 002 plans to let you leave +wayland+ out at install; that
-  option comes in a later release.
+  too. Ferro's design for Cargo features
+  (doc/contributors/design/cargo-features.md) lets you leave +wayland+
+  out at install; that option comes in a later release.
 
 The build runs <tt>cargo --locked</tt>, so it compiles exactly the
 dependency versions this gem was tested with. To build against newer ones
@@ -285,10 +286,10 @@ garbage collection while the main Ractor has another thread asleep (in
 no dialog, and Ruby 4.1 replaces the Windows scheduler involved.
 ferro-arboard's README says more.
 
-Two of rfd's Cargo features are not built in 0.1.0. ADR 002 offers +gtk3+
-at install, and plans to let you leave +wayland+ out; that install-time
-machinery comes in a later release, so the 0.1.0 build is rfd's defaults
-(+xdg-portal+ and +wayland+) plus +file-handle-inner+.
+Two of rfd's Cargo features are not built in 0.1.0. Ferro's design for
+Cargo features offers +gtk3+ at install, and lets you leave +wayland+ out;
+that install-time machinery comes in a later release, so the 0.1.0 build is
+rfd's defaults (+xdg-portal+ and +wayland+) plus +file-handle-inner+.
 
 * +gtk3+. rfd builds either its GTK backend or its XDG portal backend on
   Linux, never both, and the portal is rfd's default. The GTK backend runs

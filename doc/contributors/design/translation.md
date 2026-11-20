@@ -34,7 +34,7 @@ same day. The error rule was recorded on 2026-11-05 as well.
 | a struct with public fields | `Data.define` |
 | a borrowing builder (`clipboard.get().text()`) | an object that holds its clipboard: `clipboard.get.text` |
 | lifetimes, `Send`/`Sync` bounds | dropped; documented where they change behavior |
-| a Cargo feature | built in when Ruby reaches it; dropped when only Rust can; offered at install, by Cargo's own `--features` and `--no-default-features`, when it changes behavior, excludes another, or needs what not every machine has (ADR 002) |
+| a Cargo feature | built in when Ruby reaches it; dropped when only Rust can; offered at install, by Cargo's own `--features` and `--no-default-features`, when it changes behavior, excludes another, or needs what not every machine has ([cargo-features.md](cargo-features.md); offering is not built yet) |
 | an item a Cargo feature gates | defined only when that feature is built; `FEATURES` names the built ones |
 | a `#[cfg(target_os)]` item or platform trait | defined only on that platform, so `respond_to?` answers |
 | `Display` | `to_s` |
