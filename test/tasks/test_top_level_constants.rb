@@ -42,6 +42,6 @@ class TestTopLevelConstants < Minitest::Test
     offenses = files.flat_map do |path|
       bare_references(File.read(File.join(ROOT, path))).map { |reference| "#{path}:#{reference}" }
     end
-    assert_empty offenses, "write ::Time and ::Date (ADR 001, amendment of 2026-10-27)"
+    assert_empty offenses, "write ::Time and ::Date (doc/contributors/design/translation.md)"
   end
 end
