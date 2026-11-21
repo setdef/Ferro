@@ -11,6 +11,7 @@ require "fileutils"
 require "open3"
 require "rbconfig"
 require "tmpdir"
+require "tasks/desktop"
 
 # Showing a notification needs a desktop's notification server, so most of
 # these tests drive what runs without one: the builder, read back through
@@ -187,3 +188,14 @@ module NotifySuite
     skip "the notification server #{missing}" if missing
   end
 end
+
+# Showing a notification shows it on this session, and the Linux server
+# draws on the display the suite runs under, so only the desktop tests, in
+# test/desktop/, do either (doc/contributors/plan/014.md).
+NotifySuite::DESKTOP = [
+  [Ferro::NotifyRust::Notification, :show, "Notification#show shows a notification on this session"],
+  [Ferro::NotifyRust::Notification, :show_async, "Notification#show_async shows a notification on this session"],
+  [Ferro::NotifyRust::Notification, :show_async_at_bus, "Notification#show_async_at_bus shows a notification on this session"],
+  [NotifySuite::Server.singleton_class, :start, "NotifySuite::Server.start starts dunst on this session's display"],
+].select { |owner, name, _| owner.method_defined?(name) }.freeze
+NotifySuite::DESKTOP.each { |owner, name, what| Desktop.guard(owner, name, what) }

@@ -1,0 +1,598 @@
+# frozen_string_literal: true
+
+#--
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#++
+
+require "test_helper"
+require "json"
+
+# notify-rust against a real notification server: dunst, on the suite's own
+# session bus (NotifySuite::Server). dunstctl stands in for the user: it
+# invokes a notification's default action or dismisses it. An action with
+# another key, which dunst can offer only through a menu, comes as the
+# signal a server sends, through dbus-send. Ports notify-rust 4.18.2's
+# tests/realworld.rs (burst, closing, capabilities, init, urgency,
+# category, persistent, imagedata).
+class TestLinux < Minitest::Test
+  include NotifySuite
+
+  NotifyRust = Ferro::NotifyRust
+
+  def setup
+    skip_unless_platform(:linux)
+    require_server
+    Server.run("dunstctl", "close-all")
+  end
+
+  private def notification(summary = name)
+    NotifyRust::Notification.new.summary(summary)
+  end
+
+  private def displayed
+    Integer(Server.run("dunstctl", "count", "displayed").strip)
+  end
+
+  # Runs +action+ on another thread once a wait started after this call is
+  # listening: notify-rust adds its match rules for NotificationClosed when
+  # the wait first polls (zbus_rs.rs:127-147), and a signal sent before
+  # then is lost. Call it just before the wait.
+  private def once_listening(&action)
+    before = Server.match_rules("NotificationClosed")
+    Thread.new do
+      Thread.current.report_on_exception = false
+      200.times { Server.listening_since?("NotificationClosed", before) ? break : sleep(0.05) }
+      raise "no wait started listening" unless Server.listening_since?("NotificationClosed", before)
+
+      action.call
+    end
+  end
+
+  # Sends NotificationClosed for the notification +id+ with the
+  # specification's +reason+ code, as the server does when a notification
+  # expires.
+  private def closed(id, reason)
+    Server.signal("NotificationClosed", "uint32:#{id}", "uint32:#{reason}")
+  end
+
+  def test_the_server_is_dunst_and_says_what_it_can_do
+    info = NotifyRust.get_server_information
+
+    assert_equal "dunst", info.name
+    assert_equal "knopwob", info.vendor
+    assert_equal "1.2", info.spec_version
+    assert_includes NotifyRust.get_capabilities, "actions"
+    assert_same NotifyRust::DbusStack::Zbus, NotifyRust.dbus_stack
+    assert_equal 'ServerInformation { name: "dunst", vendor: "knopwob", version: "' \
+      "#{info.version}\", spec_version: \"1.2\" }", info.debug
+  end
+
+  # SPEC_VERSION is notify-rust's own static, read from the server once
+  # (src/lib.rs:226-233), and loads only when first named.
+  def test_spec_version_is_the_servers
+    version = NotifyRust::SPEC_VERSION
+
+    assert_equal NotifyRust.get_server_information.spec_version, "#{version.major}.#{version.minor}"
+    assert_operator version, :>=, NotifyRust::Version.__send__(:new, 1, 1)
+    assert Ractor.shareable?(version)
+    assert_same version, NotifyRust::SPEC_VERSION
+    assert_equal "Version { major: 1, minor: 2 }", version.debug
+  end
+
+  def test_show_sends_the_notification_and_answers_its_id
+    handle = notification("burst").appname("These should each").body("come in their own pop up.")
+      .icon("media-floppy").show
+
+    assert_kind_of NotifyRust::NotificationHandle, handle
+    assert_operator handle.id, :>, 0
+    assert_equal 1, displayed
+    assert_equal "burst", handle.summary
+    # notify-rust derives Debug for the handle (src/xdg/mod.rs:58, :70,
+    # src/xdg/zbus_rs/handle.rs:12), connection and all.
+    assert_match(/\ANotificationHandle \{ inner: Zbus\(ZbusNotificationHandle \{ id: #{handle.id}, connection: /,
+      handle.debug)
+    assert_match(/\A#<Ferro::NotifyRust::NotificationHandle:0x\h+>\z/, handle.inspect)
+  end
+
+  # Rust drops the handle at the end of its scope, so the end of show's
+  # block uses it up, and a later call raises IOError, as a closed IO does.
+  def test_show_with_a_block_yields_the_handle_and_returns_the_blocks_value
+    kept = nil
+    id = notification.show do |handle|
+      kept = handle
+      handle.id
+    end
+
+    assert_operator id, :>, 0
+    error = assert_raises(IOError) { kept.id }
+    assert_equal "Ferro::NotifyRust::NotificationHandle consumed by Builder#show", error.message
+    assert_raises(IOError) { kept.summary }
+    assert_raises(IOError) { kept.close }
+  end
+
+  # Each handle keeps a D-Bus connection of its own (src/xdg/zbus_rs.rs:61).
+  # Rust frees a handle, socket and all, when a call that takes it returns,
+  # or at the end of its scope; here too, not when the garbage collector
+  # frees the Ruby object, which the test keeps. A consuming call is
+  # checked inside show's block, before its end could free the handle. The
+  # socket closes on zbus's executor thread, so each check waits for it,
+  # with a generous bound.
+  def test_a_call_that_takes_the_handle_frees_its_connection
+    {
+      "close" => lambda(&:close),
+      "on_close" => lambda { |handle|
+        closer = once_listening { Server.run("dunstctl", "close") }
+        handle.on_close { |reason| reason }
+        closer.join
+      },
+    }.each do |call, consume|
+      before = sockets
+      notification(call).show do |handle|
+        opened = sockets - before
+        consume.call(handle)
+
+        refute_empty opened, "show opened no socket"
+        assert closed?(opened), "#{call} left the handle's socket open past 30 s"
+      end
+    end
+    before = sockets
+    opened = nil
+    kept = notification("scope").show do |handle|
+      opened = sockets - before
+      handle
+    end
+
+    refute_empty opened, "show opened no socket"
+    assert closed?(opened), "the end of show's block left the handle's socket open past 30 s"
+    assert_raises(IOError) { kept.id }
+  end
+
+  # The sockets this process holds, as /proc names them by inode. A test
+  # compares sockets, not counts, so another handle the garbage collector
+  # frees meanwhile cannot pass it.
+  private def sockets
+    Dir.children("/proc/self/fd").filter_map do |fd|
+      target = File.readlink("/proc/self/fd/#{fd}")
+      target if target.start_with?("socket:")
+    rescue SystemCallError
+      nil
+    end
+  end
+
+  # Whether every one of +opened+ closes within 30 s.
+  private def closed?(opened)
+    600.times.any? do
+      next true if (sockets & opened).empty?
+
+      sleep 0.05
+      false
+    end
+  end
+
+  def test_every_kind_of_hint_reaches_the_server
+    hint = NotifyRust::Hint
+    [
+      hint::Urgency.new(urgency::Low),
+      hint::Urgency.new(urgency::Critical),
+      hint::Category.new("email"),
+      hint::Resident.new(true),
+      hint::Transient.new(true),
+      hint::X.new(10),
+      hint::Y.new(10),
+      hint::CustomInt.new("value", 40),
+      hint::Custom.new("x-dunst-stack-tag", "volume"),
+      hint::ImageData.new(NotifyRust::Image.from_rgb(64, 64, "\x80".b * (64 * 64 * 3))),
+].each do |each|
+      notification("hint #{each.class.name}").hint(each).show
+    end
+
+    assert_operator displayed, :>=, 1
+  end
+
+  def test_wait_for_action_passes_the_default_action
+    handle = notification("click me").action("default", "default").timeout(NotifyRust::Timeout::Never).show
+    clicker = once_listening { Server.run("dunstctl", "action", "0") }
+    actions = []
+    handle.wait_for_action { |action| actions << action }
+    clicker.join
+
+    assert_equal ["default"], actions
+  end
+
+  # wait_for_action takes the handle (src/xdg/mod.rs:101), so a second
+  # wait on it raises IOError before it reaches the server; the second
+  # notification is another handle. The signal's id is read before the
+  # wait, as Rust could not read it from a handle moved into the wait.
+  def test_wait_for_action_passes_a_named_action_and_closed
+    handle = notification("click me").action("clicked_a", "button a").show
+    id = handle.id
+    sender = once_listening { Server.signal("ActionInvoked", "uint32:#{id}", "string:clicked_a") }
+    actions = []
+    handle.wait_for_action { |action| actions << action }
+    sender.join
+    error = assert_raises(IOError) { handle.wait_for_action { |action| actions << action } }
+
+    assert_equal "Ferro::NotifyRust::NotificationHandle consumed by NotificationHandle#wait_for_action", error.message
+    Server.run("dunstctl", "close-all")
+    closing = notification("close me").action("clicked_a", "button a").show
+    closer = once_listening { Server.run("dunstctl", "close") }
+    closing.wait_for_action { |action| actions << action }
+    closer.join
+
+    assert_equal %w[clicked_a __closed], actions
+  end
+
+  # Rust requires each wait's closure, so a wait without a block raises
+  # ArgumentError before it takes the handle, which stays usable.
+  def test_a_wait_without_a_block_raises_before_it_waits
+    handle = notification.show
+
+    %i[wait_for_action wait_for_response on_close wait_for_action_async].each do |name|
+      assert_raises(ArgumentError, name) { handle.public_send(name) }
+    end
+    assert_raises(ArgumentError) { NotifyRust.handle_action(handle.id) }
+    assert_operator handle.id, :>, 0
+  end
+
+  def test_wait_for_response_tells_a_click_from_an_action
+    handle = notification("click me").action("default", "default").show
+    clicker = once_listening { Server.run("dunstctl", "action", "0") }
+    responses = []
+    handle.wait_for_response { |response| responses << response }
+    clicker.join
+
+    assert_equal [NotifyRust::NotificationResponse::Default], responses
+  end
+
+  # on_close takes the handle (src/xdg/mod.rs:269), so the expiry's id is
+  # read before the wait, as Rust could not read it from a moved handle.
+  def test_on_close_passes_each_reason
+    reasons = []
+    expiring = notification("Time is running out").show
+    id = expiring.id
+    expiry = once_listening { closed(id, 1) }
+    expiring.on_close { |reason| reasons << reason }
+    expiry.join
+    # The test sent the signal, so dunst still shows the notification;
+    # on_close took the handle, so dunstctl closes it.
+    Server.run("dunstctl", "close-all")
+    dismissed = notification("dismiss me").show
+    closer = once_listening { Server.run("dunstctl", "close") }
+    dismissed.on_close { |reason| reasons << reason }
+    closer.join
+
+    assert_equal [NotifyRust::CloseReason::Expired, NotifyRust::CloseReason::Dismissed], reasons
+  end
+
+  def test_on_close_takes_a_block_without_arguments
+    closed = false
+    handle = notification.show
+    closer = once_listening { Server.run("dunstctl", "close") }
+    handle.on_close { closed = true }
+    closer.join
+
+    assert closed
+  end
+
+  # A setter needs the handle mutably, which wait_for_action_async borrows
+  # (src/xdg/mod.rs:183). The setter waits for the wait, with the lock
+  # released, as Ruby's Mutex makes a second thread wait, and a
+  # close_async, which borrows too (:229), from a third thread still ends
+  # the wait, since readers go first (lock.rs). The setter's thread sleeps
+  # while the waiter is still waiting, which shows both blocking with the
+  # lock released while this thread runs.
+  def test_a_setter_during_a_wait_waits_for_it_and_close_still_ends_the_wait
+    handle = notification("borrowed").timeout(NotifyRust::Timeout::Never).show
+    responses = []
+    waiter = setter = nil
+    closer = once_listening do
+      setter = Thread.new { handle.summary("changed") }
+      setter.report_on_exception = false
+      Thread.pass until setter.status != "run"
+      waiting = [setter.status, waiter.status, handle.summary]
+      handle.close_async.value
+      waiting
+    end
+    waiter = Thread.new { handle.wait_for_action_async { |response| responses << response }.value }
+
+    assert_equal ["sleep", "sleep", "borrowed"], closer.value, "the setter waits for the wait"
+    waiter.join
+    assert_same handle, setter.value
+    assert_equal [NotifyRust::NotificationResponse::Closed.new(NotifyRust::CloseReason::CloseAction)], responses
+    assert_equal "changed", handle.summary
+  end
+
+  # A wait that takes the handle uses it up when it starts, as Rust moves
+  # the handle into the call: a setter on another thread meanwhile raises
+  # IOError at once rather than waiting. The waiter's status is read
+  # before the close, which ends its wait.
+  def test_a_setter_during_a_wait_that_takes_the_handle_raises_io_error
+    handle = notification("taken").timeout(NotifyRust::Timeout::Never).show
+    waiter = nil
+    setter = once_listening do
+      error = assert_raises(IOError) { handle.summary("changed") }
+      waiting = waiter.status
+      Server.run("dunstctl", "close")
+      [error.message, waiting]
+    end
+    waiter = Thread.new { handle.on_close { |reason| reason } }
+
+    assert_equal ["Ferro::NotifyRust::NotificationHandle consumed by NotificationHandle#on_close", "sleep"], setter.value
+    waiter.join
+  end
+
+  # A setter waiting for another thread's borrowing wait has an unblocking
+  # function, so Thread#raise and Thread#kill end its wait
+  # (thread.c:2969-2982, :3007-3027 at v4.0.9) while the wait it waited
+  # for goes on. The joins' bounds only turn a lost wake into a failure
+  # rather than a hang.
+  def test_thread_raise_and_kill_end_a_setter_waiting_for_a_wait
+    handle = notification("borrowed").timeout(NotifyRust::Timeout::Never).show
+    responses = []
+    waiter = nil
+    setters = once_listening do
+      raised = Thread.new { handle.summary("raised") }
+      raised.report_on_exception = false
+      Thread.pass until raised.status != "run"
+      waited = raised.status
+      raised.raise(IOError, "raised")
+      error = begin
+        raised.join(30) || flunk("Thread#raise did not end the setter's wait")
+        nil
+      rescue IOError => e
+        e.message
+      end
+      killed = Thread.new { handle.body("killed") }
+      Thread.pass until killed.status != "run"
+      waited = [waited, killed.status]
+      killed.kill
+      killed.join(30) || flunk("Thread#kill did not end the setter's wait")
+      [waited, error, killed.status, waiter.status]
+    end
+    waiter = Thread.new { handle.wait_for_action_async { |response| responses << response }.value }
+    outcome = setters.value
+
+    assert_equal [%w[sleep sleep], "raised", false, "sleep"], outcome, "each setter waited and ended while the wait went on"
+    handle.close_async.value
+    waiter.join
+    assert_equal [NotifyRust::NotificationResponse::Closed.new(NotifyRust::CloseReason::CloseAction)], responses
+    assert_equal "borrowed", handle.summary
+    assert_equal "", handle.body
+    assert_same handle, handle.summary("free again"), "the turn ends with the wait"
+  end
+
+  # image(path) on a handle reads and decodes the file, as Image.open does,
+  # so it runs with the GVL released. The file is a FIFO: the reader blocks
+  # in open until this thread opens the other end, and then in read until
+  # this thread closes it. With the GVL held by the reader this thread
+  # could never run again, and the child is killed at CHILD_LIMIT.
+  def test_image_path_on_a_handle_reads_the_file_without_the_gvl
+    outcome, = in_child(<<~RUBY)
+      require "tmpdir"
+      Dir.mktmpdir do |dir|
+        fifo = File.join(dir, "image.png")
+        File.mkfifo(fifo)
+        handle = Ferro::NotifyRust::Notification.new.summary("x")
+          .timeout(Ferro::NotifyRust::Timeout::Never).show
+        reader = Thread.new do
+          handle.image(fifo)
+          nil
+        rescue Ferro::NotifyRust::Error => e
+          e.class.name
+        end
+        File.open(fifo, "w") { sleep 0.2 }
+        error = reader.value
+        handle.close
+        error
+      end
+    RUBY
+
+    assert_equal "Ferro::NotifyRust::Error::Image", outcome
+  end
+
+  # A setter called on the thread whose own borrowing wait holds the
+  # handle, from a signal trap that runs during that wait, would wait for
+  # itself forever, so it raises ThreadError, as Ruby's Mutex#lock does for
+  # a thread that holds it. The wait goes on after the trap, and a close
+  # ends it. The signal waits, as once_listening does, for the wait's match
+  # rules, so the trap runs inside the wait and the close's signal reaches
+  # it.
+  def test_a_setter_in_a_trap_during_its_own_threads_wait_raises_thread_error
+    outcome, = in_child(<<~RUBY)
+      rules = lambda do
+        IO.popen(%w[dbus-send --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus
+          org.freedesktop.DBus.Debug.Stats.GetAllMatchRules], &:read).scan("member='NotificationClosed'").size
+      end
+      handle = Ferro::NotifyRust::Notification.new.summary("trapped")
+        .timeout(Ferro::NotifyRust::Timeout::Never).show
+      before = rules.call
+      error = nil
+      closer = nil
+      Signal.trap(:USR1) do
+        error = begin
+          handle.summary("changed")
+          nil
+        rescue ThreadError => e
+          [e.class.name, e.message]
+        end
+        closer = Thread.new { handle.close_async.value }
+      end
+      Thread.new do
+        sleep 0.05 until rules.call > before
+        Process.kill(:USR1, Process.pid)
+      end
+      responses = []
+      handle.wait_for_action_async { |response| responses << response.debug }.value
+      closer.join
+      [error, responses, handle.summary]
+    RUBY
+
+    assert_equal [
+      ["ThreadError", "already borrowed: this thread's own wait or close is using this NotificationHandle"],
+      ["Closed(CloseAction)"],
+      "trapped",
+], outcome
+  end
+
+  # notify-rust's close_async example (src/xdg/mod.rs:155-178) closes while
+  # it waits; wait_for_action_async and close_async borrow the handle
+  # together.
+  def test_close_while_waiting_closes_with_close_action
+    handle = notification("I'll be here till you close me!").hint(NotifyRust::Hint::Resident.new(true))
+      .timeout(NotifyRust::Timeout::Never).show
+    closer = once_listening { handle.close_async.value }
+    responses = []
+    handle.wait_for_action_async { |response| responses << response }.value
+    closer.join
+
+    assert_equal [NotifyRust::NotificationResponse::Closed.new(NotifyRust::CloseReason::CloseAction)], responses
+    assert_equal 0, displayed
+  end
+
+  def test_update_replaces_the_notification_the_server_shows
+    handle = notification("Latest News").body("Bayern Dortmund 3:2").show
+    id = handle.id
+    handle.summary("Latest News (Correction)").body("Bayern Dortmund 3:3")
+    handle.update
+
+    assert_equal id, handle.id
+    assert_equal 1, displayed
+    assert_equal "Latest News (Correction)", handle.summary
+  end
+
+  # update takes &mut self, as the setters do, so a frozen handle refuses
+  # it before anything reaches the server.
+  def test_a_frozen_handle_refuses_update
+    handle = notification("frozen").show.freeze
+
+    assert_raises(FrozenError) { handle.update }
+    assert_raises(FrozenError) { handle.summary("changed") }
+    assert_equal "frozen", handle.summary
+  end
+
+  def test_an_id_set_ahead_replaces_that_notification
+    first = notification("Volume 40%").show
+    notification("Volume 50%").id(first.id).show
+
+    assert_equal 1, displayed
+  end
+
+  def test_a_wait_lets_other_threads_run_and_an_interrupt_ends_it
+    handle = notification("never answered").timeout(NotifyRust::Timeout::Never).show
+    ticks = 0
+    waiter = Thread.new do
+      Thread.current.report_on_exception = false
+      handle.wait_for_action { flunk "no action was taken" }
+    end
+    20.times do
+      ticks += 1
+      sleep 0.01
+    end
+    waiter.raise(Interrupt)
+
+    assert_raises(Interrupt) { waiter.join(5) || flunk("the interrupt did not end the wait") }
+    assert_equal 20, ticks
+    assert_raises(IOError, "the wait took the handle, as Rust moves it, though it was interrupted") do
+      handle.on_close { |reason| reason }
+    end
+  end
+
+  # An interrupt that ends a Future's wait drops the work, as dropping a
+  # Rust future does, and leaves both the borrowed handle and the Future
+  # usable: the next value waits again. notify-rust adds its match rules
+  # with AddMatch and never removes them (src/xdg/zbus_rs.rs:135-145;
+  # zbus 5.19.0 src/fdo/dbus.rs:312-314), so the dropped wait's rules stay
+  # on the handle's connection, which the borrow keeps, as they would in
+  # Rust; the next wait adds its own beside them.
+  def test_an_interrupted_future_waits_again_on_the_next_value
+    handle = notification("never answered").timeout(NotifyRust::Timeout::Never).show
+    responses = []
+    future = handle.wait_for_action_async { |response| responses << response }
+    before = Server.match_rules("NotificationClosed")
+    waiter = Thread.new do
+      Thread.current.report_on_exception = false
+      future.value
+    end
+    200.times { Server.listening_since?("NotificationClosed", before) ? break : sleep(0.05) }
+    waiter.raise(Interrupt)
+
+    assert_raises(Interrupt) { waiter.join(5) || flunk("the interrupt did not end the wait") }
+    assert Server.listening_since?("NotificationClosed", before), "the dropped wait's match rule stays"
+    closer = once_listening { Server.run("dunstctl", "close") }
+    again = Thread.new { future.value }
+    again.report_on_exception = false
+
+    assert again.join(60), "the next value did not return once the notification closed"
+    assert_nil again.value
+    closer.join
+    assert_equal [NotifyRust::NotificationResponse::Closed.new(NotifyRust::CloseReason::Dismissed)], responses
+    assert_operator handle.id, :>, 0
+  end
+
+  def test_handle_action_yields_an_action_response
+    id = notification("click me").action("clicked_a", "button a").show.id
+    sender = once_listening { Server.signal("ActionInvoked", "uint32:#{id}", "string:clicked_a") }
+    responses = []
+    NotifyRust.handle_action(id) { |response| responses << response }
+    sender.join
+
+    assert_equal [NotifyRust::ActionResponse::Custom.new("clicked_a")], responses
+  end
+
+  def test_async_methods_run_when_their_value_is_asked
+    future = notification("simple async").show_async
+
+    assert_equal 0, displayed, "nothing is sent until value runs"
+    handle = future.value
+    error = assert_raises(IOError, ".await takes the future") { future.value }
+
+    assert_equal "Ferro::NotifyRust::Future consumed by Future#value", error.message
+    assert_raises(TypeError) { future.dup }
+    assert_equal 1, displayed
+
+    responses = []
+    waiting = handle.wait_for_action_async { |response| responses << response }
+    closing = handle.close_async
+    closer = once_listening { closing.value }
+
+    assert_nil waiting.value
+    closer.join
+    assert_equal [NotifyRust::NotificationResponse::Closed.new(NotifyRust::CloseReason::CloseAction)], responses
+    assert_operator handle.id, :>, 0, "the async methods borrow the handle"
+  end
+
+  # An error is the future's outcome too, so the first value raises it and
+  # uses the future up.
+  def test_a_bus_nobody_serves_raises_zbus_errors
+    future = notification.show_async_at_bus("nobody_listens")
+    error = assert_raises(NotifyRust::Error::Zbus) { future.value }
+
+    assert_includes error.message, "org.freedesktop.DBus.Error.ServiceUnknown"
+    assert_match(/\AError \{ kind: Zbus\(/, error.debug)
+    assert_raises(IOError) { future.value }
+    invalid = assert_raises(NotifyRust::Error::Msg) { notification.show_async_at_bus("9").value }
+
+    assert_equal 'Error { kind: Msg("invalid subpath") }', invalid.debug
+  end
+
+  def test_without_a_session_bus_show_raises_zbus_and_handle_action_a_caught_panic
+    outcome, = in_child(<<~RUBY, "DBUS_SESSION_BUS_ADDRESS" => "unix:path=/nonexistent/bus")
+      show = begin
+        Ferro::NotifyRust::Notification.new.summary("x").show
+      rescue Ferro::NotifyRust::Error => e
+        e.class.name
+      end
+      handle = begin
+        Ferro::NotifyRust.handle_action(1) { }
+      rescue Ferro::NotifyRust::Error => e
+        [e.class.name, e.message]
+      end
+      [show, handle]
+    RUBY
+
+    assert_equal "Ferro::NotifyRust::Error::Zbus", outcome.first
+    assert_equal "Ferro::NotifyRust::Error", outcome.last.first
+    assert_match(/\Anotify-rust panicked: /, outcome.last.last)
+  end
+end
