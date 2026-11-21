@@ -18,7 +18,7 @@ skill is the workflow around them. Read both first, then
 
 | Source | Where |
 |---|---|
-| The crate you bind | Its latest release on crates.io. Add it to the gem's `Cargo.toml`, run `cargo metadata --format-version 1` in `gems/<name>`, and read the directory of the package's `manifest_path`. |
+| The crate you bind | Its latest release on crates.io, or, in a gem Tokra builds on, the newest release inside the requirement Tauri states (`doc/contributors/design/repository.md`, "Versions and releases"). Add it to the gem's `Cargo.toml`, run `cargo metadata --format-version 1` in `gems/<name>`, and read the directory of the package's `manifest_path`. |
 | magnus, rb-sys | The locked copies, found the same way. `pins:check` keeps every gem on the same ones. |
 | The crate's dependencies | The locked copies again, when the crate's behavior depends on them (arboard's PNG encoder asserts its buffer length). |
 | Ruby itself | The tag of the Ruby version you run (`gc.c` at `v4.0.1`, for example). |

@@ -109,6 +109,19 @@ Tokra's plugins depend only on released Ferro versions, a published gem or
 a pushed release tag, so Ferro work comes first when a plugin needs a
 binding.
 
+A gem binds its crate's latest release. A gem Tokra builds on binds
+instead the newest release inside the version requirement that the Tauri
+component Tokra ports states for the crate, in that component's
+`Cargo.toml`, and moves when Tokra moves to a newer Tauri. The requirement
+is the measure, not Tauri's `Cargo.lock`: a Tauri application ships what
+Cargo resolves inside the requirement when the application is built, and
+Cargo does not pass a library's lock on to what depends on it
+([Cargo's FAQ](https://doc.rust-lang.org/cargo/faq.html), "Why have
+Cargo.lock in version control?"). Where the requirement admits the crate's
+latest release, as `"2"` does for url, the two rules agree. Where it holds
+the crate to one 0.x line, as Tauri holds tao to 0.34, they do not, and
+Tauri's line wins, because Tokra's fidelity is to Tauri.
+
 ## Licenses
 
 A gem's Ruby and Rust code takes the license of the crate it binds:

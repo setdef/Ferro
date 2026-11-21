@@ -6,10 +6,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Translating a Crate to Ruby
 
-A Ferro gem mirrors its crate one to one ([ADR 001](../adr/001.md)). Ruby
-the language comes first, then fidelity to the crate, then Ruby culture,
-as AGENTS.md's design precedence orders them. Rust constructs with no
-Ruby meaning are translated, never ported. This document holds the
+A Ferro gem mirrors its crate one to one ([ADR 001](../adr/001.md)).
+Fidelity to the crate comes first, then what Ruby the language can
+express, then Ruby culture, as AGENTS.md's design precedence orders them.
+A gem differs from its crate only where Ruby cannot do what Rust does:
+Rust constructs with no Ruby meaning are translated, never ported. This document holds the
 translations every gem makes, so that each gem makes them the same way.
 
 The first table rows came with ADR 001 on 2026-10-24. The maintainer

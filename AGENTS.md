@@ -13,13 +13,13 @@ Pre-1.0, zero external users. Prefer good design over backward compatibility; re
 
 ## Design precedence
 
-1. **Ruby the language.** What Ruby can and cannot express. Rust constructs with no Ruby meaning (lifetimes, moves, `Send` and `Sync` bounds, Cargo features) are translated, not ported. A Cargo feature is built in, dropped, or offered at install, as `doc/contributors/design/cargo-features.md` sorts it; an offered feature keeps the crate's default.
-2. **Crate fidelity.** Names, types, error variants and their `Display` text, platform gating, and behavior MUST match the crate's source at the bound version. Do not invent "more Ruby-like" APIs.
+1. **Crate fidelity.** Names, types, error variants and their `Display` text, platform gating, and behavior MUST match the crate's source at the bound version. Do not invent "more Ruby-like" APIs. For any difference, ask what a Ruby developer would see that a Rust developer using the crate would not.
+2. **Ruby the language.** A gem differs from its crate only where Ruby cannot do what Rust does. Rust constructs with no Ruby meaning (lifetimes, moves, `Send` and `Sync` bounds, Cargo features) are translated, not ported, each as the translation table gives it. A Cargo feature is built in, dropped, or offered at install, as `doc/contributors/design/cargo-features.md` sorts it; an offered feature keeps the crate's default. A difference the table does not list is rare, comes after every other avenue has been tried, and is a recorded decision, never a preference.
 3. **Ruby culture.** Idioms yield to 1 and 2.
 
 The translation table in `doc/contributors/design/translation.md` is the rulebook: `Result` raises, each error variant is a class, `Option` is `nil`, bytes are binary Strings, public-field structs are `Data.define`, builders hold their receiver, platform items exist only on their platform. A case the table does not cover is a design decision: write it in the plan and in the RDoc a user reads.
 
-The authority is the crate's source at the version the gem's `Cargo.lock` pins. Run `cargo metadata --format-version 1` in `gems/<name>` and read the directory of the crate's `manifest_path`; the same goes for magnus, rb-sys, and any dependency whose behavior matters. Bind a crate's latest release. Never guess at a source's contents. Cite the file and lines you bind, and add an SPDX snippet with the crate's license and copyright line around any code or prose derived from it.
+The authority is the crate's source at the version the gem's `Cargo.lock` pins. Run `cargo metadata --format-version 1` in `gems/<name>` and read the directory of the crate's `manifest_path`; the same goes for magnus, rb-sys, and any dependency whose behavior matters. Bind a crate's latest release; a gem Tokra builds on binds instead the newest release inside the version requirement that the Tauri component Tokra ports states for the crate, and moves when Tokra moves to a newer Tauri (`doc/contributors/design/repository.md`, "Versions and releases"). Never guess at a source's contents. Cite the file and lines you bind, and add an SPDX snippet with the crate's license and copyright line around any code or prose derived from it.
 
 ## How to work
 
