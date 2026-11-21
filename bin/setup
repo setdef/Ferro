@@ -4,12 +4,27 @@
 
 # Ferro's development tools, from the pins in mise.toml, and its git hooks.
 # Every step does nothing when it is already satisfied, so it is quick and
-# safe to run again. It asks nothing and never runs sudo. On Linux, install
-# the packages CI installs first (.github/workflows/ci.yml, "Install display
-# servers").
+# safe to run again. It asks nothing and never runs sudo. On Linux, the
+# packages CI installs (.github/workflows/ci.yml, "Install display
+# servers") come from bin/linux-env where Debian or Ubuntu lacks them
+# (Plan 013); on another system, install them first.
+#
+# With --gate it installs only what the gate needs, and leaves the git
+# hooks alone. .githooks/pre-push runs it so before every push, so a fresh
+# checkout needs nothing run first.
 
 set -euo pipefail
 IFS=$'\n\t'
+
+gate=false
+case "$*" in
+  "") ;;
+  --gate) gate=true ;;
+  *)
+    echo "usage: bin/setup [--gate]" >&2
+    exit 2
+    ;;
+esac
 set -vx
 
 if ! command -v mise >/dev/null 2>&1; then
@@ -28,7 +43,15 @@ if [ "${CI:-}" = true ]; then
   mise x -- bundle config set --local path vendor/bundle
   mise x -- bundle config set --local frozen true
 fi
-mise x -- bundle install
+# On Linux, bin/linux-env first brings the packages the machine lacks, so
+# a download that fails stops here, and anything in the bundle that
+# compiles finds them as the gate's compile does.
+mise x -- bin/linux-env bundle install
+
+# The rest is for a clone a person works in, not for the gate.
+if [ "$gate" = true ]; then
+  exit 0
+fi
 
 # The pre-push hook, .githooks/pre-push, runs the gate on the commit you
 # push. The clone's shared hooks folder gets a stub that hands off to it, so

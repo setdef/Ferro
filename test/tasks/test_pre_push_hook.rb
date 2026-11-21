@@ -10,11 +10,12 @@ require "open3"
 require "tmpdir"
 require "yaml"
 
-# Tests .githooks/pre-push (Plan 012): which pushes run the gate, which it
-# refuses, and that it runs the gate as ci.yml does. Each test hands the
-# real hook the lines git would, in a real repository, or pushes through
-# it with a real git push, with stand-ins for bundle and xvfb-run that log
-# their arguments and their environment.
+# Tests .githooks/pre-push (Plans 012 and 013): which pushes run the gate,
+# which it refuses, that it sets Ferro up first, and that it runs the gate
+# as ci.yml does, with mise's tools. Each test hands the real hook the
+# lines git would, in a real repository, or pushes through it with a real
+# git push, with stand-ins for bin/setup, bin/linux-env, mise, bundle, and
+# xvfb-run that log their arguments and their environment.
 class TestPrePushHook < Minitest::Test
   ROOT = File.expand_path("../..", __dir__)
   HOOK = File.join(ROOT, ".githooks/pre-push")
@@ -27,6 +28,32 @@ class TestPrePushHook < Minitest::Test
     { printf '%s' "$(basename "$0")"; for a in "$@"; do printf ' %s' "$a"; done; printf '\n'; } >> "$(dirname "$0")/log"
     env > "$(dirname "$0")/env"
     exit "${GATE_STATUS:-0}"
+  SH
+
+  # A bin/linux-env that marks the environment it hands on and runs the
+  # command, as the real one does where nothing is missing.
+  LINUX_ENV = <<~SH
+    #!/bin/sh
+    LINUX_ENV_RAN=1 exec "$@"
+  SH
+
+  # A mise that logs its arguments and runs what mise x is given, as the
+  # real one does once its tools are installed.
+  MISE = <<~'SH'
+    #!/bin/sh
+    { printf mise; for a in "$@"; do printf ' %s' "$a"; done; printf '\n'; } >> "$(dirname "$0")/log"
+    [ "$1" = x ] && [ "$2" = -- ] || exit 0
+    shift 2
+    exec "$@"
+  SH
+
+  # A bin/setup that logs its arguments into LOG, says something, and exits
+  # with SETUP_STATUS, or 0.
+  SETUP = <<~'SH'
+    #!/bin/sh
+    { printf setup; for a in "$@"; do printf ' %s' "$a"; done; printf '\n'; } >> "$LOG"
+    echo "setup's last words"
+    exit "${SETUP_STATUS:-0}"
   SH
 
   # The variables a git hook passes on, which would point the git commands
@@ -44,13 +71,21 @@ class TestPrePushHook < Minitest::Test
     @dir = File.realpath(Dir.mktmpdir("pre_push"))
     @bin = File.join(@dir, "bin")
     Dir.mkdir(@bin)
-    %w[bundle xvfb-run].each do |name|
-      File.write(File.join(@bin, name), LOGGER)
+    { "bundle" => LOGGER, "xvfb-run" => LOGGER, "mise" => MISE }.each do |name, script|
+      File.write(File.join(@bin, name), script)
       File.chmod(0o755, File.join(@bin, name))
     end
     @repo = File.join(@dir, "repo")
     Dir.mkdir(@repo)
     git("init", "--quiet", "--initial-branch", "trunk")
+    FileUtils.mkdir_p(File.join(@repo, "bin"))
+    { "bin/linux-env" => LINUX_ENV, "bin/setup" => SETUP }.each do |path, script|
+      File.write(File.join(@repo, path), script)
+      File.chmod(0o755, File.join(@repo, path))
+    end
+    # The hook writes what bin/setup prints under tmp/, which git ignores.
+    File.write(File.join(@repo, ".gitignore"), "/tmp/\n")
+    git("add", "bin/linux-env", "bin/setup", ".gitignore")
     @first = commit("one")
   end
 
@@ -59,7 +94,8 @@ class TestPrePushHook < Minitest::Test
   end
 
   private def env(extra = {})
-    GIT_ALONE.merge("PATH" => "#{@bin}#{File::PATH_SEPARATOR}#{ENV.fetch('PATH')}").merge(extra)
+    GIT_ALONE.merge("PATH" => "#{@bin}#{File::PATH_SEPARATOR}#{ENV.fetch('PATH')}", "LOG" => File.join(@bin, "log"))
+      .merge(extra)
   end
 
   private def git(*, chdir: @repo, hooks: File::NULL)
@@ -97,7 +133,12 @@ class TestPrePushHook < Minitest::Test
     File.readlines(File.join(@bin, "env"), chomp: true).to_h { |line| line.split("=", 2) }
   end
 
-  private def gate = LINUX ? ["xvfb-run --auto-servernum bundle exec rake"] : ["bundle exec rake"]
+  # The calls a push that runs the gate makes: bin/setup, then the gate
+  # through mise, which runs the stand-in that logs it.
+  private def gate
+    command = LINUX ? "xvfb-run --auto-servernum bundle exec rake" : "bundle exec rake"
+    ["setup --gate", "mise x -- #{'bin/linux-env ' if LINUX}#{command}", command]
+  end
 
   private def ci_step(name)
     workflow = YAML.safe_load_file(File.join(ROOT, ".github/workflows/ci.yml"))
@@ -128,11 +169,44 @@ class TestPrePushHook < Minitest::Test
     assert_equal gate, calls
   end
 
-  def test_the_hook_runs_the_gate_as_ci_runs_it_on_linux_and_elsewhere
+  # The hook may be all that runs in a fresh checkout, as on a CI runner, so
+  # it sets Ferro up itself, and only once the push is one it will gate.
+  def test_it_sets_ferro_up_for_the_gate_before_running_it
+    output, status = push("refs/heads/trunk #{@first} refs/heads/trunk #{ZERO}")
+
+    assert_predicate status, :success?, output
+    assert_equal "setup --gate", calls.first
+    assert_includes File.read(File.join(@repo, "tmp/pre-push-setup.log")), "setup's last words"
+  end
+
+  # A setup that fails would leave the gate to fail for a reason that is
+  # not the push's, so the push stops there, with what setup said last.
+  def test_a_setup_that_fails_refuses_the_push_before_the_gate_and_shows_what_it_said
+    output, status = push("refs/heads/trunk #{@first} refs/heads/trunk #{ZERO}", extra: { "SETUP_STATUS" => "3" })
+
+    assert_equal 3, status.exitstatus, output
+    assert_equal ["setup --gate"], calls
+    assert_includes output, "setup's last words"
+    assert_includes output, "pre-push: bin/setup --gate failed with status 3; all it printed is in tmp/pre-push-setup.log."
+  end
+
+  # Nothing activates mise where the hook runs from a fresh checkout, so
+  # the gate runs with the tools mise.toml pins through mise x.
+  def test_the_hook_runs_the_gate_as_ci_runs_it_on_linux_and_elsewhere_with_mise_s_tools
     hook = File.read(HOOK)
 
-    assert_includes hook, "    exec #{ci_step('Run the gate under X11')} ;;\n"
-    assert_includes hook, "  *) exec #{ci_step('Run the gate')} ;;\n"
+    assert_includes hook, "    exec mise x -- bin/linux-env #{ci_step('Run the gate under X11')} ;;\n"
+    assert_includes hook, "  *) exec mise x -- #{ci_step('Run the gate')} ;;\n"
+  end
+
+  # bin/linux-env brings ci.yml's packages where the system lacks them.
+  def test_on_linux_the_gate_runs_through_bin_linux_env
+    skip "the hook runs bin/linux-env only on Linux" unless LINUX
+
+    output, status = push("refs/heads/trunk #{@first} refs/heads/trunk #{ZERO}")
+
+    assert_predicate status, :success?, output
+    assert_equal "1", gate_env["LINUX_ENV_RAN"]
   end
 
   # arboard takes a Wayland desktop before an X display, so on a Wayland
@@ -208,13 +282,9 @@ class TestPrePushHook < Minitest::Test
   end
 
   def test_an_ignored_file_does_not_stop_the_push
-    File.write(File.join(@repo, ".gitignore"), "/tmp/\n")
-    git("add", ".gitignore")
-    git("commit", "--quiet", "--message", "ignore tmp")
-    head = git("rev-parse", "HEAD")
     FileUtils.mkdir_p(File.join(@repo, "tmp"))
     File.write(File.join(@repo, "tmp/built"), "build output")
-    output, status = push("refs/heads/trunk #{head} refs/heads/trunk #{@first}")
+    output, status = push("refs/heads/trunk #{@first} refs/heads/trunk #{ZERO}")
 
     assert_predicate status, :success?, output
     assert_equal gate, calls

@@ -9,8 +9,10 @@
 #
 # The gate tests the working tree, so the push is refused unless that is
 # the commit being pushed, with nothing uncommitted and nothing untracked.
-# On Linux the gate runs as CI's first pass runs it
-# (.github/workflows/ci.yml), on an Xvfb display of its own.
+# Then the hook sets Ferro up itself, so it needs nothing run before it,
+# not even in a fresh checkout: only mise. On Linux the gate runs as CI's
+# first pass runs it (.github/workflows/ci.yml), on an Xvfb display of its
+# own, with the packages CI installs.
 root=$(git rev-parse --show-toplevel) || exit 1
 cd "$root" || exit 1
 # git points a hook's commands at its own repository through these, from a
@@ -53,11 +55,27 @@ if [ -n "$untracked" ]; then
   exit 1
 fi
 
+# bin/setup --gate installs the tools mise.toml pins and the bundle, and on
+# Linux the packages the machine lacks, and does nothing when they are
+# there. It leaves the git hooks to a person's bin/setup. What it prints
+# goes to a log, and its end to you if it fails.
+log=tmp/pre-push-setup.log
+mkdir -p tmp || exit 1
+bin/setup --gate > "$log" 2>&1 || {
+  status=$?
+  tail -n 40 "$log" >&2
+  echo "pre-push: bin/setup --gate failed with status $status; all it printed is in $log." >&2
+  exit "$status"
+}
+
+# Nothing need have activated mise, so the gate runs with the tools it
+# pins through mise x.
 case "$(uname -s)" in
   Linux)
     # arboard takes a Wayland desktop before the X display xvfb-run gives
     # it, and the tests would then write the desktop's own clipboard.
     unset WAYLAND_DISPLAY
-    exec xvfb-run --auto-servernum bundle exec rake ;;
-  *) exec bundle exec rake ;;
+    # bin/linux-env brings ci.yml's packages where they are missing.
+    exec mise x -- bin/linux-env xvfb-run --auto-servernum bundle exec rake ;;
+  *) exec mise x -- bundle exec rake ;;
 esac
