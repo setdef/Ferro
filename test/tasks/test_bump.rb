@@ -110,8 +110,6 @@ class TestBump < Minitest::Test
       version.rb, the crate's Cargo.toml, its Cargo.lock, and the root
       Gemfile.lock name 1.0.0-beta.1. Tag it with rake release:demo:tag.
 
-      Generated with Claude Code (https://claude.com/claude-code)
-
       Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
     MESSAGE
     assert_empty IO.popen(["git", "status", "--porcelain", chdir: @root], &:read)

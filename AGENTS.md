@@ -59,8 +59,6 @@ The authority is the crate's source at the version the gem's `Cargo.lock` pins. 
 - Scoped Conventional Commits, plain text, wrapped at 72: `feat(arboard): ...` for one gem, no scope for repository-wide work, so `git log -- gems/<name>` reads as that gem's history. The body explains why this approach over alternatives, in prose (no lists, no markdown, no file inventories). Types: gem code feat/fix/refactor/perf; `tasks/`, the Rakefile, and CI chore; `doc/` and READMEs docs; tests test. End with the AI footer, after a blank line:
 
   ```
-  Generated with Claude Code (https://claude.com/claude-code)
-
   Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
   ```
 
