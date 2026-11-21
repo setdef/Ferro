@@ -53,11 +53,24 @@ class TestDesktopTasks < Minitest::Test
     RUBY
   end
 
-  # The files the Minitest task +name+ runs, from the command its :cmd
-  # task prints.
-  private def files_of(name)
-    _, printed = in_rake(%(Rake::Task["#{name}:cmd"].invoke; nil))
-    printed.scan(/require "([^"]+)"/).flatten - ["tasks/test_watchdog", "tasks/desktop", "minitest/autorun"]
+  # The files each Minitest task in +names+ runs, from the command its
+  # :cmd task prints, by name. One child loads the Rakefile for them all,
+  # since a load takes seconds on Windows.
+  private def files_of(names)
+    printed, = in_rake(<<~RUBY)
+      require "stringio"
+      #{names.inspect}.to_h do |name|
+        out = StringIO.new
+        $stdout = out
+        Rake::Task["\#{name}:cmd"].invoke
+        [name, out.string]
+      ensure
+        $stdout = STDOUT
+      end
+    RUBY
+    printed.transform_values do |command|
+      command.scan(/require "([^"]+)"/).flatten - ["tasks/test_watchdog", "tasks/desktop", "minitest/autorun"]
+    end
   end
 
   private def gems_with_desktop_tests
@@ -69,16 +82,16 @@ class TestDesktopTasks < Minitest::Test
   end
 
   def test_the_core_tasks_run_every_test_file_but_the_desktop_ones
+    expected = {}
     Dir.glob("gems/*", base: ROOT).each do |dir|
       gem = File.basename(dir)
       all = Dir.glob("#{dir}/test/**/test_*.rb", base: ROOT)
       desktop = Dir.glob("#{dir}/test/desktop/**/test_*.rb", base: ROOT)
-
-      assert_equal (all - desktop).sort, files_of("test:ruby:core:#{gem}").sort, gem
-      next if desktop.empty?
-
-      assert_equal desktop.sort, files_of("test:ruby:desktop:#{gem}").sort, gem
+      expected["test:ruby:core:#{gem}"] = (all - desktop).sort
+      expected["test:ruby:desktop:#{gem}"] = desktop.sort unless desktop.empty?
     end
+
+    files_of(expected.keys).each { |name, files| assert_equal expected.fetch(name), files.sort, name }
   end
 
   def test_no_core_task_reaches_a_desktop_task
