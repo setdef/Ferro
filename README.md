@@ -260,7 +260,10 @@ which also names the design records behind them. To build and check
 every gem, install [mise](https://mise.jdx.dev) and run `bin/setup`. It
 installs the toolchains `mise.toml` pins, the
 [REUSE tool](https://reuse.software), the bundle, and a git hook that
-runs every check on a commit before you push it:
+sets the checkout up and runs every check on a commit before you push it.
+On Debian or Ubuntu, `bin/linux-env` brings the packages CI installs
+without root, and runs a command with them; the hook runs the checks
+through it:
 
 <!-- SPDX-SnippetBegin -->
 <!--
@@ -271,6 +274,7 @@ runs every check on a commit before you push it:
 bin/setup
 bundle exec rake                # every check, across every gem
 bundle exec rake gate:arboard   # one gem's checks
+bin/linux-env xvfb-run --auto-servernum bundle exec rake   # on Linux
 ```
 <!-- SPDX-SnippetEnd -->
 
