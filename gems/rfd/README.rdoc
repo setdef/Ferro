@@ -175,7 +175,10 @@ queues its events instead of calling back in.
 set_parent keeps a dialog in front of your window. rfd takes anything that
 can name its window and display; in Ruby, any object that answers
 +window_handle+ and +display_handle+, each returning one of the handle
-values below, or +nil+.
+values below, or +nil+. +nil+ stands for a handle the window cannot give,
+which Rust writes as <tt>Err(HandleError)</tt>; that error is
+raw-window-handle's, not rfd's, so ferro-rfd binds no class for it, and
+the dialog opens without a parent, as it does in Rust.
 
 --
 SPDX-SnippetBegin
@@ -307,8 +310,8 @@ rfd's defaults (+xdg-portal+ and +wayland+) plus +file-handle-inner+.
 
 * Source: https://github.com/setdef/Ferro/tree/trunk/gems/rfd
 * Changelog: https://github.com/setdef/Ferro/blob/trunk/gems/rfd/CHANGELOG.md
-* The translation rules every Ferro gem follows (ADR 001):
-  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/adr/001.md
+* The translation rules every Ferro gem follows:
+  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/design/translation.md
 * rfd: https://github.com/PolyMeilex/rfd
 
 == License

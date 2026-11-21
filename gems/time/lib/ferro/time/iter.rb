@@ -40,11 +40,11 @@ module Ferro
     # time's +rev+, +count+, +last+, +max+, +min+, and +is_sorted+ take
     # the iterator by value in Rust, so here each uses it up: any later
     # use, +dup+ and comparison included, raises +IOError+, as a closed IO
-    # does, naming the method that used it (ADR 001, amendment of
-    # 2026-11-05). A frozen iterator is used up the same way, as Ruby
-    # closes a frozen IO and Rust moves a binding that is not +mut+.
-    # Enumerable's +count+, +max+, and +min+, with an argument or a block,
-    # walk a copy and use up nothing.
+    # does, naming the method that used it
+    # (doc/contributors/design/translation.md). A frozen iterator is used
+    # up the same way, as Ruby closes a frozen IO and Rust moves a binding
+    # that is not +mut+. Enumerable's +count+, +max+, and +min+, with an
+    # argument or a block, walk a copy and use up nothing.
     #
     # Iterators are mutable, so they are not shareable between Ractors.
     #

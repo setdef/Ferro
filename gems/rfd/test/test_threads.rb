@@ -11,9 +11,9 @@ require "test_helper"
 # application runs its event loop, after creating the NSApplication from
 # that thread (src/backend/macos/utils.rs:20-31, modal_future.rs:104-119).
 # ferro-rfd refuses first, raising what a caught panic of rfd's raises,
-# "rfd panicked: " and rfd's message (plan 002, decision 5; ADR 001's error
-# rule). The test process runs no application, so a Ruby thread is such a
-# thread.
+# "rfd panicked: " and rfd's message (plan 002, decision 5; the error rule
+# in doc/contributors/design/translation.md). The test process runs no application, so a
+# Ruby thread is such a thread.
 class TestThreads < Minitest::Test
   include RfdSuite
 

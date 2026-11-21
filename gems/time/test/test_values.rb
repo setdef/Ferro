@@ -156,7 +156,8 @@ class TestValues < Minitest::Test
   # A number on the left reaches, through coerce, time's impls with a
   # number on the left: the reflexive Mul<SignedDuration> for i32 and f64,
   # and std Duration's Add, Sub, Div, and PartialOrd with a SignedDuration
-  # (ADR 001, 2026-11-05). Every other operator keeps Ruby's own words.
+  # (doc/contributors/design/translation.md). Every other operator keeps
+  # Ruby's own words.
   def test_a_number_on_the_left_reaches_only_times_impls
     second = Duration::SECOND
     assert_equal Duration.seconds(3), 3 * second
@@ -189,7 +190,7 @@ class TestValues < Minitest::Test
   def test_month_and_weekday_numbers
     assert_equal (1..12).to_a, (1..12).map { |n| Month.try_from(n).to_i }
     # Weekday is #[repr(u8)], so Rust's `as u8` reads 0 for Monday to 6
-    # for Sunday, which to_i answers (ADR 001, 2026-11-05).
+    # for Sunday, which to_i answers (doc/contributors/design/translation.md).
     assert_equal (0..6).to_a, %i[Monday Tuesday Wednesday Thursday Friday Saturday Sunday].map { |day| Weekday.const_get(day).to_i }
     assert_equal [1, 2, 0, 1], [
       Weekday::Monday.number_from_monday,

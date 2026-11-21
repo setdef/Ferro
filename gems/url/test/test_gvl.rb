@@ -24,8 +24,9 @@ require "test_helper"
 #
 # The native hooks (gvl_releases, gvl_fallbacks, gvl_hold_lookups,
 # gvl_refuse_threads) are private singleton methods of Native that exist
-# only in the repository's build (the test-hooks feature, ADR 001,
-# amendment of 2026-11-05: test hooks); the packaged gem has none.
+# only in the repository's build (the test-hooks feature,
+# .agents/skills/bind-crate/SKILL.md, Test hooks); the packaged gem has
+# none.
 class TestGvl < Minitest::Test
   include UrlSuite
 

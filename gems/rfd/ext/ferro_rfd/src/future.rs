@@ -208,8 +208,8 @@ impl Future {
     /// blocking `lock()` here would hold the GVL that wait needs back to
     /// return, so the two would wait on each other forever: that raises
     /// `ThreadError`, Ruby's class for a wait that could never finish
-    /// (ADR 001's error rule). Only a `__send__` past the Ruby `Future`'s
-    /// own lock reaches it.
+    /// (the error rule in `doc/contributors/design/translation.md`). Only a
+    /// `__send__` past the Ruby `Future`'s own lock reaches it.
     fn lock(&self, ruby: &Ruby) -> Result<MutexGuard<'_, Slot>, Error> {
         match self.0.try_lock() {
             Ok(slot) => Ok(slot),

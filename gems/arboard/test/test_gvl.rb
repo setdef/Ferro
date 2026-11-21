@@ -23,8 +23,9 @@ require "rbconfig"
 # at work: another thread replaces the text while a write waits.
 #
 # The count comes from the private Clipboard#native_gvl_releases, a hook
-# that exists only in the repository's build (the test-hooks feature, ADR 001,
-# amendment of 2026-11-05: test hooks). The packaged gem has no such method.
+# that exists only in the repository's build (the test-hooks feature,
+# .agents/skills/bind-crate/SKILL.md, Test hooks). The packaged gem has
+# no such method.
 class TestGvl < Minitest::Test
   include ClipboardSuite
 

@@ -149,8 +149,8 @@ class TestUnit < Minitest::Test
     assert_raises(NoMethodError) { U::Second.class.allocate }
   end
 
-  # time's deprecated +convert+ module is not bound (ADR 001, amendment of
-  # 2026-11-05); Unit is its name.
+  # time's deprecated +convert+ module is not bound
+  # (doc/contributors/design/translation.md); Unit is its name.
   def test_the_deprecated_convert_is_unbound
     refute Ferro::Time.const_defined?(:Convert, false)
   end

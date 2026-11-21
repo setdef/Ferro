@@ -27,7 +27,7 @@ pub const NAME: &str = "windows";
 /// notify-rust's waits take `self` (`:111`, `:123`, `:136`), and so does
 /// the end of `show`'s block, where Rust drops it; afterwards every call
 /// raises `IOError` naming the call that took it (plan 003, decision 5;
-/// ADR 001, 2026-11-05).
+/// `doc/contributors/design/translation.md`).
 #[magnus::wrap(
     class = "Ferro::NotifyRust::NotificationHandle",
     free_immediately,

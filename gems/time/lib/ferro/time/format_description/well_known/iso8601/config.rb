@@ -45,7 +45,8 @@ module Ferro
             end
 
             # time's derived +Debug+ text for this variant, formatted by
-            # Rust: its name. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
+            # Rust: its name. +inspect+ stays Ruby's
+            # (doc/contributors/design/translation.md).
             #
             # === Example
             #
@@ -57,7 +58,7 @@ module Ferro
             # The variant's integer value, Rust's <tt>variant as u8</tt>: the
             # enum is fieldless and exhaustive, so +as+ reads its
             # discriminant, for which Ruby's own conversion to an Integer
-            # stands in (ADR 001, 2026-11-05).
+            # stands in (doc/contributors/design/translation.md).
             #
             # === Example
             #
@@ -113,7 +114,8 @@ module Ferro
             end
 
             # time's derived +Debug+ text for this variant, formatted by
-            # Rust: its name. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
+            # Rust: its name. +inspect+ stays Ruby's
+            # (doc/contributors/design/translation.md).
             #
             # === Example
             #
@@ -125,7 +127,7 @@ module Ferro
             # The variant's integer value, Rust's <tt>variant as u8</tt>: the
             # enum is fieldless and exhaustive, so +as+ reads its
             # discriminant, for which Ruby's own conversion to an Integer
-            # stands in (ADR 001, 2026-11-05).
+            # stands in (doc/contributors/design/translation.md).
             #
             # === Example
             #
@@ -176,7 +178,8 @@ module Ferro
               # none.
 
               # time's derived +Debug+ text for this precision, formatted
-              # by Rust. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
+              # by Rust. +inspect+ stays Ruby's
+              # (doc/contributors/design/translation.md).
               #
               # === Example
               #
@@ -201,7 +204,8 @@ module Ferro
               # none.
 
               # time's derived +Debug+ text for this precision, formatted
-              # by Rust. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
+              # by Rust. +inspect+ stays Ruby's
+              # (doc/contributors/design/translation.md).
               #
               # === Example
               #
@@ -226,7 +230,8 @@ module Ferro
               # none.
 
               # time's derived +Debug+ text for this precision, formatted
-              # by Rust. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
+              # by Rust. +inspect+ stays Ruby's
+              # (doc/contributors/design/translation.md).
               #
               # === Example
               #
@@ -264,7 +269,8 @@ module Ferro
             end
 
             # time's derived +Debug+ text for this variant, formatted by
-            # Rust: its name. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
+            # Rust: its name. +inspect+ stays Ruby's
+            # (doc/contributors/design/translation.md).
             #
             # === Example
             #
@@ -276,7 +282,7 @@ module Ferro
             # The variant's integer value, Rust's <tt>variant as u8</tt>: the
             # enum is fieldless and exhaustive, so +as+ reads its
             # discriminant, for which Ruby's own conversion to an Integer
-            # stands in (ADR 001, 2026-11-05).
+            # stands in (doc/contributors/design/translation.md).
             #
             # === Example
             #

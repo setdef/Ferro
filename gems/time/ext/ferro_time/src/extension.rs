@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! time's extension traits (time 0.3.55 `src/ext/`), which Ruby brings in
-//! as refinements (ADR 001, 2026-11-05): `NumericalDuration` on `i64` and
-//! `f64`, `NumericalStdDuration` on `u64` and `f64`, and `SystemTimeExt`
-//! on `SystemTime`, Ruby's `::Time`. `NumericalDuration`'s `i64` impl calls
-//! `SignedDuration`'s own constructors (`src/ext/numerical_duration.rs:79-125`),
-//! so Ruby's Integer refinement calls `Native.duration_unit`.
+//! time's extension traits (time 0.3.55 `src/ext/`), which Ruby brings in as
+//! refinements (`doc/contributors/design/translation.md`): `NumericalDuration`
+//! on `i64` and `f64`, `NumericalStdDuration` on `u64` and `f64`, and
+//! `SystemTimeExt` on `SystemTime`, Ruby's `::Time`. `NumericalDuration`'s `i64`
+//! impl calls `SignedDuration`'s own constructors
+//! (`src/ext/numerical_duration.rs:79-125`), so Ruby's Integer refinement calls
+//! `Native.duration_unit`.
 
 use magnus::{function, prelude::*, Error, RModule, Ruby, Symbol, Value};
 use time::ext::{NumericalDuration, NumericalStdDuration, SystemTimeExt};

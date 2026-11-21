@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! time's operations with std's `Duration` (ADR 001, 2026-11-05: any
-//! Numeric number of seconds in, a Rational number of seconds out).
+//! time's operations with std's `Duration`
+//! (`doc/contributors/design/translation.md`: any Numeric number of
+//! seconds in, a Rational number of seconds out).
 //!
 //! Ruby hands a std `Duration` over as its whole seconds and nanoseconds,
 //! `[seconds, nanoseconds]`, which `Std` reads; `lib/ferro/time/arguments.rb`

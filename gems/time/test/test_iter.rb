@@ -124,7 +124,7 @@ class TestIter < Minitest::Test
   end
 
   # A consumed iterator raises IOError on any later use, as a closed IO
-  # does (ADR 001, amendment of 2026-11-05; plan 007, Follow-up: the four
+  # does (doc/contributors/design/translation.md; plan 007, Follow-up: the four
   # rulings), naming the method that consumed it.
   def test_a_method_that_takes_the_iterator_by_value_uses_it_up
     consumers.each do |type, make, methods|

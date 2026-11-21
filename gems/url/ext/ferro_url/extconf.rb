@@ -16,7 +16,7 @@ require "rb_sys/mkmf"
 # feature in Cargo.toml). The hooks are off unless the installer passes
 # the option (gem install -- --enable-test-hooks, a Bundler build config,
 # or CONFIGURE_ARGS reach mkmf), which only the repository's own build
-# does (ADR 001, amendment of 2026-11-05: test hooks).
+# does (.agents/skills/bind-crate/SKILL.md, Test hooks).
 create_rust_makefile("ferro/url/ferro_url") do |r|
   r.extra_cargo_args += ["--locked"]
   r.features += ["test-hooks"] if enable_config("test-hooks", false)

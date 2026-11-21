@@ -86,8 +86,9 @@ impl Default for Notification {
 
 /// What a notification not yet initialized, one from
 /// `Notification.allocate`, raises: Ruby's own `TypeError` in Ruby's words,
-/// as `Time.allocate.year` raises "uninitialized Time" (ADR 001,
-/// 2026-11-05: a breach of Ruby's rules raises Ruby's class).
+/// as `Time.allocate.year` raises "uninitialized Time"
+/// (`doc/contributors/design/translation.md`: a breach of Ruby's rules
+/// raises Ruby's class).
 const UNINITIALIZED: &str = "uninitialized Ferro::NotifyRust::Notification";
 
 /// The `TypeError` an uninitialized notification raises.

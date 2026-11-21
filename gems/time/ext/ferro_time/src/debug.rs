@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! time's `Debug` text, and the integer values of its fieldless enums, for
-//! the values Ruby holds as frozen constants
-//! rather than wrapped Rust values: the enums, time-core's unit structs,
-//! and the well-known formats. Each function builds the Rust value from
-//! what names it and formats it, so `debug` answers Rust's own text (ADR
-//! 001, 2026-11-05) and cannot drift from it.
+//! the values Ruby holds as frozen constants rather than wrapped Rust
+//! values: the enums, time-core's unit structs, and the well-known
+//! formats. Each function builds the Rust value from what names it and
+//! formats it, so `debug` answers Rust's own text
+//! (`doc/contributors/design/translation.md`) and cannot drift from it.
 
 use magnus::{function, prelude::*, Error, RModule, Ruby, Symbol};
 use time::format_description::well_known::{Rfc2822, Rfc3339};
@@ -92,8 +92,8 @@ fn iso8601_enum_debug(ruby: &Ruby, kind: Symbol, index: u8, digits: u8) -> Resul
 }
 
 /// `Weekday::X as u8`, the `#[repr(u8)]` discriminant of the weekday
-/// `days` after Monday (`src/weekday.rs:16-33`), which ADR 001's
-/// 2026-11-05 amendment binds as `to_i`.
+/// `days` after Monday (`src/weekday.rs:16-33`), which
+/// `doc/contributors/design/translation.md` binds as `to_i`.
 fn weekday_to_i(ruby: &Ruby, days: u8) -> Result<u8, Error> {
     guarded(ruby, || Ok(weekday(days)? as u8))
 }

@@ -53,9 +53,10 @@ class TestFerroGems < Minitest::Test
 ], FerroGem.rbs_validate_arguments([plain, urlish, other])
   end
 
-  # A gem builds its test hooks only in the repository (ADR 001, amendment
-  # of 2026-11-05): the compile passes its extconf.rb the option, Cargo
-  # the feature, and the packaging check rebuilds it from the package.
+  # A gem builds its test hooks only in the repository
+  # (.agents/skills/bind-crate/SKILL.md, Test hooks): the compile passes
+  # its extconf.rb the option, Cargo the feature, and the packaging check
+  # rebuilds it from the package.
   def test_test_hooks_are_built_only_for_a_gem_that_has_them
     plain = gem
     hooked = gem(test_hooks: true)

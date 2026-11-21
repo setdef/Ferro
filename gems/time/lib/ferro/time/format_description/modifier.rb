@@ -82,7 +82,7 @@ module Ferro
           end
 
           # time's derived +Debug+ text for this variant, formatted by
-          # Rust: its name. +inspect+ stays Ruby's (ADR 001, 2026-11-05).
+          # Rust: its name. +inspect+ stays Ruby's (doc/contributors/design/translation.md).
           def debug
             Native.modifier_enum_debug(self.class.name.to_s.split("::").last.to_s.to_sym, @index)
           end
@@ -199,8 +199,9 @@ module Ferro
 
           # The variant's integer value, which Rust's <tt>as u8</tt> computes:
           # 0 for +Prohibit+, 1 for +Discard+. Only this modifier enum has
-          # one, as the others are <tt>#[non_exhaustive]</tt> and Rust
-          # forbids casting them outside the crate (ADR 001, 2026-11-05).
+          # one, as the others are <tt>#[non_exhaustive]</tt> and Rust forbids
+          # casting them outside the crate
+          # (doc/contributors/design/translation.md).
           #
           # === Example
           #

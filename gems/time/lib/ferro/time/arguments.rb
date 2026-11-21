@@ -55,9 +55,10 @@ module Ferro
 
         # The whole seconds and nanoseconds of the std +Duration+ that
         # +seconds+ names, the pair the native layer reads as a
-        # <tt>std::time::Duration</tt> (ADR 001, 2026-11-05). A Float goes
-        # through core's <tt>Duration::try_from_secs_f64</tt>, which rounds to
-        # the nearest nanosecond, ties to even, and refuses a negative, NaN,
+        # <tt>std::time::Duration</tt>
+        # (doc/contributors/design/translation.md). A Float goes through
+        # core's <tt>Duration::try_from_secs_f64</tt>, which rounds to the
+        # nearest nanosecond, ties to even, and refuses a negative, NaN,
         # infinite, or too large count with +ArgumentError+ and core's text.
         # Any other Numeric is exact: its Rational value, rounded the same
         # way. Its seconds then cross as a +u64+, so magnus refuses with
@@ -84,7 +85,8 @@ module Ferro
         end
 
         # A Rational number of seconds from a std +Duration+'s whole
-        # +nanoseconds+, exact to the nanosecond (ADR 001, 2026-11-05).
+        # +nanoseconds+, exact to the nanosecond
+        # (doc/contributors/design/translation.md).
         def seconds(nanoseconds)
           Rational(nanoseconds, NANOSECONDS)
         end

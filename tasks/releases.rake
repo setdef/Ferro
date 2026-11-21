@@ -8,12 +8,12 @@
 require_relative "release"
 
 # Replaces bundler/gem_tasks, whose v0.1.0 tags would collide between gems
-# (ADR 001, section 5). release:<gem>:tag tags the release commit a bump
-# made and pushes only the tag; agents may run it once the gate and CI pass
-# for that commit. release:<gem> also tags and pushes the gem to
-# RubyGems.org, and release:<gem>:push[version] pushes an already-tagged
-# version there from a clean checkout of its tag; only the maintainer does
-# either, and not yet.
+# (doc/contributors/design/repository.md). release:<gem>:tag tags the
+# release commit a bump made and pushes only the tag; agents may run it
+# once the gate and CI pass for that commit. release:<gem> also tags and
+# pushes the gem to RubyGems.org, and release:<gem>:push[version] pushes an
+# already-tagged version there from a clean checkout of its tag; only the
+# maintainer does either, and not yet.
 namespace :release do
   FERRO_GEMS.each do |gem|
     release = lambda do |version = gem.written_version|

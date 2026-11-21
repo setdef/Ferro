@@ -15,8 +15,9 @@ rescue CargoOutput::Failure => e
   abort "❌ #{e.message}"
 end
 
-# Each gem's crate is its own Cargo workspace (ADR 001, section 3), so
-# every cargo task runs once per gem.
+# Each gem's crate is its own Cargo workspace
+# (doc/contributors/design/repository.md), so every cargo task runs once
+# per gem.
 namespace :rust do
   FERRO_GEMS.each do |gem|
     namespace :clippy do

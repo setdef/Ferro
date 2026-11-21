@@ -191,8 +191,9 @@ module Ferro
       end
 
       # time's derived +Debug+ text for this month, formatted by Rust: the
-      # variant's name. +inspect+ stays Ruby's (ADR 001, 2026-11-05). Mirrors time's derived +Debug+ for
-      # +Month+ (<tt>src/month.rs:13</tt>).
+      # variant's name. +inspect+ stays Ruby's
+      # (doc/contributors/design/translation.md). Mirrors time's derived
+      # +Debug+ for +Month+ (<tt>src/month.rs:13</tt>).
       #
       # === Example
       #

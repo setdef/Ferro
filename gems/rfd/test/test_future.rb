@@ -140,7 +140,8 @@ class TestFuture < Minitest::Test
   end
 
   # .await takes the future, so the answer comes once; a later value
-  # raises IOError, as a closed IO does (ADR 001, 2026-11-05).
+  # raises IOError, as a closed IO does
+  # (doc/contributors/design/translation.md).
   def test_value_uses_the_future_up
     future = Ferro::Rfd::FileHandle.new(@fifo).read
     writer = Thread.new { File.write(@fifo, "once") }
@@ -168,8 +169,9 @@ class TestFuture < Minitest::Test
 
   # The native wait holds its lock with the GVL released; a second native
   # wait could only block holding the GVL, which the first needs back, so
-  # the wait could never finish: ThreadError (ADR 001's error rule). Only
-  # a __send__ past the Future's own lock reaches it.
+  # the wait could never finish: ThreadError (the error rule in
+  # doc/contributors/design/translation.md). Only a __send__ past the Future's own lock
+  # reaches it.
   def test_a_second_native_wait_raises_thread_error
     future = Ferro::Rfd::FileHandle.new(@fifo).read
     first = Thread.new { future.value }

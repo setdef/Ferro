@@ -20,12 +20,13 @@
 //! lets the wait start again.
 //!
 //! If the operating system will not start the thread, the gem falls back to
-//! url's own behavior rather than raising an error of its own (ADR 001,
-//! 2026-11-05, the error rule): the lookup runs on the calling thread, with
-//! the GVL still released, and no interrupt can end it, as Ruby says of a
-//! call without an unblocking function (`thread.c:1676-1679` warns that
-//! built-in or missing ones leave a program deaf to Control+C, and
-//! `thread.c:367-372` calls an unblocking function only when it is non-null).
+//! url's own behavior rather than raising an error of its own
+//! (`doc/contributors/design/translation.md`, the error rule): the lookup
+//! runs on the calling thread, with the GVL still released, and no interrupt
+//! can end it, as Ruby says of a call without an unblocking function
+//! (`thread.c:1676-1679` warns that built-in or missing ones leave a program
+//! deaf to Control+C, and `thread.c:367-372` calls an unblocking function
+//! only when it is non-null).
 //!
 //! The wait and the fallback never run with the GVL held. Both go through
 //! `rb_thread_call_without_gvl`, which always runs its function, and which

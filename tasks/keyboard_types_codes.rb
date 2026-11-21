@@ -81,7 +81,7 @@ class KeyboardTypesCodes
       docs = ["The key whose W3C code value is +#{variant.name}+; keyboard-types describes it no further."] if docs.empty?
       # A deprecated variant is bound, since Tauri re-exports Code whole and
       # global-hotkey's parser returns one, but kept out of the documented
-      # API (ADR 001, amendment of 2026-11-05: hidden and deprecated items).
+      # API (doc/contributors/design/translation.md).
       docs += ["", "Deprecated: #{variant.deprecated}."] if variant.deprecated
       comment = docs.map { |line| line.empty? ? "        #" : "        # #{line}" }.join("\n")
       nodoc = variant.deprecated ? " # :nodoc:" : ""

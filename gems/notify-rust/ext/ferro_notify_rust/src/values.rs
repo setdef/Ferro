@@ -234,11 +234,11 @@ pub fn timeout_from_i32(ruby: &Ruby, milliseconds: i32) -> Value {
 }
 
 /// `Native.timeout_from_duration`: `From<Duration> for Timeout`
-/// (`src/timeout.rs:46-56`), given the Duration as seconds (ADR 001,
-/// 2026-11-05). A negative, NaN, or infinite count, or one too large for a
-/// `Duration`, raises `ArgumentError` with the text of core's
-/// `Duration::try_from_secs_f64`, where `Duration::from_secs_f64` would
-/// panic.
+/// (`src/timeout.rs:46-56`), given the Duration as seconds
+/// (`doc/contributors/design/translation.md`). A negative, NaN, or
+/// infinite count, or one too large for a `Duration`, raises
+/// `ArgumentError` with the text of core's `Duration::try_from_secs_f64`,
+/// where `Duration::from_secs_f64` would panic.
 pub fn timeout_from_duration(ruby: &Ruby, seconds: f64) -> Result<Value, Error> {
     let duration = duration_from_secs(seconds)
         .map_err(|message| Error::new(ruby.exception_arg_error(), message))?;
@@ -333,8 +333,9 @@ pub fn hint_as_str(ruby: &Ruby, tag: RArray) -> Result<Option<String>, Error> {
 
 // Each `*_debug` function builds notify-rust's value from its tag and
 // answers the `Debug` text notify-rust derives for it, so the text is
-// Rust's own (ADR 001, 2026-11-05). A tag holding a value of the wrong
-// type raises `TypeError`, as building the value would.
+// Rust's own (`doc/contributors/design/translation.md`). A tag holding
+// a value of the wrong type raises `TypeError`, as building the value
+// would.
 
 /// `Native.urgency_debug` (`src/urgency.rs:27`).
 pub fn urgency_debug(ruby: &Ruby, tag: Value) -> Result<String, Error> {
@@ -428,8 +429,9 @@ mod tests {
     use crate::{capture, Panic};
     use std::time::Duration;
 
-    /// ADR 001's error rule: the text `ArgumentError` carries is the one
-    /// the real `Duration::from_secs_f64` panics with.
+    /// The error rule in `doc/contributors/design/translation.md`: the text
+    /// `ArgumentError` carries is the one the real `Duration::from_secs_f64`
+    /// panics with.
     #[test]
     fn a_duration_core_would_panic_on_is_refused_with_the_panics_text() {
         for seconds in [-1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 1e300] {

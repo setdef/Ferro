@@ -166,10 +166,10 @@ fn open(ruby: &Ruby, path: Value) -> Result<Obj<Image>, Error> {
 /// `close` take `self` (`src/xdg/mod.rs:101`, `:134`, `:214`, `:269`), and
 /// Rust drops the handle at the end of its scope, so each of those, and
 /// the end of `show`'s block, uses the handle up (`spent`): every later
-/// call raises `IOError` (ADR 001, 2026-11-05). `wait_for_action_async`
-/// and `close_async` borrow it (`:183`, `:229`), so they do not. A call
-/// already under way on another thread when the handle is used up
-/// finishes.
+/// call raises `IOError` (`doc/contributors/design/translation.md`).
+/// `wait_for_action_async` and `close_async` borrow it (`:183`, `:229`),
+/// so they do not. A call already under way on another thread when the
+/// handle is used up finishes.
 ///
 /// A consuming call frees notify-rust's handle, and the D-Bus connection
 /// it keeps (a socket, and zbus's executor thread, `src/xdg/zbus_rs.rs:61`;

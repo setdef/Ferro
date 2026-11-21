@@ -128,8 +128,9 @@ class TestModifiers < Minitest::Test
   end
 
   # bitflags' iter and iter_names return iterators (src/iter.rs), so the
-  # Ruby methods return Enumerators, never Arrays (ADR 001, amendment of
-  # 2026-11-05: iterators); IntoIterator is each.
+  # Ruby methods return Enumerators, never Arrays
+  # (doc/contributors/design/translation.md: iterators); IntoIterator is
+  # each.
   def test_iterators_are_enumerators_and_into_iterator_is_each
     mods = Mods::SHIFT | Mods::ALT
 

@@ -455,7 +455,7 @@ module Ferro
       # Given Numeric seconds, it adds the part of a std +Duration+ shorter
       # than a day, as <tt>Add<std::time::Duration> for Time</tt> does
       # (<tt>src/time.rs:1110-1125</tt>); SignedDuration says how a number
-      # is read (ADR 001, 2026-11-05).
+      # is read (doc/contributors/design/translation.md).
       #
       # [duration] SignedDuration, or Numeric seconds.
       #

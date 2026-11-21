@@ -127,8 +127,8 @@ pub fn mul_int(value: SignedDuration, scalar: i128) -> Result<SignedDuration, Fa
 }
 
 /// The panic of Rust's own integer division by zero, which `Div<i32>`
-/// reaches (`:1681-1694`); ADR 001's error rule refuses it with
-/// `RangeError` and this text.
+/// reaches (`:1681-1694`); the error rule in
+/// `doc/contributors/design/translation.md` refuses it with `RangeError` and this text.
 pub const DIVIDE_BY_ZERO: &str = "attempt to divide by zero";
 
 /// `Div<i32>` (`:1681-1694`), refusing a zero divisor with Rust's panic

@@ -11,7 +11,7 @@
 //!
 //! Each exception raised for a value notify-rust returned keeps that
 //! value's `Debug` text, formatted here, as `@debug`, which its Ruby
-//! `debug` answers (ADR 001, 2026-11-05).
+//! `debug` answers (`doc/contributors/design/translation.md`).
 
 use magnus::{
     prelude::*, Error, ExceptionClass, RClass, RModule, RObject, Ruby, Symbol, TryConvert, Value,
@@ -73,7 +73,8 @@ pub fn base(ruby: &Ruby, message: impl Into<String>) -> Error {
 }
 
 /// The `IOError` a handle that a consuming call used up raises, as a
-/// closed IO does (ADR 001, 2026-11-05); `by` names that call.
+/// closed IO does (`doc/contributors/design/translation.md`); `by`
+/// names that call.
 pub fn consumed(ruby: &Ruby, by: &str) -> Error {
     Error::new(
         ruby.exception_io_error(),

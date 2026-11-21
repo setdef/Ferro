@@ -23,8 +23,9 @@ require "test_helper"
 # Windows has no such call: every one shows a toast.
 #
 # The count comes from the private Native.gvl_releases, a hook that
-# exists only in the repository's build (the test-hooks feature, ADR 001,
-# amendment of 2026-11-05: test hooks); the packaged gem has none.
+# exists only in the repository's build (the test-hooks feature,
+# .agents/skills/bind-crate/SKILL.md, Test hooks); the packaged gem has
+# none.
 class TestGvl < Minitest::Test
   include NotifySuite
 

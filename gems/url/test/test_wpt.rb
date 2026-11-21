@@ -24,10 +24,10 @@ require "test_helper"
 #
 # wpt.rs reads the getters, and runs setters_tests.json, through url's
 # +quirks+ module, which url hides with <tt>#[doc(hidden)]</tt> and the gem
-# therefore does not bind (ADR 001, 2026-11-05). The getters are one-liners
-# over Url's public API, so this port computes them as quirks.rs does. The
-# setters are not: they drive url's private parser, so setters_tests.json
-# and its expected failures are not ported.
+# therefore does not bind (doc/contributors/design/translation.md). The
+# getters are one-liners over Url's public API, so this port computes them
+# as quirks.rs does. The setters are not: they drive url's private parser,
+# so setters_tests.json and its expected failures are not ported.
 class TestWpt < Minitest::Test
   include UrlSuite
 

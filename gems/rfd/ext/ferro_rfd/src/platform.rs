@@ -52,7 +52,7 @@ pub const FALLBACK_OFF_MAIN: &str = "Fallback Sync Dialog Must Be Spawned On Mai
 /// for finishes on the main thread's run loop. rfd has no such message:
 /// it would deadlock. The class is `ThreadError`, Ruby's own for a thread
 /// that would wait on itself, as `Thread#join` of the current thread and
-/// a second `Mutex#lock` raise (ADR 001, 2026-11-05 amendment).
+/// a second `Mutex#lock` raise (`doc/contributors/design/translation.md`).
 pub const WAIT_ON_MAIN: &str = "waiting on the main thread would deadlock: this dialog finishes on the main thread's run loop, so start it on the main thread and wait for it on another (rfd src/lib.rs:79-86)";
 
 /// What rfd panics with for a window handle it cannot use here: on
@@ -61,8 +61,9 @@ pub const WAIT_ON_MAIN: &str = "waiting on the main thread would deadlock: this 
 /// (`src/backend/macos/utils.rs:43`). The portal backend ignores a handle
 /// it cannot use (`window_identifier/mod.rs:41`), so Linux refuses none.
 /// The text is the panic's verbatim, `unreachable!`'s prefix included, as
-/// ADR 001's error rule asks of an `ArgumentError` refusal; the tests in
-/// `handles.rs` drive rfd's real panic and compare.
+/// the error rule in `doc/contributors/design/translation.md` asks of an
+/// `ArgumentError` refusal; the tests in `handles.rs` drive rfd's real
+/// panic and compare.
 pub const fn refused_handle(window: &WindowSpec) -> Option<&'static str> {
     if cfg!(target_os = "macos") && !matches!(window, WindowSpec::AppKit { .. }) {
         Some(UNSUPPORTED_MACOS)
@@ -153,7 +154,7 @@ mod apple {
     /// What `debug` raises from another thread when no app runs to reach
     /// the main thread through (plan 008, decision 5): `ThreadError`, Ruby's
     /// class for a wait that could never finish, since nothing would drain
-    /// the main queue (ADR 001's error rule).
+    /// the main queue (the error rule in `doc/contributors/design/translation.md`).
     pub const LOOKUP_OFF_MAIN: &str = "an AppKitWindowHandle is looked up on the main thread, and no NSApplication runs to reach it from this one";
 
     /// Why a parent's window cannot be looked up.
@@ -161,8 +162,9 @@ mod apple {
     pub enum Refusal {
         /// The window number names none of the app's windows, or a window
         /// without a content view: the argument is wrong, so Ruby's
-        /// `ArgumentError`, with this message (ADR 001, 2026-11-05
-        /// amendment). In Rust the parent would be a dangling `NSView`.
+        /// `ArgumentError`, with this message
+        /// (`doc/contributors/design/translation.md`). In Rust the parent
+        /// would be a dangling `NSView`.
         Unknown(String),
         /// No thread can reach the main thread: `ThreadError`, with
         /// [`LOOKUP_OFF_MAIN`].

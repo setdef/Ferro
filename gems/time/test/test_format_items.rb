@@ -39,8 +39,9 @@ class TestFormatItems < Minitest::Test
   end
 
   # TrailingInput alone of the modifier enums is exhaustive, so Rust may
-  # cast it (modifier.rs:1145-1152); to_i answers that cast (ADR 001,
-  # 2026-11-05). The non_exhaustive ones have none.
+  # cast it (modifier.rs:1145-1152); to_i answers that cast
+  # (doc/contributors/design/translation.md). The non_exhaustive ones
+  # have none.
   def test_trailing_input_answers_rusts_cast_and_the_others_none
     assert_equal [0, 1], [M::TrailingInput::Prohibit, M::TrailingInput::Discard].map(&:to_i)
     refute_respond_to M::Padding::Zero, :to_i
@@ -85,7 +86,7 @@ class TestFormatItems < Minitest::Test
 
   # Every item and component variant is a tuple variant in Rust, so its one
   # field is positional: deconstruct and to_a give it, and no reader names
-  # it (ADR 001, amendment of 2026-11-05; plan 007, Follow-up: the four
+  # it (doc/contributors/design/translation.md; plan 007, Follow-up: the four
   # rulings).
   def test_a_variants_field_is_positional
     day = C::Day.new(M::Day.default)
@@ -161,9 +162,9 @@ class TestFormatItems < Minitest::Test
     assert(borrowed.all? { |item| Ractor.shareable?(item) })
   end
 
-  # time's deprecated items are no part of the gem's API (ADR 001,
-  # amendment of 2026-11-05), so none is bound (plan 007, Follow-up: the
-  # four rulings).
+  # time's deprecated items are no part of the gem's API
+  # (doc/contributors/design/translation.md), so none is bound (plan
+  # 007, Follow-up: the four rulings).
   def test_times_deprecated_items_are_unbound
     refute_respond_to FD, :parse
     refute_respond_to T::Util, :days_in_year_month

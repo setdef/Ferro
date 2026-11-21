@@ -15,14 +15,14 @@ require_relative "gem_version"
 
 # Tags and publishes one gem.
 #
-# Bundler's release task tags each release <tt>v0.1.0</tt>. In a
-# repository of many gems, each with its own version, those tags collide.
-# This release names the tag for the gem, <tt>ferro-arboard/v0.1.0</tt>
-# (ADR 001, section 5), and otherwise does what Bundler's does: build the
-# gem, push the branch, tag the commit, push the tag, and push the gem. The
-# branch goes before the tag because a push of it runs the gate (the
-# pre-push hook): a push the gate refuses then leaves no tag behind for the
-# next try to trip over.
+# Bundler's release task tags each release <tt>v0.1.0</tt>. In a repository
+# of many gems, each with its own version, those tags collide. This release
+# names the tag for the gem, <tt>ferro-arboard/v0.1.0</tt>
+# (doc/contributors/design/repository.md), and otherwise does what
+# Bundler's does: build the gem, push the branch, tag the commit, push the
+# tag, and push the gem. The branch goes before the tag because a push of
+# it runs the gate (the pre-push hook): a push the gate refuses then leaves
+# no tag behind for the next try to trip over.
 #
 # A release can also stop at the tag (#tag!). Ferro publishes nothing to
 # RubyGems.org yet, but a pushed tag is enough for Bundler's git sources,

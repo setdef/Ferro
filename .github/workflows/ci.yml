@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 # The gate contributors run, bundle exec rake, on each operating system a
-# gem binds and on every Ruby release that still gets fixes (ADR 001,
-# section 8). Every gem runs on every change: the gate is one command across
-# all of them, and with few gems a selective run would save little.
+# gem binds and on every Ruby release that still gets fixes
+# (doc/contributors/design/repository.md). Every gem runs on every
+# change: the gate is one command across all of them, and with few gems a
+# selective run would save little.
 
 name: CI
 
@@ -64,7 +65,7 @@ jobs:
             echo "rust=$rust"
             echo "python=$python"
             # Each gem is its own Cargo workspace, compiling into the shared
-            # target directory (ADR 001, section 3).
+            # target directory (doc/contributors/design/repository.md).
             echo "workspaces<<EOF"
             for gem in gems/*/; do echo "${gem%/} -> ../../target"; done
             echo "EOF"

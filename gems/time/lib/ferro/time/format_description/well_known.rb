@@ -60,8 +60,8 @@ module Ferro
           private_class_method :new
 
           # time's derived +Debug+ text for the unit struct this class
-          # stands for, formatted by Rust. +inspect+ stays Ruby's (ADR 001,
-          # 2026-11-05).
+          # stands for, formatted by Rust. +inspect+ stays Ruby's
+          # (doc/contributors/design/translation.md).
           #
           # === Example
           #
@@ -94,8 +94,8 @@ module Ferro
           private_class_method :new
 
           # time's derived +Debug+ text for the unit struct this class
-          # stands for, formatted by Rust. +inspect+ stays Ruby's (ADR 001,
-          # 2026-11-05).
+          # stands for, formatted by Rust. +inspect+ stays Ruby's
+          # (doc/contributors/design/translation.md).
           #
           # === Example
           #

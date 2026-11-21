@@ -519,7 +519,7 @@ module Ferro
       # (<tt>src/date.rs:1675-1687</tt>), with the same message: so
       # <tt>date + 86_400</tt> adds a day and <tt>date + 1</tt> adds none,
       # where Ruby's own <tt>::Date + 1</tt> adds a day. SignedDuration
-      # says how a number is read (ADR 001, 2026-11-05).
+      # says how a number is read (doc/contributors/design/translation.md).
       #
       # [duration] SignedDuration, or Numeric seconds.
       #

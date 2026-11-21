@@ -118,8 +118,8 @@ module Ferro
       # hold a variant this gem predates; for Error::Format::StdIo, whose
       # <tt>std::io::Error</tt> has no Ruby value here; and for fields of a
       # type no time value holds. Mirrors time's derived +Debug+ on each
-      # error type (<tt>src/error/*.rs</tt>; ADR 001, amendment of
-      # 2026-11-05).
+      # error type (<tt>src/error/*.rs</tt>;
+      # doc/contributors/design/translation.md).
       #
       # === Example
       #
@@ -376,8 +376,8 @@ module Ferro
           end
 
           # The variant's one field, the component's name, positional as Rust leaves it
-          # (ADR 001, 2026-11-05), so <tt>in InvalidComponent[name]</tt> reads as
-          # Rust's pattern does.
+          # (doc/contributors/design/translation.md), so <tt>in
+          # InvalidComponent[name]</tt> reads as Rust's pattern does.
           def deconstruct
             [@component]
           end
@@ -421,10 +421,11 @@ module Ferro
           end
 
           # The variant's one field, the Error::ComponentRange it holds, as
-          # #source answers it: positional as Rust leaves it (ADR 001,
-          # 2026-11-05), so <tt>in ComponentRange[range]</tt> reads as
-          # Rust's pattern does. time names no field of its own here; the
-          # name and conditionality are the held range's.
+          # #source answers it: positional as Rust leaves it
+          # (doc/contributors/design/translation.md), so <tt>in
+          # ComponentRange[range]</tt> reads as Rust's pattern does. time
+          # names no field of its own here; the name and conditionality are
+          # the held range's.
           def deconstruct
             [source]
           end
@@ -449,8 +450,8 @@ module Ferro
             super
           end
 
-          # The variant's one field, positional as Rust leaves it (ADR 001,
-          # 2026-11-05): +nil+, as #source is, since a
+          # The variant's one field, positional as Rust leaves it
+          # (doc/contributors/design/translation.md): +nil+, as #source is, since a
           # <tt>std::io::Error</tt> has no Ruby value here.
           #
           # === Example
@@ -546,8 +547,8 @@ module Ferro
           end
 
           # The variant's one field, the component's name, positional as Rust leaves it
-          # (ADR 001, 2026-11-05), so <tt>in InvalidComponent[name]</tt> reads as
-          # Rust's pattern does.
+          # (doc/contributors/design/translation.md), so <tt>in
+          # InvalidComponent[name]</tt> reads as Rust's pattern does.
           def deconstruct
             [@name]
           end
@@ -691,10 +692,11 @@ module Ferro
           end
 
           # The variant's one field, the Error::ComponentRange it holds, as
-          # #source answers it: positional as Rust leaves it (ADR 001,
-          # 2026-11-05), so <tt>in ComponentRange[range]</tt> reads as
-          # Rust's pattern does. time names no field of its own here; the
-          # name and conditionality are the held range's.
+          # #source answers it: positional as Rust leaves it
+          # (doc/contributors/design/translation.md), so <tt>in
+          # ComponentRange[range]</tt> reads as Rust's pattern does. time
+          # names no field of its own here; the name and conditionality are
+          # the held range's.
           def deconstruct
             [source]
           end
@@ -783,8 +785,8 @@ module Ferro
           end
 
           # The variant's one field, the Error::TryFromParsed it holds, as #source
-          # answers it: positional as Rust leaves it (ADR 001, 2026-11-05), so
-          # <tt>in TryFromParsed[error]</tt> reads as Rust's pattern does.
+          # answers it: positional as Rust leaves it (doc/contributors/design/translation.md),
+          # so <tt>in TryFromParsed[error]</tt> reads as Rust's pattern does.
           #
           # === Example
           #
@@ -869,8 +871,8 @@ module Ferro
           end
 
           # The variant's one field, the Error::ParseFromDescription it holds, as #source
-          # answers it: positional as Rust leaves it (ADR 001, 2026-11-05), so
-          # <tt>in ParseFromDescription[error]</tt> reads as Rust's pattern does.
+          # answers it: positional as Rust leaves it (doc/contributors/design/translation.md),
+          # so <tt>in ParseFromDescription[error]</tt> reads as Rust's pattern does.
           #
           # === Example
           #

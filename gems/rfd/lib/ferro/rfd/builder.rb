@@ -11,8 +11,9 @@ module Ferro
     # take +self+ (<tt>src/file_dialog.rs:121-174</tt>, <tt>:266-330</tt>,
     # <tt>src/message_dialog.rs:81-84</tt>, <tt>:147-150</tt>), so a
     # builder works once, and here any call on a builder a terminal method
-    # has used raises +IOError+, as a closed IO does (ADR 001, 2026-11-05).
-    # rfd has no such type, so the module is private.
+    # has used raises +IOError+, as a closed IO does
+    # (doc/contributors/design/translation.md). rfd has no such type, so
+    # the module is private.
     module Builder # :nodoc:
       # Marks this builder used up by +name+, its terminal method; raises
       # +IOError+ if one already did, and +FrozenError+ for a frozen

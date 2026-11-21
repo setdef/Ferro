@@ -8,9 +8,10 @@
 require "test_helper"
 
 # arboard's Debug texts, as debug answers them, and inspect, which stays
-# Ruby's (ADR 001, 2026-11-05). Rust formats each text, so these strings
-# are what format!("{:?}") gives for arboard 3.7.0; the Rust tests in
-# ext/ferro_arboard/src pin the same strings against the crate.
+# Ruby's (doc/contributors/design/translation.md). Rust formats each
+# text, so these strings are what format!("{:?}") gives for arboard
+# 3.7.0; the Rust tests in ext/ferro_arboard/src pin the same strings
+# against the crate.
 class TestDebug < Minitest::Test
   include ClipboardSuite
 

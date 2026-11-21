@@ -9,8 +9,9 @@ description: Binds a Rust crate's public API to a Ferro gem one to one, or chang
 # Bind a crate
 
 AGENTS.md is the contract: design precedence, RBS and RDoc rules, commands,
-changelog, and the definition of done. ADR 001 holds the translation table.
-This skill is the workflow around them. Read both first, then
+changelog, and the definition of done.
+`doc/contributors/design/translation.md` holds the translation table. This
+skill is the workflow around them. Read both first, then
 `doc/contributors/documentation_style.md` before writing prose.
 
 ## 1. Find the authority, never guess
@@ -37,14 +38,15 @@ off the list because it looked unimportant.
 
 ## 3. Translate, never port Rust machinery
 
-Follow ADR 001's table. In short: names stay; `Result` raises; each error
-variant is a class with the crate's `Display` text; `Option` is `nil`;
-strings, bytes, and paths are Strings; public-field structs are
-`Data.define`; builders hold their receiver; lifetimes, moves, and `Send`
-bounds disappear; every feature is on; platform items exist only on their
-platform. A case the table does not cover is a design decision: write it
-into the plan with the precedence tier that justifies it, and into the RDoc
-a user reads.
+Follow the translation table. In short: names stay; `Result` raises; each
+error variant is a class with the crate's `Display` text; `Option` is
+`nil`; strings, bytes, and paths are Strings; public-field structs are
+`Data.define`; builders hold their receiver; lifetimes and `Send` bounds
+disappear; a consumed value raises on further use; Cargo features are built
+in, dropped, or offered as `doc/contributors/design/cargo-features.md`
+sorts them; platform items exist only on their platform. A case the table
+does not cover is a design decision: write it into the plan with the
+precedence tier that justifies it, and into the RDoc a user reads.
 
 Keep the native layer thin. Ruby owns the public API, with RDoc and RBS;
 Rust exposes the smallest set of private methods that reach the crate, each
@@ -67,9 +69,9 @@ citing the crate function it calls.
 
 A test sometimes needs a probe inside the native layer, such as how many
 events wait in a channel. The crate has no such method and a gem adds
-nothing its crate lacks (ADR 001, amendment of 2026-11-05: test hooks), so
-the hook exists only in the repository's own build. global-hotkey is the
-model (plan 004, Follow-up: ADR 001's rulings):
+nothing its crate lacks, so the hook exists only in the repository's own
+build. global-hotkey is the model (plan 004, Follow-up: the translation
+rulings):
 
 - `Cargo.toml` of the extension declares an empty feature,
   `test-hooks = []`, and the Rust code gates each hook behind

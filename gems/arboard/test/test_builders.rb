@@ -30,7 +30,7 @@ class TestBuilders < Minitest::Test
   # arboard's terminal methods take self (src/lib.rs:189-212, :227-263,
   # :275; ClearExtLinux::clipboard, src/platform/linux/mod.rs:452-456), so
   # a builder works once. Here a used builder raises IOError, as a closed
-  # IO does (ADR 001, 2026-11-05).
+  # IO does (doc/contributors/design/translation.md).
   def test_a_get_is_consumed_by_its_terminal_method
     get = clipboard.get
     clipboard.set_text("first")

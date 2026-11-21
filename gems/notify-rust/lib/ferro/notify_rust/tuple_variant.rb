@@ -16,7 +16,7 @@ module Ferro
     # +deconstruct+ already; #to_a returns the same Array, so
     # <tt>ms, = timeout.to_a</tt> and the pattern
     # <tt>in Timeout::Milliseconds[ms]</tt> both read as Rust's does
-    # (ADR 001, amendment of 2026-11-05: tuple variants).
+    # (doc/contributors/design/translation.md).
     #
     # === Example
     #

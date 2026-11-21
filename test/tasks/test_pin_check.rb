@@ -9,7 +9,7 @@ require "test_helper"
 require_relative "../../tasks/pin_check"
 
 # Tests the check that every gem links the same magnus and rb-sys
-# (ADR 001, section 3), on lockfiles shaped like Cargo's.
+# (doc/contributors/design/repository.md), on lockfiles shaped like Cargo's.
 class TestPinCheck < Minitest::Test
   REGISTRY = "registry+https://github.com/rust-lang/crates.io-index"
 

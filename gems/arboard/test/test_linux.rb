@@ -141,7 +141,7 @@ class TestLinux < Minitest::Test
 
   # arboard's wait_until takes an Instant (src/platform/linux/mod.rs:344);
   # any Numeric number of seconds on the monotonic clock stands for one
-  # (ADR 001, 2026-11-05, the Duration row).
+  # (doc/contributors/design/translation.md, the Duration row).
   def test_wait_until_takes_any_numeric
     error = assert_raises(TypeError) { clipboard.set.wait_until("soon") }
     assert_equal "wrong argument type String (expected Numeric)", error.message
@@ -231,7 +231,7 @@ class TestLinux < Minitest::Test
   end
 
   # LinuxClipboardKind derives Debug (src/platform/linux/mod.rs:104), which
-  # Rust formats; inspect stays Ruby's (ADR 001, 2026-11-05).
+  # Rust formats; inspect stays Ruby's (doc/contributors/design/translation.md).
   def test_the_kinds_debug_as_arboards_variants
     assert_equal %w[Clipboard Primary Secondary], [kinds::Clipboard, kinds::Primary, kinds::Secondary].map(&:debug)
     assert_match(/\A#<Ferro::Arboard::LinuxClipboardKind[ :]/, kinds::Primary.inspect)

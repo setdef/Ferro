@@ -67,8 +67,8 @@ class TestErrors < Minitest::Test
   end
 
   # A tuple variant's field is positional, as Rust leaves it: a pattern
-  # reads it, and no reader names what the crate does not (ADR 001,
-  # 2026-11-05).
+  # reads it, and no reader names what the crate does not
+  # (doc/contributors/design/translation.md).
   def test_a_tuple_variants_field_is_positional
     [E::ParseFromDescription::InvalidComponent.new("year"), E::Format::InvalidComponent.new("year")].each do |error|
       name = case error
@@ -263,9 +263,10 @@ class TestErrors < Minitest::Test
   end
 
   # Every error answers time's Debug text for the value it stands for,
-  # formatted by Rust: the type's own, as #source answers it (ADR 001,
-  # amendment of 2026-11-05; plan 007, Follow-up: the four rulings).
-  # failure-side Rust tests pin each text against the value time returns.
+  # formatted by Rust: the type's own, as #source answers it
+  # (doc/contributors/design/translation.md; plan 007, Follow-up: the
+  # four rulings). failure-side Rust tests pin each text against the
+  # value time returns.
   def test_a_raised_error_answers_times_debug
     iso = T::FormatDescription::WellKnown::Iso8601::DATE
     [

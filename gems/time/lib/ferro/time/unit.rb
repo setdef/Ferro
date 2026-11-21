@@ -120,9 +120,10 @@ module Ferro
           Ferro::Time::Unit.__send__(:compare, [false, @place], other)
         end
 
-        # time-core's derived +Debug+ text for this unit, formatted by
-        # Rust: the struct's name. +inspect+ stays Ruby's (ADR 001, 2026-11-05). Mirrors
-        # time-core's derived +Debug+ (<tt>time-core-0.1.9/src/unit.rs:21-28</tt>).
+        # time-core's derived +Debug+ text for this unit, formatted by Rust: the
+        # struct's name. +inspect+ stays Ruby's
+        # (doc/contributors/design/translation.md). Mirrors time-core's derived
+        # +Debug+ (<tt>time-core-0.1.9/src/unit.rs:21-28</tt>).
         #
         # === Example
         #
@@ -214,8 +215,10 @@ module Ferro
         end
 
         # time-core's derived +Debug+ text for this variant, formatted by
-        # Rust. +inspect+ stays Ruby's (ADR 001, 2026-11-05). Mirrors time-core's derived +Debug+
-        # for +Unit+ (<tt>time-core-0.1.9/src/unit.rs:289-309</tt>).
+        # Rust. +inspect+ stays Ruby's
+        # (doc/contributors/design/translation.md). Mirrors time-core's
+        # derived +Debug+ for +Unit+
+        # (<tt>time-core-0.1.9/src/unit.rs:289-309</tt>).
         #
         # === Example
         #

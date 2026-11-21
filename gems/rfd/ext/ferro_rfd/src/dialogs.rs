@@ -82,8 +82,8 @@ fn filter_panic(name: &str, extensions: &[String]) -> Option<String> {
 
 /// The `ArgumentError` for a filter rfd would panic on here, if any. Only
 /// the portal backend panics; elsewhere rfd passes the NUL byte on, and so
-/// does the gem (ADR 001's error rule refuses only what the crate panics
-/// on).
+/// does the gem (the error rule in `doc/contributors/design/translation.md` refuses
+/// only what the crate panics on).
 fn refuse_filter(ruby: &Ruby, filter: &(String, Vec<String>)) -> Result<(), Error> {
     if !platform::PORTAL {
         return Ok(());
@@ -295,7 +295,7 @@ impl Picked {
 /// The `Ferro::Rfd::Error` for a call rfd would panic on here, if any:
 /// the error a caught panic of rfd's raises, `rfd panicked: ...` with
 /// rfd's message, raised before rfd's side effects (plan 002, decision 5;
-/// ADR 001's error rule).
+/// the error rule in `doc/contributors/design/translation.md`).
 fn refuse(ruby: &Ruby, refusal: Option<&'static str>) -> Result<(), Error> {
     refusal.map_or(Ok(()), |message| {
         Err(rfd_error(ruby, panic_text(&Panic(message.to_owned()))))

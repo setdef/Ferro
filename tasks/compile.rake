@@ -9,12 +9,12 @@ require "rb_sys/extensiontask"
 
 # rb_sys's extension task for a gem under gems/.
 #
-# rb_sys finds the crate by running cargo metadata in the working
-# directory. Rake runs at the repository root, and each gem is its own
-# Cargo workspace (ADR 001, section 3), so this task asks Cargo from inside
-# the gem. Every other path stays relative to the root. It takes no gemspec:
-# rake-compiler would stage the gemspec's files, which are relative to the
-# gem, for native gems Ferro does not build.
+# rb_sys finds the crate by running cargo metadata in the working directory.
+# Rake runs at the repository root, and each gem is its own Cargo workspace
+# (doc/contributors/design/repository.md), so this task asks Cargo from
+# inside the gem. Every other path stays relative to the root. It takes no
+# gemspec: rake-compiler would stage the gemspec's files, which are relative
+# to the gem, for native gems Ferro does not build.
 class FerroExtensionTask < RbSys::ExtensionTask
   # [gem] The FerroGem to compile.
   def initialize(gem, &)

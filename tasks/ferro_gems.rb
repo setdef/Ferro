@@ -12,9 +12,9 @@ require_relative "package_check"
 # One gem under gems/, and what the root tasks need to know about it.
 #
 # Every gem is a plain folder with its own gemspec, Cargo workspace, and
-# tests (ADR 001, section 4). The root Rakefile builds, tests, lints, and
-# packages each one from this description, so adding a gem means adding an
-# entry to FERRO_GEMS rather than another Rakefile.
+# tests (doc/contributors/design/repository.md). The root Rakefile builds,
+# tests, lints, and packages each one from this description, so adding a
+# gem means adding an entry to FERRO_GEMS rather than another Rakefile.
 #
 # [short_name] The name in task names and commit scopes: +arboard+ for
 #   <tt>rake test:arboard</tt> and <tt>feat(arboard): ...</tt>.
@@ -34,10 +34,10 @@ require_relative "package_check"
 # [test_hooks] Whether the crate has the TEST_HOOKS feature, the hooks its
 #   tests read inside the native layer; false by default.
 #
-# A gem with test hooks builds them only here (ADR 001, amendment of
-# 2026-11-05: test hooks). Its crate declares the feature, empty, in its
-# Cargo.toml; its extconf.rb adds it to rb_sys's features when given
-# <tt>--enable-test-hooks</tt>, which the compile tasks pass and RubyGems
+# A gem with test hooks builds them only here
+# (.agents/skills/bind-crate/SKILL.md, Test hooks). Its crate declares the
+# feature, empty, in its Cargo.toml; its extconf.rb adds it to rb_sys's
+# features when given <tt>--enable-test-hooks</tt>, which the compile tasks pass and RubyGems
 # does not unless the installer asks for it; Clippy and the Rust tests build it too, and Clippy also
 # builds without it; and the packaging check compiles the gem again from
 # its package, as an installed gem is, rather than load the repository's
@@ -97,7 +97,7 @@ class FerroGem < Data.define(:short_name, :name, :crate, :extension, :packaged, 
   end
 
   # What comes before the version in the gem's release tags:
-  # <tt>ferro-arboard/v</tt> (ADR 001, section 5).
+  # <tt>ferro-arboard/v</tt> (doc/contributors/design/repository.md).
   def tag_prefix
     "#{name}/v"
   end

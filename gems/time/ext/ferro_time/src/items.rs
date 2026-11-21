@@ -9,9 +9,10 @@
 //! Ruby owns the tree as `Data` values. It crosses as nested Arrays: an
 //! item is `[tag, payload]`, its tag the variant's place in time's enum
 //! (`StringLiteral` 1 to `First` 5; the deprecated `Literal`, 0, is not
-//! bound, ADR 001, amendment of 2026-11-05), and a component is its variant's name and
-//! then its modifier's fields in time's order, an enum as its variant's
-//! place, a `bool` as itself, and `Ignore`'s count as an Integer.
+//! bound, `doc/contributors/design/translation.md`), and a component is
+//! its variant's name and then its modifier's fields in time's order,
+//! an enum as its variant's place, a `bool` as itself, and `Ignore`'s
+//! count as an Integer.
 //!
 //! Rust rebuilds a modifier only through time's public `default` (or
 //! `Ignore::count`) and `with_*` builders. It reads one back without
@@ -447,7 +448,7 @@ fn variant_debug<F: Field + std::fmt::Debug>(index: u64) -> Result<String, Failu
 
 /// time's derived `Debug` for the variant at `index` of the modifier enum
 /// named `name` (`src/format_description/modifier.rs`), so a variant's
-/// `debug` is Rust's text (ADR 001, 2026-11-05).
+/// `debug` is Rust's text (`doc/contributors/design/translation.md`).
 fn modifier_enum_debug(ruby: &Ruby, name: Symbol, index: u64) -> Result<String, Error> {
     let name = name.name()?;
     guarded(ruby, || match name.as_ref() {
@@ -461,7 +462,7 @@ fn modifier_enum_debug(ruby: &Ruby, name: Symbol, index: u64) -> Result<String, 
 /// `TrailingInput::X as u8` for the variant at `index`
 /// (`src/format_description/modifier.rs:1145-1152`): the one modifier enum
 /// that is exhaustive and fieldless, so Rust may cast it, and `to_i` binds
-/// the cast (ADR 001, 2026-11-05).
+/// the cast (`doc/contributors/design/translation.md`).
 fn trailing_input_to_i(ruby: &Ruby, index: u64) -> Result<u8, Error> {
     guarded(ruby, || {
         TrailingInput::decode(Encoded::Int(index))
@@ -543,8 +544,9 @@ mod tests {
         assert!(build("Ignore", &[Encoded::Int(65_536)]).is_err());
     }
 
-    /// time's deprecated components are unbound (ADR 001, amendment of
-    /// 2026-11-05), so their encodings are refused like any unknown one.
+    /// time's deprecated components are unbound
+    /// (`doc/contributors/design/translation.md`), so their encodings
+    /// are refused like any unknown one.
     #[test]
     fn a_deprecated_component_is_refused() {
         let padding = Encoded::Int(1);

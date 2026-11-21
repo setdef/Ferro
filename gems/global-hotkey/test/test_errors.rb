@@ -64,9 +64,10 @@ class TestErrors < Minitest::Test
     assert_equal 7, settle([:ok, 7])
   end
 
-  # A tuple variant's field is positional, as Rust leaves it (ADR 001,
-  # amendment of 2026-11-05): deconstruct and to_a, so an array pattern
-  # reads as Rust's does, and no reader the crate does not name.
+  # A tuple variant's field is positional, as Rust leaves it
+  # (doc/contributors/design/translation.md): deconstruct and to_a, so
+  # an array pattern reads as Rust's does, and no reader the crate does
+  # not name.
   def test_a_failure_with_a_hotkey_carries_it_by_position
     error = assert_raises(Error::AlreadyRegistered) do
       settle([:error, "Error::AlreadyRegistered", "HotKey already registered", [:hotkey, [0x200, "KeyD", shift_d.id]]])

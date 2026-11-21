@@ -7,7 +7,7 @@
 
 ## Project
 
-Ferro is a repository of Ruby gems (Ruby >= 4.0) that bind Rust crates one to one: `ferro-arboard` binds arboard, and more follow. Each gem lives in `gems/<name>/` with its own gemspec, Cargo workspace, tests, CHANGELOG, and version. A gem adds no Ruby-isms and no functionality its crate lacks. Rust (rb-sys + magnus) is a thin native layer; the public API is Ruby, with RDoc and RBS. Ferro spun out of Tokra, a Ruby port of Tauri whose plugins build on these gems. ADR 001 (`doc/contributors/adr/001.md`) records the decisions behind all of this.
+Ferro is a repository of Ruby gems (Ruby >= 4.0) that bind Rust crates one to one: `ferro-arboard` binds arboard, and more follow. Each gem lives in `gems/<name>/` with its own gemspec, Cargo workspace, tests, CHANGELOG, and version. A gem adds no Ruby-isms and no functionality its crate lacks. Rust (rb-sys + magnus) is a thin native layer; the public API is Ruby, with RDoc and RBS. Ferro spun out of Tokra, a Ruby port of Tauri whose plugins build on these gems. ADR 001 (`doc/contributors/adr/001.md`) records that decision, and `doc/contributors/design/` how it is carried out.
 
 Pre-1.0, zero external users. Prefer good design over backward compatibility; record every breaking change in the gem's CHANGELOG.
 
@@ -17,13 +17,13 @@ Pre-1.0, zero external users. Prefer good design over backward compatibility; re
 2. **Crate fidelity.** Names, types, error variants and their `Display` text, platform gating, and behavior MUST match the crate's source at the bound version. Do not invent "more Ruby-like" APIs.
 3. **Ruby culture.** Idioms yield to 1 and 2.
 
-ADR 001's translation table is the rulebook: `Result` raises, each error variant is a class, `Option` is `nil`, bytes are binary Strings, public-field structs are `Data.define`, builders hold their receiver, platform items exist only on their platform. A case the table does not cover is a design decision: write it in the plan and in the RDoc a user reads.
+The translation table in `doc/contributors/design/translation.md` is the rulebook: `Result` raises, each error variant is a class, `Option` is `nil`, bytes are binary Strings, public-field structs are `Data.define`, builders hold their receiver, platform items exist only on their platform. A case the table does not cover is a design decision: write it in the plan and in the RDoc a user reads.
 
 The authority is the crate's source at the version the gem's `Cargo.lock` pins. Run `cargo metadata --format-version 1` in `gems/<name>` and read the directory of the crate's `manifest_path`; the same goes for magnus, rb-sys, and any dependency whose behavior matters. Bind a crate's latest release. Never guess at a source's contents. Cite the file and lines you bind, and add an SPDX snippet with the crate's license and copyright line around any code or prose derived from it.
 
 ## How to work
 
-- Research before designing: read the crate at its exact version and ADR 001 first. Enumerate the crate's whole public API into the plan, each item bound, translated, or deferred with a reason.
+- Research before designing: read the crate at its exact version and `doc/contributors/design/translation.md` first. Enumerate the crate's whole public API into the plan, each item bound, translated, or deferred with a reason.
 - Root-cause every fix. If you cannot explain why a change fixed the symptom, it is not a fix.
 - Write tests first, against the real crate and the real system resource, never a stub. A test must fail if the code it covers is deleted or mutated. Port the crate's own tests and examples. Save and restore user state (the clipboard's text) around a suite that changes it.
 - No input reachable from Ruby may panic the crate: magnus turns a panic into Ruby's uncatchable `fatal`. Run every crate call under `catch_unwind`, and refuse known panicking inputs with the crate's own error.
@@ -43,7 +43,7 @@ The authority is the crate's source at the version the gem's `Cargo.lock` pins. 
 - Run Ruby with `bundle exec ruby`. Run tests with `bundle exec rake test`, or one gem's with `bundle exec rake test:<name>`. Never `ruby -Ilib:test`.
 - `bundle exec rake` is the gate, across every gem: tests (tooling, Rust, Ruby), RuboCop, Steep, RBS validation and parity, RDoc coverage, REUSE, Clippy, rustfmt, the magnus and rb-sys pin check, and a packaging check that loads each built gem outside the repository. It must pass with zero errors and zero warnings; every cargo step, the extension compile included, fails on any rustc, Clippy, or Cargo warning. `bundle exec rake gate:<name>` runs one gem's checks while you work. Run `bundle exec rake rubocop:autocorrect` first to save time.
 - `bin/setup` installs the tools `mise.toml` pins, the bundle, and a pre-push hook, `.githooks/pre-push`, which runs the gate on the commit you push; run it again whenever you like. The hook refuses a push unless the commit checked out is the one pushed, with nothing uncommitted and nothing untracked, since the gate tests the working tree. Never bypass it (`--no-verify`). A commit runs only `bundle check` (plan 012).
-- CI (`.github/workflows/ci.yml`) runs the same gate on Linux, macOS, and Windows for every supported Ruby, and on Linux runs each gem's Ruby tests under both X11 and Wayland. When a Ruby release ships, add it to the matrix; remove one only at its end of life (ADR 001, section 8).
+- CI (`.github/workflows/ci.yml`) runs the same gate on Linux, macOS, and Windows for every supported Ruby, and on Linux runs each gem's Ruby tests under both X11 and Wayland. When a Ruby release ships, add it to the matrix; remove one only at its end of life (`doc/contributors/design/repository.md`).
 - Approved exceptions live in `rbs_exceptions.rb` and `clippy_exceptions.rb`; adding one needs a justification that it is impossible otherwise.
 - Each gem is its own Cargo workspace with a committed `Cargo.lock`, built with `--locked`. During development every gem compiles into the shared `target/` directory. After changing a gemspec, `Cargo.toml`, or `extconf.rb`, and before any release, also run `bundle exec rake package:install`, which compiles every gem from its packaged sources.
 - Rake tasks and gemspecs use `git ls-files`: new or deleted files must be staged (`git add -N` will do) before they count.

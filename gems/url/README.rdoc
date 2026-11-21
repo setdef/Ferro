@@ -202,8 +202,8 @@ ferro-arboard's README says more.
 
 * Source: https://github.com/setdef/Ferro/tree/trunk/gems/url
 * Changelog: https://github.com/setdef/Ferro/blob/trunk/gems/url/CHANGELOG.md
-* The translation rules every Ferro gem follows (ADR 001):
-  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/adr/001.md
+* The translation rules every Ferro gem follows:
+  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/design/translation.md
 * url: https://github.com/servo/rust-url
 * The WHATWG URL Standard: https://url.spec.whatwg.org/
 

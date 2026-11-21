@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! time's `Debug` text for its errors, which every Ruby error class
-//! answers as `debug` (ADR 001, amendment of 2026-11-05; plan 007,
+//! answers as `debug` (`doc/contributors/design/translation.md`; plan 007,
 //! Follow-up: the four rulings).
 //!
 //! A Ruby error class and its fields name exactly one time value: the

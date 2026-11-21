@@ -25,10 +25,10 @@ module Ferro
     # Each trait is a module here holding refinements of the Ruby classes
     # that stand for the Rust types time implements it for, brought into
     # scope with +using+ as Rust's is with +use+; outside that file or
-    # module nothing changes (ADR 001, 2026-11-05). Ruby's Integer stands
-    # for +i64+ or +u64+, so an Integer outside it raises +RangeError+;
-    # Float stands for +f64+; ::Time stands for +SystemTime+, as everywhere
-    # in this gem.
+    # module nothing changes (doc/contributors/design/translation.md).
+    # Ruby's Integer stands for +i64+ or +u64+, so an Integer outside it
+    # raises +RangeError+; Float stands for +f64+; ::Time stands for
+    # +SystemTime+, as everywhere in this gem.
     #
     # time's +InstantExt+ extends std's +Instant+, which no Ruby class
     # stands for, so it has no module here.
@@ -158,7 +158,8 @@ module Ferro
 
       # Creates std +Duration+s from numbers, each a Rational number of
       # seconds, exact to the nanosecond, as a std +Duration+ is in this gem
-      # (ADR 001, 2026-11-05): <tt>5.std_minutes</tt> is <tt>300r</tt>.
+      # (doc/contributors/design/translation.md): <tt>5.std_minutes</tt> is
+      # <tt>300r</tt>.
       #
       # Refines Integer as time's impl for +u64+ does, so a negative Integer,
       # or one past 64 bits, raises +RangeError+; +std_minutes+ to

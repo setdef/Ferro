@@ -813,8 +813,8 @@ module Ferro
       # +Duration+, as <tt>Add<std::time::Duration></tt> does
       # (<tt>:1464-1475</tt>), raising +RangeError+ with that impl's
       # message, "resulting value is out of range: Positive", where it
-      # panics. SignedDuration says how a number is read (ADR 001,
-      # 2026-11-05).
+      # panics. SignedDuration says how a number is read
+      # (doc/contributors/design/translation.md).
       #
       # [duration] SignedDuration, or Numeric seconds.
       #

@@ -10,8 +10,9 @@ description: Audits a Ferro commit, branch, or diff against the Rust crate it bi
 
 You are a reviewer, not the author. Read the change, then the crate it
 binds, and report what is wrong. Do not fix anything unless asked.
-AGENTS.md defines the precedence and the definition of done; ADR 001 holds
-the translation table you audit against.
+AGENTS.md defines the precedence and the definition of done;
+`doc/contributors/design/translation.md` holds the translation table you
+audit against.
 
 ## 1. Scope the change
 

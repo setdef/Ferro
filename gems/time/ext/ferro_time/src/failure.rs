@@ -41,7 +41,7 @@ pub enum Failure {
     /// Ruby's `ArgumentError`.
     Argument(String),
     /// Ruby's `IOError`: a value a method that takes `self` used up, as a
-    /// closed IO raises (ADR 001, amendment of 2026-11-05).
+    /// closed IO raises (`doc/contributors/design/translation.md`).
     Io(String),
     /// time's `ConversionRange`, which only the conversions with std's
     /// `Duration` return.

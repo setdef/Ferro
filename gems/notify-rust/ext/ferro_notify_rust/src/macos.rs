@@ -30,7 +30,7 @@ pub const NAME: &str = "macos";
 /// until a wait or the end of `show` takes it, as notify-rust's waits take
 /// `self` (`:32`, `:73`, `:113`) and Rust drops a handle at the end of its
 /// scope; then every call raises `IOError` naming the call that took it
-/// (plan 003, decision 4; ADR 001, 2026-11-05).
+/// (plan 003, decision 4; `doc/contributors/design/translation.md`).
 #[magnus::wrap(
     class = "Ferro::NotifyRust::NotificationHandle",
     free_immediately,

@@ -79,7 +79,7 @@ pub(crate) fn errors(ruby: &Ruby, error: &idna::Errors) -> Error {
 
 /// The class a caught panic raises, under `Ferro::Idna`: the gem's base
 /// `Error`, never the crate's `Errors`, which idna's own results raise
-/// (ADR 001, 2026-11-05, the error rule).
+/// (`doc/contributors/design/translation.md`, the error rule).
 pub(crate) const PANIC_CLASS: &str = "Error";
 
 /// `Errors`' `Debug` text (`src/lib.rs:64`), formatted by Rust so Ruby's

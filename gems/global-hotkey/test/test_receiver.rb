@@ -211,8 +211,9 @@ class TestReceiver < Minitest::Test
     assert_instance_of Enumerator, receiver.each
   end
 
-  # A timeout is any Numeric number of seconds (ADR 001, amendment of
-  # 2026-11-05: durations), a Rational included.
+  # A timeout is any Numeric number of seconds
+  # (doc/contributors/design/translation.md: durations), a Rational
+  # included.
   def test_a_rational_timeout_is_seconds
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     assert_raises(Receiver::RecvTimeoutError::Timeout) { receiver.recv_timeout(1/5r) }

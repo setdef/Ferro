@@ -88,8 +88,9 @@ class TestValues < Minitest::Test
     assert_equal '#<data Ferro::NotifyRust::Hint::Category value="email">', NotifyRust::Hint::Category.new("email").inspect
   end
 
-  # Rust reads a tuple variant by position (ADR 001, 2026-11-05), and
-  # deconstruct and to_a give the fields in Rust order.
+  # Rust reads a tuple variant by position
+  # (doc/contributors/design/translation.md), and deconstruct and to_a give
+  # the fields in Rust order.
   def test_tuple_variants_are_positional_through_deconstruct_and_to_a
     close = NotifyRust::CloseReason
     hint = NotifyRust::Hint
@@ -174,9 +175,10 @@ class TestValues < Minitest::Test
   end
 
   # From<Duration> for Timeout (src/timeout.rs:46-56), with the Duration as
-  # seconds (ADR 001, 2026-11-05). An Integer is From<i32>'s milliseconds,
-  # as an integer literal is in Rust, so a Duration is any other Numeric.
-  # Ports the doc tests at src/notification.rs:341-355.
+  # seconds (doc/contributors/design/translation.md). An Integer is
+  # From<i32>'s milliseconds, as an integer literal is in Rust, so a
+  # Duration is any other Numeric. Ports the doc tests at
+  # src/notification.rs:341-355.
   def test_timeout_from_a_duration_in_seconds
     timeout = NotifyRust::Timeout
 

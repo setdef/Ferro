@@ -39,9 +39,9 @@ class TestPortUtil < Minitest::Test
 
   # The cases of <tt>util.rs:30</tt>, +days_in_year_month+, through
   # +days_in_month+, which that deprecated function calls
-  # (<tt>src/util.rs:52-54</tt>). The function itself is not bound (ADR
-  # 001, amendment of 2026-11-05), and time has no test of its own for
-  # +days_in_month+.
+  # (<tt>src/util.rs:52-54</tt>). The function itself is not bound
+  # (doc/contributors/design/translation.md), and time has no test of
+  # its own for +days_in_month+.
   def test_days_in_month
     [
       [2019, Month::January, 31],

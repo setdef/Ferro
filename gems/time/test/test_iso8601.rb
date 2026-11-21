@@ -77,7 +77,7 @@ class TestIso8601 < Minitest::Test
   end
 
   # Rust's `as` on these exhaustive, fieldless enums reads each variant's
-  # discriminant, which to_i answers (ADR 001, 2026-11-05).
+  # discriminant, which to_i answers (doc/contributors/design/translation.md).
   def test_fieldless_enums_answer_their_discriminant
     assert_equal (0..6).to_a, %i[None Date Time Offset DateTime DateTimeOffset TimeOffset].map { |name| Iso8601::FormattedComponents.const_get(name).to_i }
     assert_equal [0, 1, 2], %i[Calendar Week Ordinal].map { |name| Iso8601::DateKind.const_get(name).to_i }

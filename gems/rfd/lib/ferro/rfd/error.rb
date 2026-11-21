@@ -25,8 +25,8 @@ module Ferro
     #   creating the application on the wrong thread, so ferro-rfd raises
     #   the same error first.
     #
-    # Other refusals raise Ruby's own classes, as ADR 001's error rule has
-    # it: +ArgumentError+ for an argument rfd would panic on (a window
+    # Other refusals raise Ruby's own classes, as Ferro's error rule
+    # (doc/contributors/design/translation.md) has it: +ArgumentError+ for an argument rfd would panic on (a window
     # handle the platform cannot take, or on Linux a NUL byte in a
     # filter), with rfd's panic text, and for a window number that names
     # none of your app's windows; +ThreadError+ for a wait that could never

@@ -8,9 +8,10 @@
 require_relative "tasks/ferro_gems"
 
 # Every gem compiles into one target directory during development, so a
-# shared dependency such as magnus compiles once (ADR 001, section 3).
-# rb_sys's generated Makefile honors RB_SYS_CARGO_TARGET_DIR; the cargo
-# tasks read CARGO_TARGET_DIR. An installed gem builds on its own.
+# shared dependency such as magnus compiles once
+# (doc/contributors/design/repository.md). rb_sys's generated Makefile
+# honors RB_SYS_CARGO_TARGET_DIR; the cargo tasks read CARGO_TARGET_DIR.
+# An installed gem builds on its own.
 ENV["RB_SYS_CARGO_TARGET_DIR"] ||= File.expand_path("target", __dir__)
 ENV["CARGO_TARGET_DIR"] ||= ENV.fetch("RB_SYS_CARGO_TARGET_DIR")
 

@@ -151,8 +151,8 @@ module Ferro
       # The weekday's integer value, Rust's <tt>weekday as u8</tt>: Weekday is
       # <tt>#[repr(u8)]</tt> and fieldless, so Monday is 0 and Sunday 6, and
       # Ruby's own conversion to an Integer stands in for Rust's +as+, which
-      # has no name to keep (ADR 001, 2026-11-05). Mirrors time's
-      # <tt>Weekday</tt> (<tt>src/weekday.rs:16-33</tt>).
+      # has no name to keep (doc/contributors/design/translation.md).
+      # Mirrors time's <tt>Weekday</tt> (<tt>src/weekday.rs:16-33</tt>).
       #
       # === Example
       #
@@ -194,8 +194,9 @@ module Ferro
       end
 
       # time's derived +Debug+ text for this weekday, formatted by Rust:
-      # the variant's name. +inspect+ stays Ruby's (ADR 001, 2026-11-05). Mirrors time's derived +Debug+
-      # for +Weekday+ (<tt>src/weekday.rs:12</tt>).
+      # the variant's name. +inspect+ stays Ruby's
+      # (doc/contributors/design/translation.md). Mirrors time's derived
+      # +Debug+ for +Weekday+ (<tt>src/weekday.rs:12</tt>).
       #
       # === Example
       #

@@ -35,8 +35,8 @@ module Ferro
     # Where time takes Rust's unsigned <tt>std::time::Duration</tt>, this
     # takes any Numeric number of seconds, and where time returns one, this
     # returns a Rational number of seconds, exact to the nanosecond, as
-    # Ruby's own <tt>Time#subsec</tt> is (ADR 001, 2026-11-05). So
-    # <tt>duration + 1.5</tt> adds a second and a half, as time's
+    # Ruby's own <tt>Time#subsec</tt> is (doc/contributors/design/translation.md).
+    # So <tt>duration + 1.5</tt> adds a second and a half, as time's
     # <tt>Add<std::time::Duration></tt> does, while <tt>duration * 2</tt>
     # still multiplies by a count, as <tt>Mul<i32></tt> does: Rust picks
     # the impl by type, and here the operator picks it: <tt>*</tt> and
@@ -973,7 +973,7 @@ module Ferro
       end
 
       # The value as time's +Debug+ writes it, formatted by Rust.
-      # +inspect+ stays Ruby's (ADR 001, 2026-11-05).
+      # +inspect+ stays Ruby's (doc/contributors/design/translation.md).
       #
       # === Example
       #

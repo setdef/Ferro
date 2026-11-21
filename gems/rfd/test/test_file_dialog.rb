@@ -166,8 +166,8 @@ class TestFileDialog < Minitest::Test
     assert_includes frozen.debug, 'title: Some("kept")'
   end
 
-  # inspect is Ruby's, naming the class (ADR 001, 2026-11-05); rfd's
-  # Debug text is debug.
+  # inspect is Ruby's, naming the class
+  # (doc/contributors/design/translation.md); rfd's Debug text is debug.
   def test_inspect_stays_rubys
     subject = dialog.set_title("Open")
 

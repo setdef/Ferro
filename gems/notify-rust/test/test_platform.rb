@@ -61,7 +61,7 @@ class TestPlatform < Minitest::Test
 
   # notify-rust hides and deprecates at_bus, "a test only feature"
   # (src/notification.rs:129-130), and Tauri needs none of it, so it is
-  # not bound anywhere (ADR 001, 2026-11-05).
+  # not bound anywhere (doc/contributors/design/translation.md).
   def test_hidden_and_deprecated_items_are_not_bound
     refute_respond_to NotifyRust::Notification, :at_bus
   end

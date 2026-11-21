@@ -47,7 +47,7 @@ class TestHandles < Minitest::Test
   # SPDX-SnippetEnd
 
   # raw-window-handle's structs have public fields, so the values are
-  # Data with every field (ADR 001's table).
+  # Data with every field (the table in doc/contributors/design/translation.md).
   def test_the_handles_are_data_with_raw_window_handles_fields
     assert_equal %i[hwnd hinstance], Ferro::Rfd::Win32WindowHandle.members
     assert_equal %i[window visual_id], Ferro::Rfd::XlibWindowHandle.members

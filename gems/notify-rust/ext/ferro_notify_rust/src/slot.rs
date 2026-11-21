@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! A value that a consuming call uses up, and the name of the call that
-//! did (ADR 001, 2026-11-05: a consumed value raises on further use).
+//! did (`doc/contributors/design/translation.md`: a consumed value
+//! raises on further use).
 //!
 //! notify-rust's handle waits take `self` on every platform (notify-rust
 //! 4.18.2 `src/xdg/mod.rs:101`, `:134`, `:214`, `:269`;

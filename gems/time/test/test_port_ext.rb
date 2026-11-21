@@ -21,7 +21,8 @@ using Ferro::Time::Ext::SystemTimeExt
 
 # time's own tests in <tt>tests/integration/ext.rs</tt>, ported, with the
 # refinements in scope as Rust's tests bring the traits in with +use+
-# (ADR 001, 2026-11-05). A std +Duration+ is a Rational number of seconds.
+# (doc/contributors/design/translation.md). A std +Duration+ is a
+# Rational number of seconds.
 class TestPortExt < Minitest::Test
   include TimeSuite
 

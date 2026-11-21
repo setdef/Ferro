@@ -154,8 +154,7 @@ module Ferro
 
         # Hyper. Deprecated: marked as legacy in the spec, use META instead.
         # Bound because Tauri re-exports Modifiers whole, but not part of
-        # the documented API (ADR 001, amendment of 2026-11-05: hidden and
-        # deprecated items).
+        # the documented API (doc/contributors/design/translation.md).
         HYPER = new(0x1000) # :nodoc:
 
         # Super. Deprecated: marked as legacy in the spec, use META instead.

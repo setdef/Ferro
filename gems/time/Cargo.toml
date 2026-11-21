@@ -3,7 +3,7 @@
 
 # The ferro-time gem's Cargo workspace. It ships in the gem beside
 # Cargo.lock, so an installed gem compiles against exactly the dependency
-# versions this repository tests (ADR 001, section 3).
+# versions this repository tests (doc/contributors/design/repository.md).
 
 [workspace]
 members = ["ext/ferro_time"]

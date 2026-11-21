@@ -172,9 +172,9 @@ class TestNotification < Minitest::Test
   end
 
   # notify-rust deprecates the actions setter, "please use .action() only"
-  # (src/notification.rs:442), so it is not bound (ADR 001, 2026-11-05).
-  # The field it sets is public and not deprecated, so it reads and
-  # writes.
+  # (src/notification.rs:442), so it is not bound
+  # (doc/contributors/design/translation.md). The field it sets is public
+  # and not deprecated, so it reads and writes.
   def test_the_deprecated_actions_setter_is_not_bound
     built = notification.action("a", "A")
 

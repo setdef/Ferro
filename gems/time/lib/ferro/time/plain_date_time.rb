@@ -465,7 +465,7 @@ module Ferro
       # it panics: "overflow adding duration to date" when the whole days
       # leave the range, "resulting value is out of range" when the clock
       # then wraps past the last day. SignedDuration says how a number is
-      # read (ADR 001, 2026-11-05).
+      # read (doc/contributors/design/translation.md).
       #
       # [duration] SignedDuration, or Numeric seconds.
       #

@@ -7,8 +7,8 @@
 
 require "test_helper"
 
-# std's Duration as ADR 001's 2026-11-05 amendment translates it: any
-# Numeric number of seconds in, a Rational number of seconds out, and
+# std's Duration as doc/contributors/design/translation.md translates it:
+# any Numeric number of seconds in, a Rational number of seconds out, and
 # every refusal in the words of the panic Rust would raise.
 class TestStdDuration < Minitest::Test
   include TimeSuite

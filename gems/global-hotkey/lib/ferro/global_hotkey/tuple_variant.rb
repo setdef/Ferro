@@ -15,7 +15,7 @@ module Ferro
     # no name, so the class gives it none either: #deconstruct and #to_a
     # return it in a one-element Array, and Ruby's pattern
     # <tt>in Error::FailedToRegister[reason]</tt> reads as Rust's does
-    # (ADR 001, amendment of 2026-11-05: tuple variants).
+    # (doc/contributors/design/translation.md).
     #
     # Each class that includes this says what its field holds: a String,
     # a Hotkey::HotKey, or an +io::Error+ as a +SystemCallError+ or

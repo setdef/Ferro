@@ -60,7 +60,7 @@ module Ferro
       # Mirrors time's <tt>format_description::BorrowedFormatItem</tt>
       # (<tt>src/format_description/borrowed_format_item.rs:12-144</tt>),
       # plan 009. time's deprecated +Literal+ variant, of raw bytes, is not
-      # bound (ADR 001, amendment of 2026-11-05): use StringLiteral.
+      # bound (doc/contributors/design/translation.md): use StringLiteral.
       #
       # === Example
       #

@@ -339,15 +339,15 @@ module Ferro
     # NotificationHandle#wait_for_action_async. Defined only on Linux.
     #
     # <tt>.await</tt> takes a Rust future, so a Future works once: the
-    # #value that returns its result, or raises the Error it finished
-    # with, uses it up, and any later #value raises +IOError+, as a closed
-    # IO does (ADR 001, 2026-11-05). One thread waits at a time; another
-    # waiting on the same Future gets that +IOError+ once the first has the
-    # result. Waiting releases Ruby's global VM lock, and an interrupt
-    # (Ctrl-C, <tt>Thread#raise</tt>, +Timeout+) ends the wait and drops
-    # the work, as dropping a Rust future does, without using the Future
-    # up: call #value again to start the work again. A Rust future is not
-    # +Clone+, so neither is this.
+    # #value that returns its result, or raises the Error it finished with,
+    # uses it up, and any later #value raises +IOError+, as a closed IO
+    # does (doc/contributors/design/translation.md). One thread waits at a
+    # time; another waiting on the same Future gets that +IOError+ once the
+    # first has the result. Waiting releases Ruby's global VM lock, and an
+    # interrupt (Ctrl-C, <tt>Thread#raise</tt>, +Timeout+) ends the wait
+    # and drops the work, as dropping a Rust future does, without using the
+    # Future up: call #value again to start the work again. A Rust future
+    # is not +Clone+, so neither is this.
     #
     # Mirrors the <tt>impl Future</tt> notify-rust's async methods return
     # (<tt>src/notification.rs:515-533</tt>, <tt>src/xdg/mod.rs:146-238</tt>).

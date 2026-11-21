@@ -18,8 +18,8 @@ require "test_helper"
 
 # time's own tests of its operations with std's +Duration+, ported, each
 # under its file's name and its Rust test's. A std +Duration+ is a Numeric
-# number of seconds in and a Rational out (ADR 001, 2026-11-05), so
-# <tt>1.std_seconds()</tt> is +1+ and <tt>500.std_milliseconds()</tt> is
+# number of seconds in and a Rational out (doc/contributors/design/translation.md),
+# so <tt>1.std_seconds()</tt> is +1+ and <tt>500.std_milliseconds()</tt> is
 # <tt>Rational(1, 2)</tt>. Rust's compound assignments are Ruby's +=+ and
 # an operator, as elsewhere in these ports; Rust's +-=+ on a std
 # +Duration+ keeps the std type and panics where it cannot

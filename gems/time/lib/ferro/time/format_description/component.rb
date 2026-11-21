@@ -34,8 +34,9 @@ module Ferro
       # OwnedFormatItem::Component that holds it, as time's
       # <tt>PartialEq<Component></tt> impls have it. The six components
       # time deprecated in 0.3.48 (+Month+, +Weekday+, +WeekNumber+,
-      # +Hour+, +UnixTimestamp+, +Year+) are not bound (ADR 001, amendment
-      # of 2026-11-05); time's parsers never return one.
+      # +Hour+, +UnixTimestamp+, +Year+) are not bound
+      # (doc/contributors/design/translation.md); time's parsers never
+      # return one.
       #
       # Mirrors time's <tt>format_description::Component</tt>
       # (<tt>src/format_description/component.rs:9-124</tt>), plan 009.

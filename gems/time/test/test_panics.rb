@@ -9,8 +9,9 @@ require "test_helper"
 
 # Where time panics, the gem raises RangeError with time's own message,
 # checked before time runs, and Rust's own words for an integer division
-# by zero (ADR 001, 2026-11-05). The Rust tests compare each message with
-# the panic time really raises; these check the Ruby side gets them.
+# by zero (doc/contributors/design/translation.md). The Rust tests
+# compare each message with the panic time really raises; these check
+# the Ruby side gets them.
 class TestPanics < Minitest::Test
   include TimeSuite
 

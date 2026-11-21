@@ -190,8 +190,8 @@ class TestAppkitParent < Minitest::Test
   end
 
   # A number that names no window is a wrong argument, as a dangling
-  # NSView would be in Rust, so it raises ArgumentError (ADR 001,
-  # 2026-11-05 amendment).
+  # NSView would be in Rust, so it raises ArgumentError
+  # (doc/contributors/design/translation.md).
   def test_a_number_that_names_no_window_is_refused_before_any_dialog
     messages, = in_child(<<~RUBY)
       #{APPKIT}
@@ -259,8 +259,9 @@ class TestAppkitParent < Minitest::Test
     assert_match(/\AFerro::Rfd::Error: rfd panicked: You are running RFD in NonWindowed environment/, pick_message)
   end
 
-  # inspect is Ruby's (ADR 001, 2026-11-05), so it looks nothing up: a
-  # number that names no window, which debug refuses, inspects freely.
+  # inspect is Ruby's (doc/contributors/design/translation.md), so it
+  # looks nothing up: a number that names no window, which debug refuses,
+  # inspects freely.
   def test_inspect_looks_no_window_up
     message, = in_child(<<~RUBY)
       #{APPKIT}

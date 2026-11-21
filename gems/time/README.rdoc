@@ -312,7 +312,8 @@ Not bound, or bound differently, each for a reason:
   SignedDuration in +x+ where Rust's <tt>AddAssign<SignedDuration> for
   std::time::Duration</tt> keeps std's type.
 * +InstantExt+, since no Ruby class stands for std's +Instant+.
-* time's hidden and deprecated items, which Tauri never calls (ADR 001).
+* time's hidden and deprecated items, which Tauri never calls (Ferro's
+  translation rules leave them unbound).
   Each deprecated one has the replacement time names:
   <tt>FormatDescription.parse</tt> is <tt>parse_borrowed(1, ...)</tt>,
   <tt>util::days_in_year_month</tt> is Util.days_in_month, the
@@ -352,8 +353,8 @@ involved. ferro-arboard's README says more.
 
 * Source: https://github.com/setdef/Ferro/tree/trunk/gems/time
 * Changelog: https://github.com/setdef/Ferro/blob/trunk/gems/time/CHANGELOG.md
-* The translation rules every Ferro gem follows (ADR 001):
-  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/adr/001.md
+* The translation rules every Ferro gem follows:
+  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/design/translation.md
 * time: https://github.com/time-rs/time
 
 == License

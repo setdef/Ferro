@@ -10,9 +10,10 @@
 # Each gem is its own Cargo workspace with its own Cargo.lock, so nothing
 # stops two gems from drifting to different versions of the binding
 # crates. Then a fix in one magnus reaches only some gems, and the shared
-# target directory compiles both. ADR 001, section 3 makes agreement a
-# gate: every gem's lockfile names the same version and source of each
-# crate below, and every gemspec asks for the same rb_sys gem.
+# target directory compiles both. doc/contributors/design/repository.md
+# makes agreement a gate: every gem's lockfile names the same version and
+# source of each crate below, and every gemspec asks for the same rb_sys
+# gem.
 class PinCheck
   # The crates every gem links to talk to Ruby.
   CRATES = %w[magnus rb-sys].freeze

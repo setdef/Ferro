@@ -288,8 +288,8 @@ README says more).
 
 * Source: https://github.com/setdef/Ferro/tree/trunk/gems/global-hotkey
 * Changelog: https://github.com/setdef/Ferro/blob/trunk/gems/global-hotkey/CHANGELOG.md
-* The translation rules every Ferro gem follows (ADR 001):
-  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/adr/001.md
+* The translation rules every Ferro gem follows:
+  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/design/translation.md
 * global-hotkey: https://github.com/tauri-apps/global-hotkey
 
 == License

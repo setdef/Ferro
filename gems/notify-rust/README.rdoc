@@ -317,8 +317,8 @@ main Ractor has another thread asleep; ferro-arboard's README says more.
 
 * Source: https://github.com/setdef/Ferro/tree/trunk/gems/notify-rust
 * Changelog: https://github.com/setdef/Ferro/blob/trunk/gems/notify-rust/CHANGELOG.md
-* The translation rules every Ferro gem follows (ADR 001):
-  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/adr/001.md
+* The translation rules every Ferro gem follows:
+  https://github.com/setdef/Ferro/blob/trunk/doc/contributors/design/translation.md
 * notify-rust: https://github.com/hoodie/notify-rust
 * The XDG notification specification:
   https://specifications.freedesktop.org/notification-spec/latest/

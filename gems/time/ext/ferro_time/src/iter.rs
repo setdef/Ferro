@@ -25,7 +25,7 @@ use crate::values::{month, weekday, weekday_number, NDate};
 use crate::{frozen_option, guarded, Failure};
 
 /// A native iterator, or, once a method that takes `self` used it up, the
-/// name of that method (ADR 001, amendment of 2026-11-05).
+/// name of that method (`doc/contributors/design/translation.md`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum State<T> {
     /// The iterator, live.
@@ -706,7 +706,7 @@ mod tests {
 
     /// A method that takes `self` moves the iterator out once; every read
     /// after it, and a second move, fail with the first method's name
-    /// (ADR 001, amendment of 2026-11-05).
+    /// (`doc/contributors/design/translation.md`).
     #[test]
     fn a_consuming_method_takes_the_iterator_once() {
         let held = NMonthIter::default();

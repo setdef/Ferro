@@ -8,10 +8,10 @@
 require "test_helper"
 
 # ferro-time defines Ferro::Time and Ferro::Time::Date, so inside module
-# Ferro a bare Time or Date can name the binding, not Ruby's class (ADR 001,
-# amendment of 2026-10-27). RuboCop's Lint/ConstantResolution refuses one in
-# every other gem's lib; RuboCop does not read RBS, so this test refuses one
-# in every other gem's signatures.
+# Ferro a bare Time or Date can name the binding, not Ruby's class
+# (doc/contributors/design/translation.md). RuboCop's
+# Lint/ConstantResolution refuses one in every other gem's lib; RuboCop does
+# not read RBS, so this test refuses one in every other gem's signatures.
 class TestTopLevelConstants < Minitest::Test
   ROOT = File.expand_path("../..", __dir__)
 

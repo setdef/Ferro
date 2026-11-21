@@ -9,8 +9,8 @@ require "test_helper"
 
 # time's extension traits are refinements, so a file that does not bring
 # one in with +using+ sees Ruby's Integer, Float, and ::Time unchanged,
-# even with the gem loaded and other files using them (ADR 001,
-# 2026-11-05).
+# even with the gem loaded and other files using them
+# (doc/contributors/design/translation.md).
 class TestExtScope < Minitest::Test
   def test_ruby_s_classes_are_unchanged_without_using
     assert_raises(NoMethodError) { 5.seconds }

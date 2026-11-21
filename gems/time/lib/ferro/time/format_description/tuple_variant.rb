@@ -13,8 +13,8 @@ module Ferro
       # as in <tt>Component::Day(modifier) => ...</tt>.
       #
       # So +new+ takes the field by position, #deconstruct and #to_a give
-      # it back, and no reader names it, since time names none (ADR 001,
-      # amendment of 2026-11-05: tuple variants). Ruby's +Data+ would name
+      # it back, and no reader names it, since time names none
+      # (doc/contributors/design/translation.md). Ruby's +Data+ would name
       # it in a reader, a keyword, +to_h+, and +with+, so a variant is a
       # plain class. It is frozen, compares by class and field as time's
       # derived +PartialEq+ and +Eq+ do, and hashes the same way; +dup+ and

@@ -3,8 +3,9 @@
 
 //! `form_urlencoded`'s iterators, `Parse` and `ByteSerialize`
 //! (`form_urlencoded` 1.2.2 `src/lib.rs:31-172`), held by Ruby objects that
-//! call `next` one item at a time (ADR 001, 2026-11-05: an iterator type is
-//! a class with `next`, `each`, and `Enumerable`; plan 005, decision 9).
+//! call `next` one item at a time
+//! (`doc/contributors/design/translation.md`: an iterator type is a class
+//! with `next`, `each`, and `Enumerable`; plan 005, decision 9).
 //!
 //! Each iterator borrows the bytes it reads, and a Ruby object outlives the
 //! call that made it, so the bytes travel with the iterator in `Owned`.
