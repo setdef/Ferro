@@ -47,7 +47,8 @@ Two technical limits decide what can be split between gems.
    dirs, url, idna, and time keep no such state. A second copy of them,
    even at another version, is harmless.
 
-Tokra's ADR 011 cites the sources for this table: objc2 0.6.3 and 0.6.5
+Tokra's native layer design (`doc/contributors/design/native.md`, "Where
+each crate lives") gives the sources for this table: objc2 0.6.3 and 0.6.5
 (`define_class.rs`), tao 0.37.2, wry 0.54.1 and 0.57.1 (commit 40a7032,
 "fix(macOS): panic when loading multiple dylibs"), muda 0.21.2, tray-icon
 0.26.1, global-hotkey 0.9.0, mac-notification-sys 0.6.15, and crossterm
