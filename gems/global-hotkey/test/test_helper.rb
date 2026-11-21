@@ -9,6 +9,13 @@ require "ferro/global_hotkey"
 require "minitest/autorun"
 require "open3"
 require "rbconfig"
+require "tasks/desktop"
+
+# A manager registers its hotkeys with the session on macOS and Windows,
+# so only the desktop tests, in test/desktop/, make one in the test process
+# (doc/contributors/plan/014.md).
+Desktop.guard(Ferro::GlobalHotkey::GlobalHotKeyManager.singleton_class, :new,
+  "GlobalHotKeyManager.new makes a manager that registers hotkeys with this session")
 
 # A registered hotkey belongs to the whole desktop while it is registered,
 # and an event needs a key press, so these tests take care with both:
