@@ -275,8 +275,14 @@ bin/setup
 bundle exec rake                # every check, across every gem
 bundle exec rake gate:arboard   # one gem's checks
 bin/linux-env xvfb-run --auto-servernum bundle exec rake   # on Linux
+bundle exec rake test           # every test that leaves your desktop alone
 ```
 <!-- SPDX-SnippetEnd -->
+
+The gate drives the real clipboard, notifications, dialogs, and hotkeys in
+the session that runs it. `rake test` and the other test tasks skip those
+tests unless `FERRO_DESKTOP=1` is set, so run them at your desk and the
+gate on another machine, or in CI.
 
 ## License
 

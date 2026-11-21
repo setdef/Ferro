@@ -59,6 +59,10 @@ citing the crate function it calls.
 - Test against the real crate and the real system resource. When a test
   changes state the user owns (the clipboard, a keyring), save and restore
   it around the suite.
+- A test that uses the session's desktop (the clipboard, a notification, a
+  dialog, a hotkey) goes in the gem's `test/desktop/`, which only the gate
+  runs (plan 014), and the helper guards the gem's way onto the desktop
+  with `Desktop.guard`.
 - A platform-only test skips elsewhere and says which platform it needs.
 - For each behavior, name the test that fails if its line is reverted, and
   spot-check by reverting the line, running the test, and restoring it.

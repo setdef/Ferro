@@ -62,7 +62,8 @@ Automated mutation testing does not exist yet. Do it by hand:
    deleted or a key constant or branch changes. No such test is a TEST-GAP.
 2. Spot-check a sample, at least one per changed file: revert or alter the
    line, run only the named test (`bundle exec rake test:<gem>
-   N=/test_name/`, or `cargo test <name>` in the gem for Rust), confirm it
+   N=/test_name/`, with `FERRO_DESKTOP=1` for a test in `test/desktop/`,
+   or `cargo test <name>` in the gem for Rust), confirm it
    fails, then restore the line and confirm `git diff` shows nothing you
    introduced.
 3. Report each spot-check: the line, the mutation, the test, and whether it
