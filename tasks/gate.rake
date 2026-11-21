@@ -10,8 +10,9 @@
 # other gems, licensing, RDoc, and the pins every gem must share.
 namespace :gate do
   FERRO_GEMS.each do |gem|
-    desc "Run every check for #{gem.name} alone"
+    desc "Run every check for #{gem.name} alone, its desktop tests included"
     task gem.short_name => [
+      "test:allow_desktop",
       "compile:#{gem.short_name}",
       "test:#{gem.short_name}",
       "rust:#{gem.short_name}",

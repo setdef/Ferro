@@ -96,7 +96,7 @@ class TestClipboard < Minitest::Test
   end
 
   def test_file_list_round_trips
-    gem_dir = File.expand_path("..", __dir__)
+    gem_dir = File.expand_path("../..", __dir__)
     paths = [File.join(gem_dir, "README.rdoc"), File.join(gem_dir, "ferro-arboard.gemspec")].map { |path| File.realpath(path) }
 
     clipboard.set.file_list(paths)

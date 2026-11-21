@@ -97,7 +97,7 @@ class TestGvl < Minitest::Test
 
   # The value of +script+, run in a child Ruby, which prints it marshaled.
   private def in_child(script)
-    output, errors, status = Open3.capture3(RbConfig.ruby, "-I", File.expand_path("../lib", __dir__),
+    output, errors, status = Open3.capture3(RbConfig.ruby, "-I", File.expand_path("../../lib", __dir__),
       stdin_data: "#{script}\n$stdout.binmode.write(Marshal.dump(result))\n", binmode: true)
     assert_predicate status, :success?, "the child Ruby failed: #{errors}"
     Marshal.load(output)

@@ -175,8 +175,11 @@ jobs:
       - name: Run the gems' tests under Wayland
         if: runner.os == 'Linux'
         timeout-minutes: 10
+        # test:ruby is not the gate, so it runs the desktop tests only
+        # with FERRO_DESKTOP=1 (doc/contributors/plan/014.md).
         env:
           A: --verbose
+          FERRO_DESKTOP: "1"
         run: |
           export XDG_RUNTIME_DIR="$RUNNER_TEMP/xdg"
           mkdir -m 700 "$XDG_RUNTIME_DIR"

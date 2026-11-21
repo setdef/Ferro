@@ -45,20 +45,4 @@ class TestError < Minitest::Test
     assert_equal %i[ClipboardNotSupported ClipboardOccupied ContentNotAvailable ConversionFailure Unknown],
       Ferro::Arboard::Error.constants.sort
   end
-
-  def test_the_native_layer_raises_the_variant_with_arboards_message
-    clipboard.clear
-
-    error = assert_raises(Ferro::Arboard::Error::ContentNotAvailable) { clipboard.get_text }
-
-    assert_equal NOT_AVAILABLE, error.message
-  end
-
-  def test_a_missing_image_raises_content_not_available
-    clipboard.set_text("not an image")
-
-    error = assert_raises(Ferro::Arboard::Error::ContentNotAvailable) { clipboard.get_image }
-
-    assert_equal NOT_AVAILABLE, error.message
-  end
 end

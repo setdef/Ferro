@@ -8,23 +8,31 @@
 require "ferro/arboard"
 require "minitest/autorun"
 require "rbconfig"
+require "tasks/desktop"
 
-# These tests drive the real system clipboard, so they overwrite whatever
-# you had copied. The helper saves its text before the suite and puts it
-# back after; anything other than text (an image, a file list) is lost.
+# A clipboard is the session's, so only the desktop tests, in
+# test/desktop/, open one (doc/contributors/plan/014.md).
+Desktop.guard(Ferro::Arboard::Clipboard.singleton_class, :new, "Clipboard.new opens this session's clipboard")
+
+# The desktop tests drive the real system clipboard, so they overwrite
+# whatever you had copied. In a desktop run with a session, the helper
+# saves its text before the suite and puts it back after; anything other
+# than text (an image, a file list) is lost.
 module ClipboardSuite
   # The platform the extension was built for, as arboard's cfg decides it.
   PLATFORM = Ferro::Arboard.const_get(:PLATFORM)
 
-  SAVED_TEXT = begin
-    Ferro::Arboard::Clipboard.new.get_text
-  rescue Ferro::Arboard::Error
-    nil
-  end
+  if Desktop.allowed? && !Desktop.session_unavailable_reason
+    saved = begin
+      Ferro::Arboard::Clipboard.new.get_text
+    rescue Ferro::Arboard::Error
+      nil
+    end
 
-  Minitest.after_run do
-    clipboard = Ferro::Arboard::Clipboard.new
-    SAVED_TEXT ? clipboard.set_text(SAVED_TEXT) : clipboard.clear
+    Minitest.after_run do
+      clipboard = Ferro::Arboard::Clipboard.new
+      saved ? clipboard.set_text(saved) : clipboard.clear
+    end
   end
 
   # The messages arboard 3.7.0 displays (src/common.rs:58-62).

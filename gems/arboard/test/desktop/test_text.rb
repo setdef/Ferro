@@ -39,7 +39,7 @@ class TestText < Minitest::Test
   end
 
   def test_file_list_takes_pathnames
-    readme = File.realpath(File.expand_path("../README.rdoc", __dir__))
+    readme = File.realpath(File.expand_path("../../README.rdoc", __dir__))
 
     clipboard.set.file_list([Pathname(readme)])
 
@@ -47,7 +47,7 @@ class TestText < Minitest::Test
   end
 
   def test_file_list_skips_missing_files
-    readme = File.realpath(File.expand_path("../README.rdoc", __dir__))
+    readme = File.realpath(File.expand_path("../../README.rdoc", __dir__))
 
     clipboard.set.file_list([readme, "/nonexistent/ferro-arboard"])
 

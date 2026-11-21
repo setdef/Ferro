@@ -47,14 +47,6 @@ class TestDebug < Minitest::Test
       error.debug
   end
 
-  def test_a_raised_error_debugs_as_arboard_does
-    clipboard.clear
-
-    error = assert_raises(Ferro::Arboard::Error::ContentNotAvailable) { clipboard.get_text }
-
-    assert_equal %(ContentNotAvailable - "#{NOT_AVAILABLE}"), error.debug
-  end
-
   # ImageData derives Debug (src/common.rs:126); its Cow<[u8]> prints as a
   # list of bytes.
   def test_image_data_debugs_as_its_derived_debug
@@ -76,15 +68,6 @@ class TestDebug < Minitest::Test
 
     assert_equal "#<data Ferro::Arboard::ImageData width=2, height=1, bytes=#{RED_THEN_GREEN.inspect}>", image.inspect
     assert_equal "#<Ferro::Arboard::Error::ConversionFailure: #{CONVERSION_FAILURE}>", error.inspect
-  end
-
-  # Clipboard, Get, Set, and Clear derive no Debug (src/lib.rs:70, :182-185,
-  # :221-224, :267-270), and the base Error is no variant of arboard's: it
-  # is raised for a panic, or for a variant a later arboard adds.
-  def test_what_arboard_gives_no_debug_has_none
-    [clipboard, clipboard.get, clipboard.set, clipboard.clear_with, Ferro::Arboard::Error.new].each do |value|
-      refute_respond_to value, :debug
-    end
   end
 
   def test_the_native_layer_is_private

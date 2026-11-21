@@ -50,7 +50,7 @@ class TestRactor < Minitest::Test
     Dir.mktmpdir("ferro-ractor") do |dir|
       child = File.join(dir, "child.rb")
       File.write(child, CHILD)
-      output, errors, status = Open3.capture3(RbConfig.ruby, "-I", File.expand_path("../lib", __dir__), child,
+      output, errors, status = Open3.capture3(RbConfig.ruby, "-I", File.expand_path("../../lib", __dir__), child,
         stdin_data: script, binmode: true)
       raise "the child Ruby failed: #{errors}" unless status.success?
 

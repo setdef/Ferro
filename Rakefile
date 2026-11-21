@@ -17,5 +17,7 @@ ENV["CARGO_TARGET_DIR"] ||= ENV.fetch("RB_SYS_CARGO_TARGET_DIR")
 
 Dir.glob("tasks/*.rake").each { |file| import file }
 
-desc "The gate: every check, across every gem"
-task default: %w[compile:strict test rubocop steep lint:rbs rdoc:check reuse:lint lint:rust pins:check package:check]
+# The gate runs the desktop tests too, in the session that runs it
+# (plan 014), so its first step sets FERRO_DESKTOP=1.
+desc "The gate: every check, across every gem, the desktop tests included"
+task default: %w[test:allow_desktop compile:strict test rubocop steep lint:rbs rdoc:check reuse:lint lint:rust pins:check package:check]
