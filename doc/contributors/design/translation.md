@@ -72,6 +72,16 @@ work it already holds, the gem raises the built-in Ruby raises for that
 (`ThreadError`), documented and tested. Each gem's plan records its own
 cases.
 
+One kind of call stands outside "never runs blocking work with the GVL
+held": a crate's run loop that calls back into Ruby, as tao's
+`EventLoop::run` does. Such a loop keeps the GVL, and hands it to the Ruby
+threads waiting for it once in each turn, so what the rule is for still
+holds: other threads run while the loop waits. Releasing the GVL around
+the loop and taking it back for each callback is not sound, for the
+reasons Tokra's
+[ADR 012](https://github.com/setdef/Tokra/blob/trunk/doc/contributors/adr/012.md)
+records. That record moves to Ferro with the code it describes.
+
 ## Platform items
 
 The native layer reports the platform it was built for, so the Ruby side

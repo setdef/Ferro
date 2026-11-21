@@ -67,11 +67,56 @@ RatatuiRuby can build on it instead. muda's keyboard accelerators on
 Windows also need the loop that owns the window to call
 `TranslateAcceleratorW`.
 
-tao and wry stay in Tokra's own extension, and muda and tray-icon wait
-with them, until a later decision settles where the windowing stack lives.
-Any option that splits those crates across gems first needs Tokra on wry
-0.54.3 or later and objc2 0.6.4 or later, the releases that stopped
-panicking on a second copy.
+## The windowing stack
+
+tao, wry, muda, tray-icon, and window-vibrancy share one gem with one
+native library ([ADR 001](../adr/001.md)). wry builds its webview into
+tao's window as a Rust value, muda and window-vibrancy follow the window's
+pointers, tray-icon takes muda's menus as Rust values, and tao and
+tray-icon crash as a second copy, so no split between gems is sound.
+
+Inside the gem each crate has a module of its own, required by its own
+path: `Ferro::Tao`, `Ferro::Wry`, `Ferro::Muda`, `Ferro::TrayIcon`, and
+`Ferro::WindowVibrancy`. Each module answers to its crate alone, by every
+rule a gem of its own would follow, and its files carry that crate's
+license (tao is `Apache-2.0`; the others are `Apache-2.0 OR MIT`). The
+gem's plan names the gem. The name must not be one a crate has, since
+`ferro-<crate>` names that crate's gem.
+
+The gem is not built yet. Until it is, Tokra's own extension is the one
+native home of these crates. The two can never load in one process, so
+Tokra moves from its extension to the gem whole, not a class at a time.
+
+What the gem holds, and what it does not:
+
+- **The crates' APIs,** at the versions Tauri's requirements admit
+  ("Versions and releases"). What Tauri calls comes first; an item nothing
+  calls yet may be deferred in the plan, with that reason.
+- **The machinery any Ruby binding of these crates needs:** using and
+  dropping each platform object on its own thread, waking the loop for
+  Ruby's signals, keeping a Ruby exception out of the crates' frames, and
+  handing the GVL to other Ruby threads while the loop waits
+  ([translation.md](translation.md), "The error rule").
+- **Calls from any Ractor,** where the crate's type allows them: tao's
+  `EventLoopProxy` and wry's `RequestAsyncResponder` at the least, each
+  with a test that starts a Ractor ([translation.md](translation.md),
+  "Ractors").
+- **None of Tauri's own behavior.** Tauri's runtime logic is Ruby in
+  Tokra. Where Tauri's runtime is itself the function the platform calls
+  (a window procedure, a GTK signal handler, a WebView2 event handler),
+  that code is no crate's API, and no Ferro gem holds it as Tauri wrote
+  it.
+
+One question is open. Tokra's Ruby needs a way to be such a platform
+callback. The gem needs a Ruby block called inside a platform callback in
+any case, for wry's handlers that answer at once, such as
+`with_navigation_handler` (wry 0.54.1, `src/lib.rs:1258`). Whether the
+platform crates' own calls on the objects tao and wry hand out (`windows`,
+`gtk`, `webview2-com`, `objc2-app-kit`) are then bound here one to one, by
+need, with a block as the callback, or Tokra reaches the platform from
+Ruby another way, waits for a spike of three things: a block called while
+the platform holds no GVL, a block called inside tao's drain of its
+events, and the cost of a block for each message.
 
 ## Layout
 
