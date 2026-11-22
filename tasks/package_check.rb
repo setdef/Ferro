@@ -183,6 +183,42 @@ class PackageCheck
     end
   end
 
+  # Checks a precompiled gem (plan 015), built here or on another machine:
+  # refuses one that is for every platform, has an extension to compile,
+  # or lacks its compiled extension; installs it into an empty GEM_HOME
+  # with no directory holding cargo or rustc on PATH, failing if RubyGems
+  # built anything; and runs the smoke script against the installed gem.
+  # Its runtime dependencies must already be in Ruby's own gem directory:
+  # no Ferro gem has any once rb_sys is dropped.
+  def precompiled(gem, package)
+    Dir.mktmpdir("ferro-package") do |work|
+      home = File.join(work, "gems")
+      spec = Gem::Package.new(package).spec
+      verify_precompiled(gem, spec)
+      env = isolated_env(home)
+      @out.puts "Installing #{File.basename(package)} with no Rust toolchain on PATH..."
+      output = run!(env.merge("PATH" => self.class.path_without_rust), Gem.ruby, "-S", "gem", "install", "--local",
+        "--no-document", File.expand_path(package), chdir: work)
+      if output.include?("Building native extensions")
+        raise Failure, "#{File.basename(package)} built an extension as it installed:\n#{output}"
+      end
+
+      dir = Dir.glob(File.join(home, "gems", "#{gem.name}-[0-9]*")).first
+      raise Failure, "#{gem.name} did not install into #{home}" unless dir
+
+      smoke(gem, env:, load_paths: [], dir:, mode: "full", allowed: dependency_closure(gem.name, { gem.name => spec }),
+        work:)
+    end
+  end
+
+  # PATH less each directory that holds cargo or rustc.
+  def self.path_without_rust(path = ENV.fetch("PATH", ""))
+    tools = %w[cargo rustc].flat_map { |tool| [tool, "#{tool}.exe"] }
+    path.split(File::PATH_SEPARATOR).reject do |dir|
+      tools.any? { |tool| File.file?(File.join(dir, tool)) }
+    end.join(File::PATH_SEPARATOR)
+  end
+
   # Packaged paths that fall outside the gem's +packaged+ list.
   def self.unexpected_files(gem, contents)
     contents.reject do |path|
@@ -205,6 +241,18 @@ class PackageCheck
     raise Failure, "#{gem.name}: gem build warned:\n#{log}" if log.match?(/^WARNING:/)
 
     package
+  end
+
+  private def verify_precompiled(gem, spec)
+    problems = []
+    problems << "is for every platform" if spec.platform == Gem::Platform::RUBY
+    problems << "has extensions to compile: #{spec.extensions.join(', ')}" if spec.extensions.any?
+    if gem.extension && spec.files.none? { |file| file.start_with?("#{gem.extension}.") }
+      problems << "lacks its compiled extension, #{gem.extension}"
+    end
+    raise Failure, "#{spec.full_name} #{problems.join('; ')}" if problems.any?
+
+    @out.puts "✅ #{spec.full_name}: precompiled, for Ruby #{spec.required_ruby_version}"
   end
 
   private def unpack(package, work)
