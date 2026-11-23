@@ -137,6 +137,13 @@ Makefile honors, so a dependency compiles once. A root check
 (`tasks/pin_check.rb`) fails the gate when two gems pin different magnus
 or rb-sys versions.
 
+A gem that needs a change a crate has not released carries the crate,
+patched, in its own `vendor/` folder, takes it with `[patch.crates-io]`,
+and ships the folder, since an installed gem holds only its own files
+([plan 016](../plan/016.md)). ferro-url carries magnus 0.9.3 so, for
+Ruby 4.1 on Windows; the pin check takes such a copy as agreeing with the
+same version from crates.io.
+
 A gem may also be built precompiled, for one platform and one Ruby, so it
 installs with no Rust ([plan 015](../plan/015.md)). `PlatformGem`
 (`tasks/platform_gem.rb`) builds it from the source gem, not from the
