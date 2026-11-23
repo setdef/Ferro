@@ -1,0 +1,119 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Builds ferro-url's precompiled gems, one per platform, each on its own
+# platform with the Ruby mise.precompiled.toml names, installs each with no Rust on PATH,
+# loads it, and keeps it and its SHA-256 as a workflow artifact (plan 015).
+# It gates nothing. It runs when the maintainer dispatches it, on the
+# branch chosen there and from the sources of the tag given, and for each
+# ferro-url release tag. It publishes nothing: no release, no tag, and no
+# push to RubyGems.org; the maintainer takes the gems from the run's
+# artifacts.
+
+name: Platform gems
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release tag whose sources to build, such as ferro-url/v0.1.0 (empty: the commit dispatched)"
+        required: false
+        default: ""
+  push:
+    tags: ["ferro-url/v*"]
+
+permissions:
+  contents: read
+
+env:
+  # tasks/precompiled.rake defines the tasks for every gem; only ferro-url's
+  # precompiled gems are built and proven so far.
+  GEM: url
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each gem is built natively. A Linux gem needs at least the glibc
+        # of the system it was built on, so it is built on the oldest
+        # Ubuntu runner. No musl gem: no runner runs musl, and an Alpine
+        # app compiles the source gem. No Windows gem: Ferro has no Windows
+        # build on Ruby 4.1 yet.
+        include:
+          - runner: macos-15
+            platform: arm64-darwin
+          - runner: ubuntu-22.04
+            platform: x86_64-linux-gnu
+          - runner: ubuntu-22.04-arm
+            platform: aarch64-linux-gnu
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # The whole history, so a tag's sources can be checked out beside the
+      # tooling (PlatformGem.source_gem).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # Rust from mise.toml, as the gate builds with it. The Ruby is the
+      # one mise.precompiled.toml names, not mise.toml's: a gem built on a
+      # Ruby preview loads only on that preview (tasks/platform_gem.rb).
+      - name: Read the toolchain pins
+        id: pins
+        run: |
+          rust=$(sed -n 's/^rust = "\(.*\)"$/\1/p' mise.toml)
+          ruby=$(sed -n 's/^ruby = "\(.*\)"$/\1/p' mise.precompiled.toml)
+          test -n "$rust" || { echo "::error::no Rust pin in mise.toml"; exit 1; }
+          test -n "$ruby" || { echo "::error::no Ruby pin in mise.precompiled.toml"; exit 1; }
+          {
+            echo "rust=$rust"
+            echo "ruby=$ruby"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: ${{ steps.pins.outputs.rust }}
+
+      # rb-sys's bindgen parses Ruby's headers with libclang.
+      - name: Install libclang
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libclang-dev
+
+      - uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1.335.0
+        with:
+          ruby-version: ${{ steps.pins.outputs.ruby }}
+          bundler-cache: true
+
+      # The source gem of the tag given, or of the commit checked out, its
+      # extension compiled as RubyGems would compile it.
+      - name: Build the gem
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          ruby -v
+          bundle exec rake "package:native:$GEM[$TAG]"
+
+      # From an empty GEM_HOME, with no Rust on PATH, then the gem's smoke
+      # script (tasks/package_check.rb, #precompiled).
+      - name: Install and load the gem
+        run: bundle exec rake "package:deliver:$GEM"
+
+      - name: Record the gem's SHA-256
+        working-directory: pkg
+        run: shasum -a 256 ./*.gem | tee "ferro-$GEM-${{ matrix.platform }}.sha256"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ferro-${{ env.GEM }}-${{ matrix.platform }}
+          path: |
+            pkg/*.gem
+            pkg/*.sha256
+          if-no-files-found: error
