@@ -68,7 +68,7 @@ jobs:
         id: pins
         run: |
           rust=$(sed -n 's/^rust = "\(.*\)"$/\1/p' mise.toml)
-          ruby=$(sed -n 's/^ruby = "\(.*\)"$/\1/p' mise.precompiled.toml)
+          ruby=$(sed -n 's/^ruby = { version = "\([^"]*\)".*/\1/p' mise.precompiled.toml)
           test -n "$rust" || { echo "::error::no Rust pin in mise.toml"; exit 1; }
           test -n "$ruby" || { echo "::error::no Ruby pin in mise.precompiled.toml"; exit 1; }
           {

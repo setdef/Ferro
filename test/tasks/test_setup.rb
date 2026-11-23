@@ -128,6 +128,25 @@ class TestSetup < Minitest::Test
     refute_path_exists @stub
   end
 
+  # Windows sets OS=Windows_NT for every process (plan 016). The Rust is
+  # mise.toml's, as the GNU host toolchain.
+  def test_on_windows_it_adds_the_gnu_toolchain_and_libclang_and_builds_through_windows_env
+    rust = File.read(File.join(ROOT, "mise.toml"))[/^rust = "([^"]+)"$/, 1]
+    options = "--profile minimal --component clippy --component rustfmt"
+    output, status = run_setup({ "OS" => "Windows_NT" })
+
+    assert_predicate status, :success?, output
+    assert_equal [
+      "mise install",
+      "mise x -- rustup toolchain install #{rust}-x86_64-pc-windows-gnu #{options}",
+      "mise x -- python -m pip install --quiet #{REUSE}",
+      "mise x -- python -m pip install --quiet libclang==18.1.1",
+      "mise x -- sh bin/clang-headers",
+      "mise x -- sh bin/windows-env bundle install",
+    ], calls
+    assert_path_exists @stub
+  end
+
   def test_for_the_gate_on_a_ci_runner_it_installs_the_bundle_as_ci_does
     output, status = run_setup({ "CI" => "true" }, "--gate")
 

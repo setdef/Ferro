@@ -7,7 +7,10 @@
 # safe to run again. It asks nothing and never runs sudo. On Linux, the
 # packages CI installs (.github/workflows/ci.yml, "Install display
 # servers") come from bin/linux-env where Debian or Ubuntu lacks them
-# (Plan 013); on another system, install them first.
+# (Plan 013); on another system, install them first. On Windows it runs
+# in MSYS2's bash, and builds for RubyInstaller's Ruby only under
+# MISE_ENV=precompiled, whose mise.precompiled.toml pins that Ruby and the
+# MSYS2 it compiles with (plan 016).
 #
 # With --gate it installs only what the gate needs, and leaves the git
 # hooks alone. .githooks/pre-push runs it so before every push, so a fresh
@@ -32,10 +35,30 @@ if ! command -v mise >/dev/null 2>&1; then
   exit 1
 fi
 
+# Windows sets OS for every process, and MSYS2's bash passes it on.
+windows=false
+[ "${OS:-}" = Windows_NT ] && windows=true
+
 # Ruby, Rust, and Python, pinned in mise.toml
 mise install
+# On Windows, mise's Ruby is RubyInstaller's, a MinGW build, which rb-sys
+# builds only with Rust's GNU target, so Cargo runs the GNU host toolchain
+# of mise.toml's Rust, with CI's components (ci.yml, "Read the toolchain
+# pins"). bin/windows-env selects it.
+if [ "$windows" = true ]; then
+  rust=$(sed -n 's/^rust = "\(.*\)"$/\1/p' "$(dirname "$0")/../mise.toml")
+  mise x -- rustup toolchain install "$rust-x86_64-pc-windows-gnu" --profile minimal --component clippy --component rustfmt
+fi
 # the REUSE tool, at CI's version
 mise x -- python -m pip install --quiet "reuse[charset-normalizer]==6.2.0"
+# On Windows, libclang for bindgen, which reads Ruby's headers: LLVM's own
+# build, from PyPI's libclang wheel, where CI takes the runner's LLVM.
+# The wheel holds libclang alone, so clang's own headers come from LLVM's
+# clang source release of the same version (bin/clang-headers).
+if [ "$windows" = true ]; then
+  mise x -- python -m pip install --quiet "libclang==18.1.1"
+  mise x -- sh bin/clang-headers
+fi
 # A CI runner (CI=true) installs the bundle much as ci.yml's setup-ruby
 # does: locked to Gemfile.lock, in vendor/bundle, which a runner that
 # keeps its checkout or caches that folder has from its last run.
@@ -45,8 +68,13 @@ if [ "${CI:-}" = true ]; then
 fi
 # On Linux, bin/linux-env first brings the packages the machine lacks, so
 # a download that fails stops here, and anything in the bundle that
-# compiles finds them as the gate's compile does.
-mise x -- bin/linux-env bundle install
+# compiles finds them as the gate's compile does. On Windows the bundle
+# builds with what bin/windows-env sets.
+if [ "$windows" = true ]; then
+  mise x -- sh bin/windows-env bundle install
+else
+  mise x -- bin/linux-env bundle install
+fi
 
 # The rest is for a clone a person works in, not for the gate.
 if [ "$gate" = true ]; then
@@ -79,12 +107,13 @@ fi
 # Where core.hooksPath is set, git runs the hooks in that folder and never
 # this clone's, so the stub above runs only if the pre-push hook there
 # hands off to it, and pre-commit refuses to install its own. A CI runner
-# commits nothing.
+# commits nothing. mise.toml leaves pre-commit off Windows, where mise
+# installs it only through pipx.
 hooks_path="$(git config --get core.hooksPath || true)"
 if [ -n "$hooks_path" ]; then
   echo "core.hooksPath is set, so git runs the hooks in $hooks_path, not this clone's:" >&2
   echo "git push runs .githooks/pre-push only if the pre-push hook there runs $stub," >&2
   echo "and pre-commit's hook is not installed." >&2
-elif [ "${CI:-}" != true ]; then
+elif [ "${CI:-}" != true ] && [ "$windows" != true ]; then
   mise x -- pre-commit install
 fi
