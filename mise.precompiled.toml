@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# The Ruby that precompiled gems are built for (plan 015), laid over
+# mise.toml when MISE_ENV=precompiled, so the gate keeps mise.toml's Ruby:
+#
+#   MISE_ENV=precompiled bin/setup --gate
+#   MISE_ENV=precompiled mise x -- bundle exec rake package:native:url
+#
+# It is the Ruby Fledge embeds on macOS and Linux. A gem built on a Ruby
+# preview loads only on that preview (tasks/platform_gem.rb), so this is
+# exactly that version; the Platform gems workflow reads it from here.
+
+# SPDX-SnippetBegin
+# SPDX-License-Identifier: MIT
+# SPDX-SnippetCopyrightText: 2026 setdef <kerrick@setdef.com>
+# SPDX-SnippetComment: Adapted from Fledge's mise.toml at 70ce470e
+#   (setdef/Fledge), its [settings], by way of Tokra's mise.toml.
+#
+# mise finds a precompiled Ruby among jdx/ruby's releases, but not among
+# the ones GitHub marks as prereleases, as jdx/ruby marks 4.1.0-preview1.
+# precompiled_url names jdx/ruby's own asset for each version and
+# platform, so mise downloads the build it would download for a release.
+# ruby.compile = false makes an install fail when that download does,
+# where mise would otherwise compile Ruby with ruby-build, against
+# whatever libraries the computer has: on a Mac with no libyaml, psych
+# could not be configured and the build failed. For a URL it is given,
+# mise checks no artifact attestation, as it does for jdx/ruby's releases.
+[settings]
+ruby.precompiled_url = "https://github.com/jdx/ruby/releases/download/{version}/ruby-{version}.{platform}.tar.gz"
+ruby.compile = false
+# SPDX-SnippetEnd
+
+[tools]
+ruby = "4.1.0-preview1"
