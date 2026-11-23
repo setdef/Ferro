@@ -129,13 +129,27 @@ own history.
 ## Builds
 
 Each gem is its own Cargo workspace with a committed `Cargo.lock`, built
-with `--locked`. An installed gem compiles from its packaged files alone,
+with `--locked`. An installed source gem compiles from its packaged files alone,
 so `workspace = true` inheritance and a root lockfile would not ship.
 During development the root Rakefile points every gem at one shared target
 directory through `RB_SYS_CARGO_TARGET_DIR`, which rb-sys's generated
 Makefile honors, so a dependency compiles once. A root check
 (`tasks/pin_check.rb`) fails the gate when two gems pin different magnus
 or rb-sys versions.
+
+A gem may also be built precompiled, for one platform and one Ruby, so it
+installs with no Rust ([plan 015](../plan/015.md)). `PlatformGem`
+(`tasks/platform_gem.rb`) builds it from the source gem, not from the
+repository: it compiles the packaged extension as RubyGems would, with
+`extconf.rb` given no options, so the test hooks stay off, and packs the
+source gem's files with the extension added, no extension to compile,
+and no `rb_sys` dependency. Each platform builds its own, natively. Its
+platform names no darwin version and names glibc on Linux, and a gem
+built on a Ruby preview requires exactly that preview, whose ABI Ruby
+checks. A released version's precompiled gems are built from its tag's
+sources by the tooling of the commit that runs the build. The Platform
+gems workflow builds ferro-url's and keeps them as artifacts; it
+publishes nothing.
 
 Ruby owns each gem's public API, with RDoc and RBS; the native layer
 defines the wrapped types and private methods that reach the crate, since
