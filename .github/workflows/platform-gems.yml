@@ -63,7 +63,8 @@ jobs:
 
       # Rust from mise.toml, as the gate builds with it. The Ruby is the
       # one mise.precompiled.toml names, not mise.toml's: a gem built on a
-      # Ruby preview loads only on that preview (tasks/platform_gem.rb).
+      # Ruby preview is offered to every prerelease of its release
+      # (tasks/platform_gem.rb).
       - name: Read the toolchain pins
         id: pins
         run: |
