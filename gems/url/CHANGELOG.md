@@ -12,6 +12,10 @@ own API. Releases are tagged `ferro-url/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Fixed
+
+- On Windows with Ruby 4.1, where RubyInstaller makes Ruby's lengths and indices 64 bits and `long` 32, the extension passes them at their own width, through a patched magnus 0.9.3 the gem ships; it passed them as 32 bits.
+
 ## [0.1.0] - 2026-11-05
 
 ### Added

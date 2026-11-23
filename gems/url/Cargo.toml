@@ -7,7 +7,17 @@
 
 [workspace]
 members = ["ext/ferro_url"]
+exclude = ["vendor"]
 resolver = "2"
+
+# magnus 0.9.3 as crates.io serves it, with one change: it passes Ruby
+# 4.1's lengths and indices as rb_len_t, which RubyInstaller's Ruby makes
+# 64 bits where long is 32 (doc/contributors/plan/016.md). The gem ships
+# the folder, so an installed gem builds the same, and Cargo.lock names
+# it as a path package, so --locked holds. It goes when a magnus release
+# has the change.
+[patch.crates-io]
+magnus = { path = "vendor/magnus" }
 
 # Keep symbols in released builds, as the other gems do, so a crash or
 # panic backtrace from an installed gem names Ferro's and url's

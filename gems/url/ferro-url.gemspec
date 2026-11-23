@@ -27,8 +27,9 @@ Gem::Specification.new do |spec|
   spec.metadata["url_version"] = "2.5.8"
 
   # Ship what an installed app loads, what compiles the native extension
-  # against its pinned dependencies, and the license texts.
-  packaged = %w[lib sig ext Cargo.toml Cargo.lock Cargo.lock.license README.rdoc CHANGELOG.md LICENSES]
+  # against its pinned dependencies (vendor holds the patched magnus that
+  # Cargo.toml and Cargo.lock name), and the license texts.
+  packaged = %w[lib sig ext vendor Cargo.toml Cargo.lock Cargo.lock.license README.rdoc CHANGELOG.md LICENSES]
   spec.files = IO.popen(["git", "ls-files", "-z", "--", *packaged], chdir: __dir__, err: IO::NULL) do |ls|
     ls.readlines("\x0", chomp: true)
   end

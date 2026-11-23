@@ -20,6 +20,8 @@ AllCops:
     - "tmp/**/*"
     - "target/**/*"
     - "gems/*/tmp/**/*"
+    # A crate's own sources, vendored and patched (doc/contributors/plan/016.md)
+    - "gems/*/vendor/**/*"
     - "vendor/bundle/**/*"
 
 # RDoc mis-parses endless methods: the methods after one lose their comments

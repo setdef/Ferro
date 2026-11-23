@@ -305,7 +305,7 @@ FERRO_GEMS = [
     name: "ferro-url",
     crate: "ext/ferro_url",
     extension: "lib/ferro/url/ferro_url",
-    packaged: %w[lib sig ext Cargo.toml Cargo.lock Cargo.lock.license README.rdoc CHANGELOG.md LICENSES],
+    packaged: %w[lib sig ext vendor Cargo.toml Cargo.lock Cargo.lock.license README.rdoc CHANGELOG.md LICENSES],
     native_namespace: "Ferro::Url",
     platform_sigs: {},
     rbs_libraries: %w[ipaddr socket],

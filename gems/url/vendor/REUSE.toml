@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: CC0-1.0
+
+version = 1
+
+# magnus 0.9.3 as crates.io serves it, with one change: lengths and
+# indices pass as rb_len_t (doc/contributors/plan/016.md). Its LICENSE is
+# MIT. This file ships in the gem, so the package is REUSE-compliant on
+# its own.
+[[annotations]]
+path = 'magnus/**'
+SPDX-FileCopyrightText = "2021-2023 Matthew Sadler"
+SPDX-License-Identifier = "MIT"
