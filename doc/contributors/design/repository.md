@@ -152,8 +152,14 @@ repository: it compiles the packaged extension as RubyGems would, with
 source gem's files with the extension added, no extension to compile,
 and no `rb_sys` dependency. Each platform builds its own, natively. Its
 platform names no darwin version and names glibc on Linux, and a gem
-built on a Ruby preview requires exactly that preview, whose ABI Ruby
-checks. A released version's precompiled gems are built from its tag's
+built on a Ruby preview or on Ruby's master admits every prerelease of
+its release and not the release, so that one lockfile can hold every
+platform's gem: Bundler writes a platform's gem into a lockfile only when
+the Ruby that locks satisfies the gem's requirement, and a release's gems
+are built on a preview on one system and on master on another. Ruby
+checks a prerelease's ABI and refuses to load such a gem built for
+another, except on Windows, so the gem is offered to prereleases it was
+not built for. A released version's precompiled gems are built from its tag's
 sources by the tooling of the commit that runs the build. The Platform
 gems workflow builds ferro-url's and keeps them as artifacts; it
 publishes nothing.
