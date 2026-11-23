@@ -12,6 +12,10 @@ own API. Releases are tagged `ferro-url/vX.Y.Z`.
 
 ## [Unreleased]
 
+### Changed
+
+- Its precompiled gems admit every prerelease of Ruby 4.1.0, where each required exactly the Ruby it was built on.
+
 ## [0.1.1] - 2026-11-22
 
 ### Fixed
