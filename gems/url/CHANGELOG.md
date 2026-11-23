@@ -12,6 +12,8 @@ own API. Releases are tagged `ferro-url/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-22
+
 ### Fixed
 
 - On Windows with Ruby 4.1, where RubyInstaller makes Ruby's lengths and indices 64 bits and `long` 32, the extension passes them at their own width, through a patched magnus 0.9.3 the gem ships; it passed them as 32 bits.
@@ -58,6 +60,7 @@ own API. Releases are tagged `ferro-url/vX.Y.Z`.
 - `ParseError` with a subclass per variant, and `Error` for url's `Err(())` results. A panic inside url raises `Error` instead of ending the process.
 - Built with url's `serde` and `expose_internals` features.
 
-[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-url/v0.1.0...HEAD
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-url/v0.1.1...HEAD
+[0.1.1]: https://github.com/setdef/Ferro/compare/ferro-url/v0.1.0...ferro-url/v0.1.1
 [0.1.0]: https://github.com/setdef/Ferro/compare/ferro-url/v0.1.0.pre.1...ferro-url/v0.1.0
 [0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-url/v0.1.0.pre.1
