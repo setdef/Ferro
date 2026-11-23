@@ -12,6 +12,8 @@ own API. Releases are tagged `ferro-url/vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-22
+
 ### Changed
 
 - Its precompiled gems admit every prerelease of Ruby 4.1.0, where each required exactly the Ruby it was built on.
@@ -64,7 +66,8 @@ own API. Releases are tagged `ferro-url/vX.Y.Z`.
 - `ParseError` with a subclass per variant, and `Error` for url's `Err(())` results. A panic inside url raises `Error` instead of ending the process.
 - Built with url's `serde` and `expose_internals` features.
 
-[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-url/v0.1.1...HEAD
+[Unreleased]: https://github.com/setdef/Ferro/compare/ferro-url/v0.1.2...HEAD
+[0.1.2]: https://github.com/setdef/Ferro/compare/ferro-url/v0.1.1...ferro-url/v0.1.2
 [0.1.1]: https://github.com/setdef/Ferro/compare/ferro-url/v0.1.0...ferro-url/v0.1.1
 [0.1.0]: https://github.com/setdef/Ferro/compare/ferro-url/v0.1.0.pre.1...ferro-url/v0.1.0
 [0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-url/v0.1.0.pre.1
