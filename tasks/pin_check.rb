@@ -14,6 +14,11 @@
 # makes agreement a gate: every gem's lockfile names the same version and
 # source of each crate below, and every gemspec asks for the same rb_sys
 # gem.
+#
+# A gem may vendor one of these crates, patched, at the version the others
+# lock (doc/contributors/plan/016.md). Its lockfile names it as a path
+# package, with no source, so a local pin agrees with any source of the
+# same version.
 class PinCheck
   # The crates every gem links to talk to Ruby.
   CRATES = %w[magnus rb-sys].freeze
@@ -36,7 +41,9 @@ class PinCheck
     problems << describe("the rb_sys gem", requirements) if requirements.values.uniq.size > 1
     raise Failure, problems.join("\n") if problems.any?
 
-    CRATES.to_h { |crate| [crate, @lockfiles.values.map { |lock| pin(lock, crate) }.compact.first] }
+    CRATES.to_h do |crate|
+      [crate, @lockfiles.values.filter_map { |lock| pin(lock, crate) }.min_by { |pin| local?(pin) ? 1 : 0 }]
+    end
   end
 
   # The <tt>version (source)</tt> a Cargo.lock locks +crate+ at, or +nil+.
@@ -55,7 +62,13 @@ class PinCheck
 
   private def disagreement(crate, pins)
     found = pins.compact
-    describe(crate, found) if found.values.uniq.size > 1
+    versions = found.values.map { |pin| pin.gsub(/ \([^)]*\)/, "") }
+    sourced = found.values.reject { |pin| local?(pin) }
+    describe(crate, found) if versions.uniq.size > 1 || sourced.uniq.size > 1
+  end
+
+  private def local?(pin)
+    pin.include?("(local)")
   end
 
   private def describe(what, pins)

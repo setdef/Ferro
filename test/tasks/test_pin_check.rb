@@ -25,7 +25,7 @@ class TestPinCheck < Minitest::Test
       [[package]]
       name = "magnus"
       version = "#{magnus}"
-      source = "#{magnus_source}"
+      #{%(source = "#{magnus_source}") if magnus_source}
 
       [[package]]
       name = "rb-sys"
@@ -63,6 +63,22 @@ class TestPinCheck < Minitest::Test
     end
 
     assert_includes error.message, "ferro-b: 0.9.3 (#{git})"
+  end
+
+  # A gem that vendors magnus, patched, locks it as a path package, with no
+  # source (doc/contributors/plan/016.md).
+  def test_a_vendored_magnus_of_the_same_version_passes
+    pins = check({ "ferro-a" => lock, "ferro-b" => lock(magnus_source: nil) })
+
+    assert_equal "0.9.3 (#{REGISTRY})", pins["magnus"]
+  end
+
+  def test_a_vendored_magnus_of_another_version_fails
+    error = assert_raises(PinCheck::Failure) do
+      check({ "ferro-a" => lock, "ferro-b" => lock(magnus: "0.9.4", magnus_source: nil) })
+    end
+
+    assert_includes error.message, "ferro-b: 0.9.4 (local)"
   end
 
   def test_a_different_rb_sys_crate_fails
