@@ -253,6 +253,8 @@ GitHub repository has issues turned off. Name the gem and its version,
 your operating system, `ruby -v` and `rustc -V`, the code you ran, and
 its full output.
 
+Report a security problem privately, as [SECURITY.md](SECURITY.md) says, never on the forum.
+
 ## Contributing
 
 Ferro's rules for people and agents alike are in [AGENTS.md](AGENTS.md),
