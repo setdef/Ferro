@@ -5,10 +5,10 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Changelog
 
-All notable changes to ferro-time are recorded here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the gem
-follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for its
-own API. Releases are tagged `ferro-time/vX.Y.Z`.
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
@@ -98,8 +98,8 @@ own API. Releases are tagged `ferro-time/vX.Y.Z`.
 - `Error` with a class for each of time's error types and variants, and time's messages. Inputs time panics on raise `RangeError` with time's message instead of ending the process.
 
 [Unreleased]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0...HEAD
-[0.1.0]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.4...ferro-time/v0.1.0
-[0.1.0.pre.4]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.3...ferro-time/v0.1.0.pre.4
-[0.1.0.pre.3]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.2...ferro-time/v0.1.0.pre.3
-[0.1.0.pre.2]: https://github.com/setdef/Ferro/compare/ferro-time/v0.1.0.pre.1...ferro-time/v0.1.0.pre.2
+[0.1.0]: https://github.com/setdef/Ferro/releases/tag/ferro-time/v0.1.0
+[0.1.0.pre.4]: https://github.com/setdef/Ferro/releases/tag/ferro-time/v0.1.0.pre.4
+[0.1.0.pre.3]: https://github.com/setdef/Ferro/releases/tag/ferro-time/v0.1.0.pre.3
+[0.1.0.pre.2]: https://github.com/setdef/Ferro/releases/tag/ferro-time/v0.1.0.pre.2
 [0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-time/v0.1.0.pre.1

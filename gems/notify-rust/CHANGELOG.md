@@ -5,10 +5,10 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Changelog
 
-All notable changes to ferro-notify-rust are recorded here. The format
-follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
-gem follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for
-its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
@@ -25,7 +25,7 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 
 ### Changed
 
-- On Linux, a `NotificationHandle` setter or `update` while another thread's `wait_for_action_async` or `close_async` runs waits for it to end, which Ctrl-C, `Thread#raise`, and `Thread#kill` can cut short, instead of raising `Error` ("already borrowed"); any call while `update` runs waits for it instead of raising ("already mutably borrowed"). From a signal trap on the waiting thread itself it raises `ThreadError`. Breaking: code that rescued `Error` for "already borrowed" or "already mutably borrowed" now waits, or gets `ThreadError`.
+- **Breaking:** On Linux, a `NotificationHandle` setter or `update` while another thread's `wait_for_action_async` or `close_async` runs waits for it to end, which Ctrl-C, `Thread#raise`, and `Thread#kill` can cut short, instead of raising `Error` ("already borrowed"); any call while `update` runs waits for it instead of raising ("already mutably borrowed"). From a signal trap on the waiting thread itself it raises `ThreadError`. Code that rescued `Error` for "already borrowed" or "already mutably borrowed" now waits, or gets `ThreadError`.
 - `Error::Conversion.new(reason)` builds notify-rust's message, `Conversion Error: ` and the reason, as `ErrorKind::Conversion` displays it; errors notify-rust raises keep the same message.
 - **Breaking:** a `NotificationHandle` works until a call that notify-rust's takes `self` for: `wait_for_action`, `wait_for_response`, `on_close`, and on Linux `close`, and the end of `show`'s block, where Rust drops it. Any later call on it raises `IOError`, instead of waiting again (Linux), returning without calling its block (macOS, Windows), or raising `Error` (Windows setters). On macOS, `show` without a block uses the handle up at once. On Linux, `wait_for_action_async` and `close_async` borrow the handle and leave it usable, and a used-up handle frees its D-Bus connection then, once any borrowing call ends, rather than when garbage-collected; a setter or `update` waiting for its turn then raises `IOError`.
 - **Breaking:** a Linux `Future` answers once, as `.await` takes a Rust future: the `value` that returns or raises its outcome uses it up, and a later `value` raises `IOError`; `dup` and `clone` raise `TypeError`.
@@ -75,8 +75,8 @@ its own API. Releases are tagged `ferro-notify-rust/vX.Y.Z`.
 - Built with notify-rust's `z` (zbus), `images`, and `chrono` features; `d`, `tokio`, `debug_namespace`, and `preview-macos-un` are not built.
 
 [Unreleased]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0...HEAD
-[0.1.0]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.4...ferro-notify-rust/v0.1.0
-[0.1.0.pre.4]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.3...ferro-notify-rust/v0.1.0.pre.4
-[0.1.0.pre.3]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.2...ferro-notify-rust/v0.1.0.pre.3
-[0.1.0.pre.2]: https://github.com/setdef/Ferro/compare/ferro-notify-rust/v0.1.0.pre.1...ferro-notify-rust/v0.1.0.pre.2
+[0.1.0]: https://github.com/setdef/Ferro/releases/tag/ferro-notify-rust/v0.1.0
+[0.1.0.pre.4]: https://github.com/setdef/Ferro/releases/tag/ferro-notify-rust/v0.1.0.pre.4
+[0.1.0.pre.3]: https://github.com/setdef/Ferro/releases/tag/ferro-notify-rust/v0.1.0.pre.3
+[0.1.0.pre.2]: https://github.com/setdef/Ferro/releases/tag/ferro-notify-rust/v0.1.0.pre.2
 [0.1.0.pre.1]: https://github.com/setdef/Ferro/releases/tag/ferro-notify-rust/v0.1.0.pre.1

@@ -5,10 +5,10 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Changelog
 
-All notable changes to ferro-arboard are recorded here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the gem
-follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for its
-own API. Releases are tagged `ferro-arboard/vX.Y.Z`.
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
@@ -44,5 +44,5 @@ own API. Releases are tagged `ferro-arboard/vX.Y.Z`.
 - Calls that can block (Linux reads and waiting writes) release Ruby's global VM lock, so other threads run meanwhile; the extension is Ractor-safe, and a frozen `Clipboard` is shareable.
 
 [Unreleased]: https://github.com/setdef/Ferro/compare/ferro-arboard/v0.1.0...HEAD
-[0.1.0]: https://github.com/setdef/Ferro/compare/ferro-arboard/v0.1.0.pre.2...ferro-arboard/v0.1.0
+[0.1.0]: https://github.com/setdef/Ferro/releases/tag/ferro-arboard/v0.1.0
 [0.1.0.pre.2]: https://github.com/setdef/Ferro/releases/tag/ferro-arboard/v0.1.0.pre.2

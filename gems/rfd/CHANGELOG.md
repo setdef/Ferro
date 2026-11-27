@@ -5,10 +5,10 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Changelog
 
-All notable changes to ferro-rfd are recorded here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the gem
-follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for its
-own API. Releases are tagged `ferro-rfd/vX.Y.Z`.
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
@@ -29,10 +29,10 @@ own API. Releases are tagged `ferro-rfd/vX.Y.Z`.
 - **Breaking:** a window handle rfd cannot use here raises `ArgumentError` with rfd's whole panic text, `internal error: entered unreachable code: ` included.
 - **Breaking:** on macOS, a dialog started off the main thread with no running app raises `Ferro::Rfd::Error` as rfd's caught panic would, `rfd panicked: ` before rfd's message.
 - **Breaking:** on macOS, `debug` with an `AppKitWindowHandle` parent, from another thread with no running app, raises `ThreadError`; `inspect` raised `Ferro::Rfd::Error`.
-- `MessageButtons` and `MessageDialogResult` are modules, so `MessageButtons::OkCustom` and its siblings are `MessageButtons`, and `MessageDialogResult::Custom` is a `MessageDialogResult`. Breaking: both were classes, which code could subclass, and `MessageButtons::Ok.class` and `MessageDialogResult::Ok.instance_of?(MessageDialogResult)` no longer answer the enum, as the constants are instances of a private class that includes the module.
-- `set_can_create_directories` takes only `true` or `false`, and raises `TypeError` for anything else, as rfd's `bool` does. Breaking: it took any truthy value.
-- On macOS, an `AppKitWindowHandle` parent whose window number names no window of the app, or a window without a content view, raises `ArgumentError` with the same message. Breaking: it raised `Ferro::Rfd::Error`.
-- On macOS, `Future#value` on the main thread for a sheet that finishes on the main run loop raises `ThreadError` with the same message. Breaking: it raised `Ferro::Rfd::Error`.
+- **Breaking:** `MessageButtons` and `MessageDialogResult` are modules, so `MessageButtons::OkCustom` and its siblings are `MessageButtons`, and `MessageDialogResult::Custom` is a `MessageDialogResult`. Both were classes, which code could subclass, and `MessageButtons::Ok.class` and `MessageDialogResult::Ok.instance_of?(MessageDialogResult)` no longer answer the enum, as the constants are instances of a private class that includes the module.
+- **Breaking:** `set_can_create_directories` takes only `true` or `false`, and raises `TypeError` for anything else, as rfd's `bool` does. It took any truthy value.
+- **Breaking:** On macOS, an `AppKitWindowHandle` parent whose window number names no window of the app, or a window without a content view, raises `ArgumentError` with the same message. It raised `Ferro::Rfd::Error`.
+- **Breaking:** On macOS, `Future#value` on the main thread for a sheet that finishes on the main run loop raises `ThreadError` with the same message. It raised `Ferro::Rfd::Error`.
 
 ### Fixed
 
@@ -66,6 +66,6 @@ own API. Releases are tagged `ferro-rfd/vX.Y.Z`.
 - On Linux, rfd's XDG desktop portal backend (rfd's default); its GTK backend and Windows' `common-controls-v6` are not built.
 
 [Unreleased]: https://github.com/setdef/Ferro/compare/ferro-rfd/v0.1.0...HEAD
-[0.1.0]: https://github.com/setdef/Ferro/compare/ferro-rfd/v0.1.0.pre.3...ferro-rfd/v0.1.0
-[0.1.0.pre.3]: https://github.com/setdef/Ferro/compare/ferro-rfd/v0.1.0.pre.2...ferro-rfd/v0.1.0.pre.3
+[0.1.0]: https://github.com/setdef/Ferro/releases/tag/ferro-rfd/v0.1.0
+[0.1.0.pre.3]: https://github.com/setdef/Ferro/releases/tag/ferro-rfd/v0.1.0.pre.3
 [0.1.0.pre.2]: https://github.com/setdef/Ferro/releases/tag/ferro-rfd/v0.1.0.pre.2
